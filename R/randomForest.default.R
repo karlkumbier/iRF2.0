@@ -15,7 +15,7 @@ mylevels <- function(x) if (is.factor(x)) levels(x) else 0
              proximity, oob.prox=proximity,
              norm.votes=TRUE, do.trace=FALSE,
              keep.forest=!is.null(y) && is.null(xtest), corr.bias=FALSE,
-             keep.inbag=FALSE, ...) {
+             keep.inbag=FALSE, track.nodes=FALSE,...) {
 
         if (length(mtry_select_prob)!=ncol(x))
             stop('length of mtry_select_prob != ncol(x)')
@@ -222,6 +222,18 @@ mylevels <- function(x) if (is.factor(x)) levels(x) else 0
     }
     nt <- if (keep.forest) ntree else 1
 
+    # pre allocate matrices for tracking feature and observation data at each
+    # node
+    if (track.nodes) {
+      feat.offset <- trunc(n * (log(nrnodes + 1, base=2) - 1))
+      feature.nodes <- matrix(0L, nrow=feat.offset, ncol=ntree)
+      obs.nodes <- matrix(0L, nrow=n, ncol=ntree)
+    } else {
+      feature.nodes <- 0L
+      obs.nodes <- 0L
+      feat.offset <- 0
+    }
+
     if (classRF) {
         cwt <- classwt
         threshold <- cutoff
@@ -249,6 +261,10 @@ mylevels <- function(x) if (is.factor(x)) levels(x) else 0
                     ntree = as.integer(ntree),
                     mtry = as.integer(mtry),
                     selprob = as.double(mtry_select_prob),
+                    featurenodes = feature.nodes,
+                    obsnodes = obs.nodes,
+                    featoffest = feat.offset,
+                    tracknodes = as.integer(track.nodes),
                     subsetVar = subsetVar, 
                     subsetVarCard = ifelse(is.null(keep_subset_var)
                                          , as.integer(0)
@@ -370,6 +386,8 @@ mylevels <- function(x) if (is.factor(x)) levels(x) else 0
                              nrnodes = max.nodes, ntree = ntree,
                              nclass = nclass, xlevels=xlevels)
                     },
+                    feature.nodes = rfout$featurenodes,
+                    obs.nodes = rfout$obsnodes,
                     y = if (addclass) NULL else y,
                     test = if(!testdat) NULL else list(
                     predicted = out.class.ts,

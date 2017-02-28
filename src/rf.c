@@ -40,6 +40,10 @@ void F77_SUB(rrand)(double *r) { *r = unif_rand(); }
 void classRF(double *x, int *dimx, int *cl, int *ncl, int *cat, int *maxcat,
 	     int *sampsize, int *strata, int *Options, int *ntree, int *nvar,
              double *selprob,
+             int *featurenodes,
+             int *obsnodes,
+             int *featoffset,
+             int *tracknodes,
              int *subsetVar,
              int *subsetVarCard,
 	     int *ipi, double *classwt, double *cut, int *nodesize,
@@ -97,13 +101,14 @@ void classRF(double *x, int *dimx, int *cl, int *ncl, int *cat, int *maxcat,
 	oobprox, keepf, replace, stratify, trace, *nright,
 	*nrightimp, *nout, *nclts, Ntree;
 	
-    int ii, jj, tmpcheck, subsetCard;
+    int tmpcheck, subsetCard;
 
     int *out, *bestsplitnext, *bestsplit, *nodepop, *jin, *nodex,
 	*nodexts, *nodestart, *ta, *ncase, *jerr, *varUsed,
 	*jtr, *classFreq, *idmove, *jvr,
 	*at, *a, *b, *mind, *nind, *jts, *oobpair;
     int **strata_idx, *strata_size, last, ktmp, nEmpty, ntry;
+    int *featuremat, *obsmat;
 
     double av=0.0, delta=0.0;
 
@@ -168,6 +173,9 @@ void classRF(double *x, int *dimx, int *cl, int *ncl, int *cat, int *maxcat,
     nright =        (int *) S_alloc(nclass, sizeof(int));
     nrightimp =     (int *) S_alloc(nclass, sizeof(int));
     nout =          (int *) S_alloc(nclass, sizeof(int));
+    featuremat =    (int *) S_alloc(mdim * *nrnodes, sizeof(int));
+    obsmat =        (int *) S_alloc(nsample * *nrnodes, sizeof(int));
+
     if (oobprox) {
     	oobpair = (int *) S_alloc(near*near, sizeof(int));
     }
@@ -350,11 +358,40 @@ void classRF(double *x, int *dimx, int *cl, int *ncl, int *cat, int *maxcat,
 								ta, nrnodes, idmove, &ndsize, ncase,
 								&mtry, 
 								selprob,
+                featuremat,
+                obsmat,
                                                                 subsetVar, &subsetCard,
 								varUsed, nodeclass + idxByNnode,
 								ndbigtree + jb, win, wr, wl, &mdim,
 								&nuse, mind, &tmpcheck);
 			/* if the "tree" has only the root node, start over */
+
+      /* store node level observation and feature data for each tree */
+      if (*tracknodes == 1) {
+        int varArrayCt = 0;
+        int leafct = 0;
+        
+        for (int i = 0; i < (*nrnodes); i++) {
+
+          /* Track the node number that
+           * observation n lands in*/
+          if (nodestatus[i + jb * (*nrnodes)] == -1) {
+            leafct += 1;
+            for (n = 0; n < nsample; n++) {
+              if (obsmat[n + i * nsample] > 0) {
+                obsnodes[n + jb * nsample] = leafct;
+              }
+            }
+          }
+
+          for (int m = 0; m < mdim; m++) {
+            if (featuremat[m + i * mdim] > 0) {
+              featurenodes[varArrayCt + jb * (*featoffset)] = m + i * mdim;
+              varArrayCt += 1;
+            }
+          }
+        }
+      }
 		}  while (ndbigtree[jb] == 1);
 
 		Xtranslate(x, mdim, *nrnodes, nsample, bestvar + idxByNnode,
