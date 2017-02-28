@@ -366,23 +366,10 @@ void classRF(double *x, int *dimx, int *cl, int *ncl, int *cat, int *maxcat,
 								&nuse, mind, &tmpcheck);
 			/* if the "tree" has only the root node, start over */
 
-      /* store node level observation and feature data for each tree */
+      /* track features on decision path for each node in forest */
       if (*tracknodes == 1) {
         int varArrayCt = 0;
-        int leafct = 0;
-
         for (int i = 0; i < (*nrnodes); i++) {
-
-          /* Track the node number that
-           * observation n lands in*/
-          if (nodestatus[i + jb * (*nrnodes)] == -1) {
-            leafct += 1;
-            for (n = 0; n < nsample; n++) {
-              if (obsmat[n + i * nsample] > 0) {
-                obsnodes[n + jb * nsample] = leafct;
-              }
-            }
-          }
 
           for (int m = 0; m < mdim; m++) {
             if (featuremat[m + i * mdim] > 0) {
@@ -415,6 +402,13 @@ void classRF(double *x, int *dimx, int *cl, int *ncl, int *cat, int *maxcat,
                          bestvar + idxByNnode,
                          nodeclass + idxByNnode, ndbigtree[jb],
                          cat, nclass, jtr, nodex, *maxcat);
+     
+       /* track which leaf node each observation falls into */ 
+        if (*tracknodes == 1) {
+          for (int n = 0; n < nsample; n++) {
+            obsnodes[n + jb * nsample] = nodex[n];
+          }
+        }
 
 		zeroInt(nout, nclass);
 		noutall = 0;

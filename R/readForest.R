@@ -46,7 +46,8 @@ readForest <- function(rfobj  # a randomForest object with forest component in i
   }
 
   tt <- matrix(0L, nrow=n, ncol=nrow(out$tree_info))
-  obs.nodes <- rfobj$obs.node - 1
+  obs.nodes <- rfobj$obs.node
+  obs.nodes <- apply(obs.nodes, MAR=2, matchOrder) - 1
   leaf.obs <- nodeObs(obs.nodes, n, ntree, n.node.t.sub, tt)
   out$tree_info$size_node <- colSums(leaf.obs)
 
@@ -55,3 +56,8 @@ readForest <- function(rfobj  # a randomForest object with forest component in i
   return(out)
 }
 
+matchOrder <- function(x) {
+  x.sorted <- sort(unique(x))
+  x.matched <- match(x, x.sorted)
+  return(x.matched)
+}
