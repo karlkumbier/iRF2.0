@@ -370,7 +370,7 @@ void classRF(double *x, int *dimx, int *cl, int *ncl, int *cat, int *maxcat,
       if (*tracknodes == 1) {
         int varArrayCt = 0;
         int leafct = 0;
-        
+
         for (int i = 0; i < (*nrnodes); i++) {
 
           /* Track the node number that
@@ -392,7 +392,7 @@ void classRF(double *x, int *dimx, int *cl, int *ncl, int *cat, int *maxcat,
           }
         }
       }
-		}  while (ndbigtree[jb] == 1);
+    }  while (ndbigtree[jb] == 1);
 
 		Xtranslate(x, mdim, *nrnodes, nsample, bestvar + idxByNnode,
 				   bestsplit, bestsplitnext, xbestsplit + idxByNnode,

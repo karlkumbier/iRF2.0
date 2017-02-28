@@ -263,7 +263,7 @@ mylevels <- function(x) if (is.factor(x)) levels(x) else 0
                     selprob = as.double(mtry_select_prob),
                     featurenodes = feature.nodes,
                     obsnodes = obs.nodes,
-                    featoffest = feat.offset,
+                    featoffest = as.integer(feat.offset),
                     tracknodes = as.integer(track.nodes),
                     subsetVar = subsetVar, 
                     subsetVarCard = ifelse(is.null(keep_subset_var)
@@ -388,6 +388,7 @@ mylevels <- function(x) if (is.factor(x)) levels(x) else 0
                     },
                     feature.nodes = rfout$featurenodes,
                     obs.nodes = rfout$obsnodes,
+                    nrnodes = rfout$nrnodes,
                     y = if (addclass) NULL else y,
                     test = if(!testdat) NULL else list(
                     predicted = out.class.ts,

@@ -1,4 +1,5 @@
 useDynLib(iRF)
+importFrom(Rcpp, evalCpp)
 
 export(combine, getTree, grow, importance, margin, MDSplot, na.roughfix,
        partialPlot, randomForest, rfImpute, treesize, tuneRF,

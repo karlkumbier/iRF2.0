@@ -83,38 +83,34 @@ for (iter in 1:n_iter){
    if (find_interaction == TRUE){
       if (verbose){cat('finding interactions ... ')}
 
-      interact_list[[iter]] = list()
-      Stability_Score[[iter]] = list()
-      
+      Stability_Score[[iter]] = list()      
       n1 = sum(y==1); n0 = sum(y==0)
 
       # 2.1: find interactions in  multiple bootstrap samples to assess stability
-      for (i_b in 1:n_bootstrap){
+      interact_list[[iter]] <- mclapply(1:n_bootstrap, function(i_b) {
          if (verbose){cat(paste('b = ', i_b, ';  ', '\n', sep=''))}
 
          sample_id = c(sample(which(y==0), n0, replace=TRUE)
-                     , sample(which(y==1), n1, replace=TRUE)
-                      )
+                     , sample(which(y==1), n1, replace=TRUE))
+
          #2.1.1: fit random forest
-         rf_b <- foreach(nt=ntree_id, .combine=combine
-                     , .multicombine=TRUE, .packages='iRF')%dopar%{
-               randomForest(x[sample_id,]
+         rf_b <- randomForest(x[sample_id,]
                           , y[sample_id]
                           , xtest
                           , ytest
-                          , ntree=nt
+                          , ntree=ntree
                           , mtry_select_prob = mtry_select_prob
                           , keep_subset_var = keep_subset_var
                           , keep.forest=TRUE
+                          , track.nodes=TRUE
                           , ...
                            )
-          }
+          
         # 2.1.2: select large leaf nodes
         rforest_b = readForest(rf_b, X = x[sample_id,]
                              , return_node_feature = TRUE
                              , return_node_data = FALSE
                              , leaf_node_only = TRUE
-                             , verbose = verbose
                               )
 
         select_leaf_id = rforest_b$tree_info$prediction == (as.numeric(class_id) + 1)
@@ -127,12 +123,10 @@ for (iter in 1:n_iter){
         if (!sum(select_leaf_id)){
             if (verbose) print('no large node - not running RIT!')
             interact_list[[iter]][[i_b]] = character(0)
-        }
-        else if (sum(select_leaf_id) == 1){
+        } else if (sum(select_leaf_id) == 1){
             if (verbose) print('only one large node - not running RIT!')
             interact_list[[iter]][[i_b]] = paste(which(as.vector(nf)!=0), collapse='_')
-        }
-        else{
+        } else{
         
         # grp features, if specified
         if (!is.null(varnames_grp))
@@ -140,29 +134,27 @@ for (iter in 1:n_iter){
 
         # drop features, if cutoff_unimp_feature is specified
         if (cutoff_unimp_feature > 0){
-            if (ncol(rf_b$importance) == 1)
-                rfimp = rf_b$importance
-            else
-                rfimp = rf_b$importance[,4]
-            
-            drop_id = which(rfimp < quantile(rfimp, prob=cutoff_unimp_feature))
-            nf[,drop_id] = FALSE
+          if (ncol(rf_b$importance) == 1)
+            rfimp = rf_b$importance
+          else
+            rfimp = rf_b$importance[,4]
+
+          drop_id = which(rfimp < quantile(rfimp, prob=cutoff_unimp_feature))
+          nf[,drop_id] = FALSE
         }
-         
+
         rforest_b$node_feature = nf   
-        interact_list[[iter]][[i_b]] =
-                ritfun(rforest_b
-                     , node_sample = node_sample 
-                     , tree_depth = rit_param[1]
-                     , n_ritree = rit_param[2]
-                     , n_child = rit_param[3]
-                     , varnames = NULL
-                     , verbose = verbose
-                      )
+        return(ritfun(rforest_b
+                      , node_sample = node_sample 
+                      , tree_depth = rit_param[1]
+                      , n_ritree = rit_param[2]
+                      , n_child = rit_param[3]
+                      , varnames = NULL
+                      , verbose = verbose
+                      ))
         }
 
-
-      } # end for (i_b in ... )
+      }, mc.cores=n_core) # end for (i_b in ... )
 
    # 2.2: calculate stability scores of interactions
    if (!is.null(varnames_grp))
@@ -175,6 +167,7 @@ for (iter in 1:n_iter){
    Stability_Score[[iter]] =
    summarize_interact(interact_list[[iter]]
                     , varnames = vnames_new)
+   
       
    } # end if (find_interaction)
    
@@ -209,8 +202,11 @@ return(out)
 
 subsetReadForest <- function(rforest, subset_idcs) {
   # subset nodes from readforest output 
-  rforest$node_feature <- rforest$node_feature[subset_idcs,]
-  rforest$node_data <- rforest$node_data[subset_idcs,]
+  if (!is.null(rforest$node_feature)) 
+    rforest$node_feature <- t(rforest$node_feature[,subset_idcs])
+  if (!is.null(rforest$node_data)) 
+    rforest$node_data <- t(rforest$node_data[,subset_idcs])
+  if(!is.null(rforest$tree_info))
   rforest$tree_info <- rforest$tree_info[subset_idcs,]
   return(rforest)
 }
