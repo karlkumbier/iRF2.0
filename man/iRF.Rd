@@ -31,9 +31,12 @@
   retained during random splitting variable selection in the next iteration}
   \item{find_interaction}{find stable feature interaction using random
     intersection trees?}
-  \item{cutoff_nodesize_prop}{a non-negative fraction p. Only leaf nodes
-    containing at least a fraction p of the observations from clas 
-    \code{class_id} are used to find feature interactions}
+  \item{node_sample}{a named list containing two entries (1) \code{subset} a
+    function that takes the output of \code{getTree} as an input and returns a
+    vector of indices, specifying which nodes to keep for RIT. (2) \code{wt} a
+    function that takes the output of \code{getTree} as an input and retruns a
+    vector of weights, specifying the probability with which RIT will sample
+    each node.}
   \item{cutoff_unimp_feature}{a non-negative fraction r. If provided,
     only features with Gini importance score in the top 100*(1-r)
     percentile are used to find feature interactions}

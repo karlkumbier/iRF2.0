@@ -1,12 +1,21 @@
-ritfun=function(node_feature
+ritfun=function(rforest
+               , node_sample=list(subset=function(x) seq(nrow(x)),
+                                  wt=function(x) x$size_node)
                , tree_depth=5
                , n_child=2
                , n_ritree=500
                , varnames=NULL
                , verbose=TRUE
-               , node_wt = NULL
               ){
-   if (!is.matrix(node_feature))
+   
+  
+  node_subset = node_sample$subset(rforest$tree_info)
+  rforest$tree_info = rforest$tree_info[node_subset,]
+  rforest$node_feature = rforest$node_feature[node_subset,]
+  node_wt = node_sample$wt(rforest$tree_info)
+  node_feature = rforest$node_feature
+
+  if (!is.matrix(node_feature))
        stop('in ritfun(), input node_feature is not a matrix !')
 
    if (nrow(node_feature)==1)

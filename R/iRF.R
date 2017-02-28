@@ -11,7 +11,8 @@ iRF <- function(x
               , mtry_select_prob = rep(1/ncol(x), ncol(x))
               , keep_impvar_quantile = NULL 
               , find_interaction = FALSE
-              , cutoff_nodesize_prop = 0.1
+              , node_sample = list(subset=function(x) seq(nrow(x)),
+                                   wt=function(x) x$size_node)
               , cutoff_unimp_feature = 0
               , class_id = 1
               , rit_param = c(5, 1000, 2) # c(rit depth (D), n_rit (M), n_child)
@@ -116,13 +117,12 @@ for (iter in 1:n_iter){
                              , verbose = verbose
                               )
 
-        cutoff_nodesize = cutoff_nodesize_prop*ifelse(class_id == 1, n1, n0)
-        select_leaf_id = rforest_b$tree_info$size_node > cutoff_nodesize &
-                         rforest_b$tree_info$prediction == (as.numeric(class_id)+1)
+        select_leaf_id = rforest_b$tree_info$prediction == (as.numeric(class_id) + 1)
                          # since tree predictions are saved as 1, 2 for binary classification
 
         # 2.1.3: apply random intersection trees
-        nf = rforest_b$node_feature[select_leaf_id,]
+        rforest_b = subsetReadForest(rforest_b, select_leaf_id)
+        nf = rforest_b$node_feature
 
         if (!sum(select_leaf_id)){
             if (verbose) print('no large node - not running RIT!')
@@ -148,9 +148,11 @@ for (iter in 1:n_iter){
             drop_id = which(rfimp < quantile(rfimp, prob=cutoff_unimp_feature))
             nf[,drop_id] = FALSE
         }
-            
+         
+        rforest_b$node_feature = nf   
         interact_list[[iter]][[i_b]] =
-                ritfun(node_feature = nf
+                ritfun(rforest_b
+                     , node_sample = node_sample 
                      , tree_depth = rit_param[1]
                      , n_ritree = rit_param[2]
                      , n_child = rit_param[3]
@@ -203,4 +205,12 @@ if (find_interaction == TRUE){
 }
     
 return(out)
+}
+
+subsetReadForest <- function(rforest, subset_idcs) {
+  # subset nodes from readforest output 
+  rforest$node_feature <- rforest$node_feature[subset_idcs,]
+  rforest$node_data <- rforest$node_data[subset_idcs,]
+  rforest$tree_info <- rforest$tree_info[subset_idcs,]
+  return(rforest)
 }
