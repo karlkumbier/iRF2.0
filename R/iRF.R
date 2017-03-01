@@ -113,6 +113,7 @@ for (iter in 1:n_iter){
                              , leaf_node_only = TRUE
                               )
 
+        # we can move this into readForest function
         select_leaf_id = rforest_b$tree_info$prediction == (as.numeric(class_id) + 1)
                          # since tree predictions are saved as 1, 2 for binary classification
 
@@ -129,8 +130,10 @@ for (iter in 1:n_iter){
         } else{
         
         # grp features, if specified
-        if (!is.null(varnames_grp))
+        if (!is.null(varnames_grp)) {
+            warning("groupFeature may not work for sparse matrices")
             nf = groupFeature(nf, grp = varnames_grp)
+        }
 
         # drop features, if cutoff_unimp_feature is specified
         if (cutoff_unimp_feature > 0){
@@ -143,15 +146,10 @@ for (iter in 1:n_iter){
           nf[,drop_id] = FALSE
         }
 
-        rforest_b$node_feature = nf   
-        return(ritfun(rforest_b
-                      , node_sample = node_sample 
-                      , tree_depth = rit_param[1]
-                      , n_ritree = rit_param[2]
-                      , n_child = rit_param[3]
-                      , varnames = NULL
-                      , verbose = verbose
-                      ))
+        interactions <- RIT(nf, depth=rit_param[1], n_trees=rit_param[2], branch=rit_param[3])   
+        interactions <- interactions$Interaction 
+        interactions <- gsub(' ', '_', interactions)
+        return(interactions)       
         }
 
       }, mc.cores=n_core) # end for (i_b in ... )
@@ -203,7 +201,7 @@ return(out)
 subsetReadForest <- function(rforest, subset_idcs) {
   # subset nodes from readforest output 
   if (!is.null(rforest$node_feature)) 
-    rforest$node_feature <- t(rforest$node_feature[,subset_idcs])
+    rforest$node_feature <- rforest$node_feature[subset_idcs,]
   if (!is.null(rforest$node_data)) 
     rforest$node_data <- t(rforest$node_data[,subset_idcs])
   if(!is.null(rforest$tree_info))

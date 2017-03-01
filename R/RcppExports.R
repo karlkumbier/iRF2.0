@@ -5,7 +5,7 @@ nodeObs <- function(obsnodes, n, ntree, nrnodes, nodeobs) {
     .Call('iRF_nodeObs', PACKAGE = 'iRF', obsnodes, n, ntree, nrnodes, nodeobs)
 }
 
-nodeVars <- function(varnodes, p, ntree, maxnodes, nr, nrnodes, nodevars, idcskeep) {
-    .Call('iRF_nodeVars', PACKAGE = 'iRF', varnodes, p, ntree, maxnodes, nr, nrnodes, nodevars, idcskeep)
+nodeVars <- function(varnodes, p, ntree, nnodes, idcskeep, nodect, nnodest, nodevars) {
+    .Call('iRF_nodeVars', PACKAGE = 'iRF', varnodes, p, ntree, nnodes, idcskeep, nodect, nnodest, nodevars)
 }
 
