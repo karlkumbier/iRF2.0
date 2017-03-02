@@ -11,7 +11,7 @@ iRF <- function(x
               , mtry_select_prob = rep(1/ncol(x), ncol(x))
               , keep_impvar_quantile = NULL 
               , find_interaction = FALSE
-              , node_sample = list(subset=function(x) seq(nrow(x)),
+              , node_sample = list(subset=function(x) rep(TRUE, nrow(x)),
                                    wt=function(x) x$size_node)
               , cutoff_unimp_feature = 0
               , class_id = 1
@@ -105,13 +105,14 @@ for (iter in 1:n_iter){
                           , track.nodes=TRUE
                           , ...
                            )
-          
         # 2.1.2: select large leaf nodes
         rforest_b = readForest(rf_b, X = x[sample_id,]
                              , return_node_feature = TRUE
                              , return_node_data = FALSE
-                             , leaf_node_only = TRUE
-                              )
+                             , leaf_node_only = TRUE)
+                             #, subsetFun = node_sample$subset
+                             #, wtFun = node_sample$wt
+                            #)
 
         # we can move this into readForest function
         select_leaf_id = rforest_b$tree_info$prediction == (as.numeric(class_id) + 1)

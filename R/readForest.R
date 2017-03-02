@@ -4,8 +4,10 @@ readForest <- function(rfobj  # a randomForest object with forest component in i
                        , return_node_feature=TRUE
                        , return_node_data=TRUE
                        , leaf_node_only = TRUE
+                       , subsetFun = function(x) rep(TRUE, nrow(x))
+                       , wtFun = function(x) x$size_node
                        ){
-
+  
   if (is.null(rfobj$forest))
     stop('No Forest component in the randomForest object')
   if (!leaf_node_only)
@@ -29,29 +31,31 @@ readForest <- function(rfobj  # a randomForest object with forest component in i
     out$tree_info$tree <- 1
   }
 
-  select.node <- rep(TRUE, nrow(out$tree_info))
-  if (leaf_node_only) {
-    select.node <- out$tree_info$status == -1
-    size.node <- rep(0, nrow(out$tree_info)) #only sizes for leaf nodes right now
-    out$tree_info <- out$tree_info[select.node,]
-    n.node.t.sub <- table(out$tree_info$tree)
-  }
 
+  # How many times should each node be repeated in node_feature matrix:
+  # size_node = importance sampling, 1 = uniform
+  rep.node <- rep(0, nrow(out$tree_info))
+  select.node <- rep(TRUE, nrow(out$tree_info))
+  if (leaf_node_only) select.node <- out$tree_info$status == -1 
+  
   tt <- matrix(0L, nrow=n, ncol=nrow(out$tree_info))
   obs.nodes <- rfobj$obs.node
   obs.nodes <- apply(obs.nodes, MAR=2, matchOrder) - 1
-  leaf.obs <- nodeObs(obs.nodes, n, ntree, n.node.t.sub, tt)
+  leaf.obs <- nodeObs(obs.nodes, n, ntree, table(out$tree_info$tree[select.node]), tt)
   out$tree_info$size_node <- colSums(leaf.obs)
-  size.node[select.node] <- out$tree_info$size_node
+  
+  select.node <- select.node & subsetFun(out$tree_info)
+  out$tree_info <- out$tree_info[select.node,]
+  rep.node[select.node] <- trunc(wtFun(out$tree_info))
 
   if (return_node_feature) {
     
     var.nodes <- rfobj$feature.node
-    total.rows <- sum(size.node[select.node])
+    total.rows <- sum(rep.node[select.node])
     node.vars <- matrix(0L, nrow=(total.rows * p), ncol=2)
     sparse.idcs <- nodeVars(var.nodes, p, ntree, nrow(var.nodes),
                                  as.integer(select.node),
-                                 as.integer(size.node), 
+                                 as.integer(rep.node), 
                                  as.integer(n.node.t),
                                  node.vars)
     sparse.idcs <- sparse.idcs[!sparse.idcs[,1] == 0,]
