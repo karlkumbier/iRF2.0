@@ -36,13 +36,15 @@ readForest <- function(rfobj  # a randomForest object with forest component in i
   # size_node = importance sampling, 1 = uniform
   rep.node <- rep(0, nrow(out$tree_info))
   select.node <- rep(TRUE, nrow(out$tree_info))
-  if (leaf_node_only) select.node <- out$tree_info$status == -1 
-  
-  tt <- matrix(0L, nrow=n, ncol=nrow(out$tree_info))
+  leaf.node <- out$tree_info$status == -1
+  if (leaf_node_only) select.node <- leaf.node 
+ 
+  tt <- matrix(0L, nrow=n, ncol=sum(leaf.node))
   obs.nodes <- rfobj$obs.node
   obs.nodes <- apply(obs.nodes, MAR=2, matchOrder) - 1
-  leaf.obs <- nodeObs(obs.nodes, n, ntree, table(out$tree_info$tree[select.node]), tt)
-  out$tree_info$size_node <- colSums(leaf.obs)
+  leaf.obs <- nodeObs(obs.nodes, n, ntree, table(out$tree_info$tree[leaf.node]), tt)
+  out$tree_info$size_node <- 0
+  out$tree_info$size_node[leaf.node] <- colSums(leaf.obs)
   
   select.node <- select.node & subsetFun(out$tree_info)
   out$tree_info <- out$tree_info[select.node,]

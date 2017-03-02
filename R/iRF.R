@@ -25,17 +25,7 @@ iRF <- function(x
 n = nrow(x)
 p = ncol(x)
 keep_subset_var = NULL
-
-# check if y, ytest are factors with levels 0,1
-if (!is.factor(y))
-    stop('y is not a factor')
-if (!setequal(as.numeric(levels(y)), c(0,1)))
-    stop('y must have levels 0, 1')
-
-if ((!is.null(ytest)) & (!is.factor(ytest)))
-    stop('ytest is not a factor')
-if ((!is.null(ytest)) & (!setequal(as.numeric(levels(ytest)), c(0,1))) )
-    stop('ytest must have levels 0, 1')
+class.irf <- is.factor(y)
 
 # check if x is a numeric matrix with two or more columns if find_interaction = TRUE
 if (!is.matrix(x) | ((!is.null(xtest)) & (!is.matrix(xtest))))
@@ -84,14 +74,19 @@ for (iter in 1:n_iter){
       if (verbose){cat('finding interactions ... ')}
 
       Stability_Score[[iter]] = list()      
-      n1 = sum(y==1); n0 = sum(y==0)
 
       # 2.1: find interactions in  multiple bootstrap samples to assess stability
       interact_list[[iter]] <- mclapply(1:n_bootstrap, function(i_b) {
          if (verbose){cat(paste('b = ', i_b, ';  ', '\n', sep=''))}
 
-         sample_id = c(sample(which(y==0), n0, replace=TRUE)
-                     , sample(which(y==1), n1, replace=TRUE))
+         if (class.irf) {
+           n.class <- table(y)
+           sample_id <- mapply(function(cc, nn) sample(which(y == cc), nn, replace=TRUE),
+                               as.factor(names(n.class)), n.class)
+           sample_id <- unlist(sample_id)
+         } else {
+           sample_id = sample(n, n, replace=TRUE)
+         }
 
          #2.1.1: fit random forest
          rf_b <- randomForest(x[sample_id,]
@@ -109,14 +104,14 @@ for (iter in 1:n_iter){
         rforest_b = readForest(rf_b, X = x[sample_id,]
                              , return_node_feature = TRUE
                              , return_node_data = FALSE
-                             , leaf_node_only = TRUE)
-                             #, subsetFun = node_sample$subset
-                             #, wtFun = node_sample$wt
-                            #)
+                             , leaf_node_only = TRUE
+                             , subsetFun = node_sample$subset
+                             , wtFun = node_sample$wt
+                            )
 
-        # we can move this into readForest function
-        select_leaf_id = rforest_b$tree_info$prediction == (as.numeric(class_id) + 1)
-                         # since tree predictions are saved as 1, 2 for binary classification
+        select_leaf_id = rep(TRUE, nrow(rforest_b$tree_info))
+        if (class.irf & all(y %in% c(0, 1)))
+          select_leaf_id = rforest_b$tree_info$prediction == (as.numeric(class_id) + 1)
 
         # 2.1.3: apply random intersection trees
         rforest_b = subsetReadForest(rforest_b, select_leaf_id)
