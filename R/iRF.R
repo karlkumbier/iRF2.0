@@ -166,10 +166,10 @@ for (iter in 1:n_iter){
    } # end if (find_interaction)
    
 ## 3: change mtry_select_prob (and keep_subset_var, if applicable) for next iteration
-   if (ncol(rf$importance) == 1)
-       mtry_select_prob = rf$importance
-   else
-       mtry_select_prob = rf$importance[,4]
+   #if (ncol(rf$importance) == 1)
+   mtry_select_prob = rf$importance[,'IncNodePurity']
+   #else
+   #    mtry_select_prob = rf$importance[,4]
 
    if (!is.null(keep_impvar_quantile)){
        keep_subset_var = which(mtry_select_prob >
