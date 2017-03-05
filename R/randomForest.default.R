@@ -225,13 +225,9 @@ mylevels <- function(x) if (is.factor(x)) levels(x) else 0
     # pre allocate matrices for tracking feature and observation data at each
     # node
     if (track.nodes) {
-      feat.offset <- trunc(n * (log(nrnodes + 1, base=2) - 1))
-      feature.nodes <- matrix(0L, nrow=feat.offset, ncol=ntree)
       obs.nodes <- matrix(0L, nrow=n, ncol=ntree)
     } else {
-      feature.nodes <- 0L
       obs.nodes <- 0L
-      feat.offset <- 0
     }
 
     if (classRF) {
@@ -261,9 +257,7 @@ mylevels <- function(x) if (is.factor(x)) levels(x) else 0
                     ntree = as.integer(ntree),
                     mtry = as.integer(mtry),
                     selprob = as.double(mtry_select_prob),
-                    featurenodes = feature.nodes,
                     obsnodes = obs.nodes,
-                    featoffest = as.integer(feat.offset),
                     tracknodes = as.integer(track.nodes),
                     subsetVar = subsetVar, 
                     subsetVarCard = ifelse(is.null(keep_subset_var)
@@ -386,7 +380,6 @@ mylevels <- function(x) if (is.factor(x)) levels(x) else 0
                              nrnodes = max.nodes, ntree = ntree,
                              nclass = nclass, xlevels=xlevels)
                     },
-                    feature.nodes = rfout$featurenodes,
                     obs.nodes = rfout$obsnodes,
                     test = if(!testdat) NULL else list(
                     predicted = out.class.ts,
@@ -410,13 +403,9 @@ mylevels <- function(x) if (is.factor(x)) levels(x) else 0
     # each
     # node
     if (track.nodes) {
-      feat.offset <- trunc(n * (log(nrnodes + 1, base=2) - 1))
-      feature.nodes <- matrix(0L, nrow=feat.offset, ncol=ntree)
       obs.nodes <- matrix(0L, nrow=n, ncol=ntree)
     } else {
-      feature.nodes <- 0L
       obs.nodes <- 0L
-      feat.offset <- 0
     }
         rfout <- .C("regRF",
                     x,
@@ -428,9 +417,7 @@ mylevels <- function(x) if (is.factor(x)) levels(x) else 0
                     as.integer(ntree),
                     as.integer(mtry),
                     selprob = as.double(mtry_select_prob),
-                    featurenodes = feature.nodes,
                     obsnodes = obs.nodes,
-                    featoffset = as.integer(feat.offset),
                     trackodes = as.integer(track.nodes),
                     subsetVar = subsetVar,
                     subsetVarCard = ifelse(is.null(keep_subset_var)

@@ -22,9 +22,7 @@ void simpleLinReg(int nsample, double *x, double *y, double *coef,
 void regRF(double *x, double *y, int *xdim, int *sampsize,
     int *nthsize, int *nrnodes, int *nTree, int *mtry, 
     double *selprob,
-    int *featurenodes,
     int *obsnodes,
-    int *featoffset,
     int *tracknodes,
     int *subsetVar,
     int *subsetVarCard,
@@ -203,19 +201,6 @@ squared errors when the mth variable is randomly permuted.
         subsetVar, subsetCard,
         mbest + idx, cat, tgini,
         varUsed);
-
-    if (*tracknodes == 1) {
-      int varArrayCt = 0;
-      for (int i = 0; i < (*nrnodes); i++) {
-
-        for (int m = 0; m < mdim; m++) {
-          if (featuremat[m + i * mdim] > 0) {
-            featurenodes[varArrayCt + j * (*featoffset)] = m + i * mdim;
-            varArrayCt += 1;
-          }
-        }
-      }
-    }
 
     /* predict the OOB data with the current tree */
     /* ytr is the prediction on OOB data by the current tree */

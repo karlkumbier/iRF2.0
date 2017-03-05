@@ -3,33 +3,82 @@ using namespace Rcpp;
 
 // [[Rcpp::export]]
 IntegerVector nodeObs(IntegerVector obsnodes, 
-                      int n, int ntree, 
-                      IntegerVector nrnodes, 
-                      IntegerVector nodeobs) {
+    int n, int ntree, 
+    IntegerVector nrnodes, 
+    IntegerVector nodeobs) {
 
-/* Read data from RF with node tracking and return nleaf x n binary
- * matrix indicating which leaf nodes each observation falls in */  
+  /* Read data from RF with node tracking and return nleaf x n binary
+   * matrix indicating which leaf nodes each observation falls in */  
   int cumnodes = 0; //number of processed nodes
-  
+
   for (int t = 0; t < ntree; t++) {
-    
+
     int nrnodest = nrnodes[t];
-    
+
     for (int nd = 0; nd < nrnodest; nd ++) {
-      
+
       for (int i = 0; i < n; i ++) {
-        
+
         if (obsnodes[i + t * n] == -1) continue;       
-          nodeobs[i + (obsnodes[i + t * n]) * n + n * cumnodes] = 1;
+        nodeobs[i + (obsnodes[i + t * n]) * n + n * cumnodes] = 1;
       }
     }
     cumnodes += nrnodest;
   }
-  
+
   return nodeobs;
 }
 
 
+// [[Rcpp::export]]
+IntegerVector nodeVars(IntegerVector varnodes,
+    int ntree, 
+    int nrnodes,
+    IntegerVector parents,
+    IntegerVector idcskeep,                  
+    IntegerVector nodect,
+    IntegerVector nnodest,
+    IntegerVector nodevars) {
+
+  int cumnodes = 0; //cumulative number of nodes processed over forest
+  int idx = 0; //current index of output vector
+  int nobsnode = 0; //number of observations in current node
+  int annd = 0; //ancestor nodes
+  int pp = 0; //track current col of sparse matrix
+  int rowoffset = 0; //track current row of sparse matrix
+
+  for (int t = 0; t < ntree; t++) {
+
+    for (int nd = 0; nd < nnodest[t]; nd++) {
+
+      if (idcskeep[nd + cumnodes] == 1) {
+        // Keeping the current node. Determine variables on path and store
+        // entries in output vector based on counts for associated node.
+
+        nobsnode = nodect[nd + cumnodes];
+        annd = nd;
+        while (annd > 0) {  
+          annd = parents[annd + cumnodes] - 1;
+          pp = varnodes[annd + nrnodes * t];
+
+          for (int rw = 0; rw < nobsnode; rw ++) {
+            nodevars[idx] = rw + rowoffset + 1;
+            nodevars[nodevars.size() / 2 + idx] = pp;
+            idx += 1;
+          }
+        }
+        rowoffset += nobsnode;
+      }
+
+    }
+    cumnodes += nnodest[t];
+  }
+
+  return nodevars;
+}
+
+
+/*
 // [[Rcpp::export]]
 IntegerVector nodeVars(IntegerVector varnodes,
                        int p, int ntree, int nnodes,
@@ -68,9 +117,8 @@ IntegerVector nodeVars(IntegerVector varnodes,
   }
 
   return nodevars;
-}
+  }
 
-/*
 // [[Rcpp::export]]
 IntegerVector nodeVars(IntegerVector varnodes, 
                        int p, int ntree, int nr,
@@ -122,4 +170,4 @@ IntegerVector nodeVars(IntegerVector varnodes,
   
   return nodevars;
 }
-i*/
+*/

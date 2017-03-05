@@ -21,20 +21,20 @@ BEGIN_RCPP
 END_RCPP
 }
 // nodeVars
-IntegerVector nodeVars(IntegerVector varnodes, int p, int ntree, int nnodes, IntegerVector idcskeep, IntegerVector nodect, IntegerVector nnodest, IntegerVector nodevars);
-RcppExport SEXP iRF_nodeVars(SEXP varnodesSEXP, SEXP pSEXP, SEXP ntreeSEXP, SEXP nnodesSEXP, SEXP idcskeepSEXP, SEXP nodectSEXP, SEXP nnodestSEXP, SEXP nodevarsSEXP) {
+IntegerVector nodeVars(IntegerVector varnodes, int ntree, int nrnodes, IntegerVector parents, IntegerVector idcskeep, IntegerVector nodect, IntegerVector nnodest, IntegerVector nodevars);
+RcppExport SEXP iRF_nodeVars(SEXP varnodesSEXP, SEXP ntreeSEXP, SEXP nrnodesSEXP, SEXP parentsSEXP, SEXP idcskeepSEXP, SEXP nodectSEXP, SEXP nnodestSEXP, SEXP nodevarsSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< IntegerVector >::type varnodes(varnodesSEXP);
-    Rcpp::traits::input_parameter< int >::type p(pSEXP);
     Rcpp::traits::input_parameter< int >::type ntree(ntreeSEXP);
-    Rcpp::traits::input_parameter< int >::type nnodes(nnodesSEXP);
+    Rcpp::traits::input_parameter< int >::type nrnodes(nrnodesSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type parents(parentsSEXP);
     Rcpp::traits::input_parameter< IntegerVector >::type idcskeep(idcskeepSEXP);
     Rcpp::traits::input_parameter< IntegerVector >::type nodect(nodectSEXP);
     Rcpp::traits::input_parameter< IntegerVector >::type nnodest(nnodestSEXP);
     Rcpp::traits::input_parameter< IntegerVector >::type nodevars(nodevarsSEXP);
-    rcpp_result_gen = Rcpp::wrap(nodeVars(varnodes, p, ntree, nnodes, idcskeep, nodect, nnodest, nodevars));
+    rcpp_result_gen = Rcpp::wrap(nodeVars(varnodes, ntree, nrnodes, parents, idcskeep, nodect, nnodest, nodevars));
     return rcpp_result_gen;
 END_RCPP
 }
