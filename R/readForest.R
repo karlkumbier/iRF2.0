@@ -60,12 +60,14 @@ readForest <- function(rfobj  # a randomForest object with forest component in i
     var.nodes <- rfobj$forest$bestvar
     total.rows <- sum(rep.node[select.node])
     node.vars <- matrix(0L, nrow=(total.rows * p), ncol=2)
-    sparse.idcs <- nodeVars(var.nodes, ntree, nrow(var.nodes),
-                                 as.integer(parents),
-                                 as.integer(select.node),
-                                 as.integer(rep.node), 
-                                 as.integer(n.node.t),
-                                 node.vars)
+    sparse.idcs <- nodeVars(var.nodes, as.integer(ntree), 
+                            as.integer(nrow(var.nodes)), 
+                            as.integer(p),
+                            as.integer(parents),
+                            as.integer(select.node),
+                            as.integer(rep.node), 
+                            as.integer(n.node.t),
+                            node.vars)
     sparse.idcs <- sparse.idcs[!sparse.idcs[,1] == 0,]
     out$node_feature <- sparseMatrix(i=sparse.idcs[,1], j=sparse.idcs[,2], dims=c(total.rows, p))
 

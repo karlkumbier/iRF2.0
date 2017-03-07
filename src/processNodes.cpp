@@ -34,6 +34,7 @@ IntegerVector nodeObs(IntegerVector obsnodes,
 IntegerVector nodeVars(IntegerVector varnodes,
     int ntree, 
     int nrnodes,
+    int p,
     IntegerVector parents,
     IntegerVector idcskeep,                  
     IntegerVector nodect,
@@ -57,14 +58,18 @@ IntegerVector nodeVars(IntegerVector varnodes,
 
         nobsnode = nodect[nd + cumnodes];
         annd = nd;
+        IntegerVector pathvars(p);
         while (annd > 0) {  
           annd = parents[annd + cumnodes] - 1;
           pp = varnodes[annd + nrnodes * t];
 
-          for (int rw = 0; rw < nobsnode; rw ++) {
-            nodevars[idx] = rw + rowoffset + 1;
-            nodevars[nodevars.size() / 2 + idx] = pp;
-            idx += 1;
+          if (pathvars[pp - 1] == 0) {
+            for (int rw = 0; rw < nobsnode; rw ++) {
+              nodevars[idx] = rw + rowoffset + 1;
+              nodevars[nodevars.size() / 2 + idx] = pp;
+              idx += 1;
+            }
+            pathvars[pp - 1] = 1;
           }
         }
         rowoffset += nobsnode;
