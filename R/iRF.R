@@ -140,6 +140,9 @@ for (iter in 1:n_iter){
           nf[,drop_id] = FALSE
         }
 
+        rforest_b$node_feature = nf
+        rm(nf)
+        rm(rf_b)
         interactions <- ritfun(rforest_b, 
                                node_sample=node_sample, 
                                tree_depth=rit_param[1], 
