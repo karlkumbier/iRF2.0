@@ -99,7 +99,7 @@ for (iter in 1:n_iter){
                           , keep.forest=TRUE
                           , track.nodes=TRUE
                           , ...
-                          )
+                           )
         # 2.1.2: select large leaf nodes
         rforest_b = readForest(rf_b, X = x[sample_id,]
                              , return_node_feature = TRUE
@@ -145,7 +145,6 @@ for (iter in 1:n_iter){
         interactions <- RIT(nf, depth=rit_param[1], n_trees=rit_param[2], branch=rit_param[3])   
         interactions <- interactions$Interaction 
         interactions <- gsub(' ', '_', interactions)
-
         return(interactions)       
         }
 

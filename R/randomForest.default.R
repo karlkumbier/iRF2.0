@@ -381,9 +381,6 @@ mylevels <- function(x) if (is.factor(x)) levels(x) else 0
                              nclass = nclass, xlevels=xlevels)
                     },
                     obs.nodes = rfout$obsnodes,
-
-                    nrnodes = nrnodes,
-
                     test = if(!testdat) NULL else list(
                     predicted = out.class.ts,
                     err.rate = if (labelts) t(matrix(rfout$errts, nclass+1,
@@ -406,12 +403,10 @@ mylevels <- function(x) if (is.factor(x)) levels(x) else 0
     # each
     # node
     if (track.nodes) {
-      feature.nodes <- matrix(0L, nrow=feat.offset, ncol=ntree)
       obs.nodes <- matrix(0L, nrow=n, ncol=ntree)
     } else {
-      feature.nodes <- 0L
       obs.nodes <- 0L
-      obs.nodes <- matrix(0L, nrow=n, ncol=ntree)
+    }
         rfout <- .C("regRF",
                     x,
                     as.double(y),
@@ -423,6 +418,7 @@ mylevels <- function(x) if (is.factor(x)) levels(x) else 0
                     as.integer(mtry),
                     selprob = as.double(mtry_select_prob),
                     obsnodes = obs.nodes,
+                    trackodes = as.integer(track.nodes),
                     subsetVar = subsetVar,
                     subsetVarCard = ifelse(is.null(keep_subset_var)
                                          , as.integer(0)
@@ -517,7 +513,6 @@ mylevels <- function(x) if (is.factor(x)) levels(x) else 0
                     y = y + ymean,
                     feature.nodes = rfout$featurenodes,
                     obs.nodes = rfout$obsnodes,
-                    nrnodes = nrnodes,
                     test = if(testdat) {
                         list(predicted = structure(rfout$ytestpred + ymean,
                              names=xts.row.names),
