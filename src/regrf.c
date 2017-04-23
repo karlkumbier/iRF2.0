@@ -22,9 +22,13 @@ void simpleLinReg(int nsample, double *x, double *y, double *coef,
 void regRF(double *x, double *y, int *xdim, int *sampsize,
     int *nthsize, int *nrnodes, int *nTree, int *mtry, 
     double *selprob,
+<<<<<<< HEAD
     int *featurenodes,
     int *obsnodes,
     int *featoffset,
+=======
+    int *obsnodes,
+>>>>>>> rit_switch
     int *tracknodes,
     int *subsetVar,
     int *subsetVarCard,
@@ -204,6 +208,7 @@ squared errors when the mth variable is randomly permuted.
         mbest + idx, cat, tgini,
         varUsed);
 
+<<<<<<< HEAD
     if (*tracknodes == 1) {
       int varArrayCt = 0;
       for (int i = 0; i < (*nrnodes); i++) {
@@ -230,6 +235,21 @@ squared errors when the mth variable is randomly permuted.
         obsnodes[n + j * nsample] = nodex[n];
       }
     }
+=======
+    /* predict the OOB data with the current tree */
+    /* ytr is the prediction on OOB data by the current tree */
+    predictRegTree(x, nsample, mdim, lDaughter + idx,
+        rDaughter + idx, nodestatus + idx, ytr, upper + idx,
+        avnode + idx, mbest + idx, treeSize[j], cat, *maxcat,
+        nodex);
+
+    /* track which leaf node each observation falls into */
+    if (*tracknodes == 1) {
+      for (int n = 0; n < nsample; n++) {
+        obsnodes[n + j * nsample] = nodex[n];
+      }
+    }
+>>>>>>> rit_switch
 
     /* yptr is the aggregated prediction by all trees grown so far */
     errb = 0.0;
@@ -275,6 +295,7 @@ squared errors when the mth variable is randomly permuted.
         }
         errts /= ntest;
       }
+<<<<<<< HEAD
     }
     /* Print running output. */
     if ((j + 1) % *jprint == 0) {
@@ -284,6 +305,17 @@ squared errors when the mth variable is randomly permuted.
           errts, 100.0 * errts / varYts);
       Rprintf("|\n");
     }
+=======
+    }
+    /* Print running output. */
+    if ((j + 1) % *jprint == 0) {
+      Rprintf("%4d |", j + 1);
+      Rprintf(" %8.4g %8.2f ", errb, 100 * errb / varY);
+      if(*labelts == 1) Rprintf("| %8.4g %8.2f ",
+          errts, 100.0 * errts / varYts);
+      Rprintf("|\n");
+    }
+>>>>>>> rit_switch
     mse[j] = errb;
     if (*labelts) msets[j] = errts;
 

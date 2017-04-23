@@ -21,20 +21,21 @@ BEGIN_RCPP
 END_RCPP
 }
 // nodeVars
-IntegerVector nodeVars(IntegerVector varnodes, int p, int ntree, int maxnodes, int nr, IntegerVector nrnodes, IntegerVector nodevars, IntegerVector idcskeep);
-RcppExport SEXP iRF_nodeVars(SEXP varnodesSEXP, SEXP pSEXP, SEXP ntreeSEXP, SEXP maxnodesSEXP, SEXP nrSEXP, SEXP nrnodesSEXP, SEXP nodevarsSEXP, SEXP idcskeepSEXP) {
+IntegerVector nodeVars(IntegerVector varnodes, int ntree, int nrnodes, int p, IntegerVector parents, IntegerVector idcskeep, IntegerVector nodect, IntegerVector nnodest, IntegerVector nodevars);
+RcppExport SEXP iRF_nodeVars(SEXP varnodesSEXP, SEXP ntreeSEXP, SEXP nrnodesSEXP, SEXP pSEXP, SEXP parentsSEXP, SEXP idcskeepSEXP, SEXP nodectSEXP, SEXP nnodestSEXP, SEXP nodevarsSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< IntegerVector >::type varnodes(varnodesSEXP);
-    Rcpp::traits::input_parameter< int >::type p(pSEXP);
     Rcpp::traits::input_parameter< int >::type ntree(ntreeSEXP);
-    Rcpp::traits::input_parameter< int >::type maxnodes(maxnodesSEXP);
-    Rcpp::traits::input_parameter< int >::type nr(nrSEXP);
-    Rcpp::traits::input_parameter< IntegerVector >::type nrnodes(nrnodesSEXP);
-    Rcpp::traits::input_parameter< IntegerVector >::type nodevars(nodevarsSEXP);
+    Rcpp::traits::input_parameter< int >::type nrnodes(nrnodesSEXP);
+    Rcpp::traits::input_parameter< int >::type p(pSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type parents(parentsSEXP);
     Rcpp::traits::input_parameter< IntegerVector >::type idcskeep(idcskeepSEXP);
-    rcpp_result_gen = Rcpp::wrap(nodeVars(varnodes, p, ntree, maxnodes, nr, nrnodes, nodevars, idcskeep));
+    Rcpp::traits::input_parameter< IntegerVector >::type nodect(nodectSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type nnodest(nnodestSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type nodevars(nodevarsSEXP);
+    rcpp_result_gen = Rcpp::wrap(nodeVars(varnodes, ntree, nrnodes, p, parents, idcskeep, nodect, nnodest, nodevars));
     return rcpp_result_gen;
 END_RCPP
 }

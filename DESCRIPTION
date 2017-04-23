@@ -8,7 +8,9 @@ Depends:
     AUC,
     doMC,
     graphics,
-    akima
+    akima,
+    FSInteract,
+    Matrix
 Suggests:
     RColorBrewer,
     MASS,

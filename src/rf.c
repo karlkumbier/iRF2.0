@@ -40,9 +40,7 @@ void F77_SUB(rrand)(double *r) { *r = unif_rand(); }
 void classRF(double *x, int *dimx, int *cl, int *ncl, int *cat, int *maxcat,
 	     int *sampsize, int *strata, int *Options, int *ntree, int *nvar,
              double *selprob,
-             int *featurenodes,
              int *obsnodes,
-             int *featoffset,
              int *tracknodes,
              int *subsetVar,
              int *subsetVarCard,
@@ -366,20 +364,7 @@ void classRF(double *x, int *dimx, int *cl, int *ncl, int *cat, int *maxcat,
 								&nuse, mind, &tmpcheck);
 			/* if the "tree" has only the root node, start over */
 
-      /* track features on decision path for each node in forest */
-      if (*tracknodes == 1) {
-        int varArrayCt = 0;
-        for (int i = 0; i < (*nrnodes); i++) {
-
-          for (int m = 0; m < mdim; m++) {
-            if (featuremat[m + i * mdim] > 0) {
-              featurenodes[varArrayCt + jb * (*featoffset)] = m + i * mdim;
-              varArrayCt += 1;
-            }
-          }
-        }
-      }
-    }  while (ndbigtree[jb] == 1);
+   }  while (ndbigtree[jb] == 1);
 
 		Xtranslate(x, mdim, *nrnodes, nsample, bestvar + idxByNnode,
 				   bestsplit, bestsplitnext, xbestsplit + idxByNnode,

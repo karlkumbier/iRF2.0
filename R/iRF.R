@@ -105,6 +105,8 @@ for (iter in 1:n_iter){
                              , return_node_feature = TRUE
                              , return_node_data = FALSE
                              , leaf_node_only = TRUE
+                             , subsetFun = node_sample$subset
+                             , wtFun = node_sample$wt
                             )
 
         select_leaf_id = rep(TRUE, nrow(rforest_b$tree_info))
@@ -140,16 +142,10 @@ for (iter in 1:n_iter){
           nf[,drop_id] = FALSE
         }
 
-        rforest_b$node_feature = nf
-        rm(nf)
-        rm(rf_b)
-        interactions <- ritfun(rforest_b, 
-                               node_sample=node_sample, 
-                               tree_depth=rit_param[1], 
-                               n_ritree=rit_param[2], 
-                               n_child=rit_param[3], 
-                               varnames=NULL,
-                               verbose=verbose)   
+        interactions <- RIT(nf, depth=rit_param[1], n_trees=rit_param[2], branch=rit_param[3])   
+        interactions <- interactions$Interaction 
+        interactions <- gsub(' ', '_', interactions)
+
         return(interactions)       
         }
 
@@ -202,7 +198,7 @@ return(out)
 subsetReadForest <- function(rforest, subset_idcs) {
   # subset nodes from readforest output 
   if (!is.null(rforest$node_feature)) 
-    rforest$node_feature <- t(rforest$node_feature[,subset_idcs])
+    rforest$node_feature <- rforest$node_feature[subset_idcs,]
   if (!is.null(rforest$node_data)) 
     rforest$node_data <- t(rforest$node_data[,subset_idcs])
   if(!is.null(rforest$tree_info))
