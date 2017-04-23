@@ -10,12 +10,12 @@ iRF <- function(x
               , n_core = 1
               , mtry_select_prob = rep(1/ncol(x), ncol(x))
               , keep_impvar_quantile = NULL 
-              , find_interaction = FALSE
+              , interactions_return = NULL
               , node_sample = list(subset=function(x) rep(TRUE, nrow(x)),
                                    wt=function(x) x$size_node)
               , cutoff_unimp_feature = 0
               , class_id = 1
-              , rit_param = c(5, 1000, 2) # c(rit depth (D), n_rit (M), n_child)
+              , rit_param = c(5, 100, 2) # c(rit depth (D), n_rit (M), n_child)
               , varnames_grp = NULL
               , n_bootstrap = 30
               , verbose = TRUE
@@ -32,13 +32,14 @@ if (!is.matrix(x) | ((!is.null(xtest)) & (!is.matrix(xtest))))
     stop('either x or xtest is not a matrix !')
 if ((!is.numeric(x)) | ((!is.null(xtest) & (!is.numeric(xtest)))))
     stop('either x or xtest is not a numeric matrix!')
-if ((ncol(x) < 2) & find_interaction == TRUE)
+if ((ncol(x) < 2) & !is.null(interactions_return))
     stop('cannot find interaction - X has less than two columns!')
-
+if (any(interactions_return > n_iter))
+  stop('interactions to return greater than niter')
     
 # initialize outputs
 rf_list = list()
-if (find_interaction){
+if (!is.null(interactions_return)){
     interact_list = list()
     Stability_Score = list()
 }
@@ -70,7 +71,7 @@ for (iter in 1:n_iter){
 
 
 ## 2: find interactions stable over multiple bootstrap replicates
-   if (find_interaction == TRUE){
+   if (iter %in% interactions_return){
       if (verbose){cat('finding interactions ... ')}
 
       Stability_Score[[iter]] = list()      
@@ -166,10 +167,11 @@ for (iter in 1:n_iter){
    } # end if (find_interaction)
    
 ## 3: change mtry_select_prob (and keep_subset_var, if applicable) for next iteration
-   #if (ncol(rf$importance) == 1)
-   mtry_select_prob = rf$importance[,'IncNodePurity']
-   #else
-   #    mtry_select_prob = rf$importance[,4]
+   if (!class.irf) 
+     mtry_select_prob = rf$importance[,'IncNodePurity']
+   else
+     mtry_select_prob = rf$importance[,'MeanDecreaseGini']
+    
 
    if (!is.null(keep_impvar_quantile)){
        keep_subset_var = which(mtry_select_prob >
@@ -177,7 +179,7 @@ for (iter in 1:n_iter){
                               )
    }
     
-   if (!is.null(xtest)){
+   if (!is.null(xtest) & class.irf){
        auroc = auc(roc(rf$test$votes[,2], ytest))
        print(paste('AUROC: ', round(auroc, 2)))
    }
@@ -187,7 +189,7 @@ for (iter in 1:n_iter){
 
 out=list()
 out$rf_list = rf_list
-if (find_interaction == TRUE){
+if (!is.null(interactions_return)){
     out$interaction = Stability_Score
 }
     
