@@ -183,6 +183,7 @@ generalizedRIT <- function(rf, x, y,
     interactions <- interactions$Interaction
     interactions <- gsub(' ', '_', interactions)
     return(interactions)
+  }
 }
 
 subsetReadForest <- function(rforest, subset_idcs) {
