@@ -1,26 +1,25 @@
 # iteratively grows random forests, finds case specific feature interactions
 # in binary classification problems
 iRF <- function(x, y, 
-                xtest = NULL, ytest = NULL, 
-                n.iter = 5, 
-                ntree = 500, 
-                n.core = 1, 
-                mtry.select.prob = rep(1/ncol(x), ncol(x)), 
-                keep.impvar.quantile = NULL, 
-                interactions.return = NULL, 
-                node.sample = list(subset=function(x) rep(TRUE, nrow(x)),
-                                   wt=function(x) x$size_node), 
-                cutoff.unimp.feature = 0, 
-                class.id = 1, 
-                rit.param = c(5, 100, 2), 
-                varnames.grp = NULL, 
-                n.bootstrap = 30, 
-                verbose = TRUE, 
+                xtest=NULL, ytest=NULL, 
+                n.iter=5, 
+                ntree=500, 
+                n.core=1, 
+                mtry.select.prob=rep(1/ncol(x), ncol(x)), 
+                keep.impvar.quantile=NULL, 
+                interactions.return=NULL, 
+                node.sample=list(subset=function(x) rep(TRUE, nrow(x)),
+                                wt=function(x) x$size_node), 
+                cutoff.unimp.feature=0, 
+                class.id=1, 
+                rit.param=c(5, 100, 2), 
+                varnames.grp=NULL, 
+                n.bootstrap=30, 
+                verbose=TRUE, 
                 ...) {
   
   n <- nrow(x)
   p <- ncol(x)
-  keep_subset_var <- NULL
   class.irf <- is.factor(y)
   
   # Check whether iRF can be run for given inputs
@@ -54,7 +53,7 @@ iRF <- function(x, y,
                                  randomForest(x, y, 
                                               xtest, ytest, 
                                               ntree=nt, 
-                                              mtry.select.prob=mtry.select.prob, 
+                                              mtry_select_prob=mtry.select.prob, 
                                               keep.forest=TRUE, 
                                               ...)
                                }
@@ -81,7 +80,7 @@ iRF <- function(x, y,
         rf.b <- randomForest(x[sample.id,], y[sample.id], 
                              xtest, ytest, 
                              ntree=ntree, 
-                             mtry.select.prob=mtry.select.prob, 
+                             mtry_select_prob=mtry.select.prob, 
                              keep.forest=TRUE, 
                              track.nodes=TRUE, 
                              ...)
@@ -155,7 +154,6 @@ generalizedRIT <- function(rf, x, y,
   # Select class specific leaf nodes if classification
   select.leaf.id <- rep(TRUE, nrow(rforest$tree_info))
   if (class.irf & all(y %in% c(0, 1))) {
-    print('Subsetting')
     select.leaf.id <- rforest$tree_info$prediction == as.numeric(class.id) + 1
     rforest <- subsetReadForest(rforest, select.leaf.id)
   }
