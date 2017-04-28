@@ -144,10 +144,8 @@ generalizedRIT <- function(rf, x, y,
                            rit.param) {
   
   # Extract decision paths from rf as binary matrix to be passed to RIT
-  rforest <- readForest(rf, X=x, 
+  rforest <- readForest(rf, x=x, 
                         return_node_feature=TRUE,
-                        leaf_node_only=TRUE,
-                        return_node_data=FALSE, 
                         subsetFun=subsetFun, 
                         wtFun=wtFun)
   
