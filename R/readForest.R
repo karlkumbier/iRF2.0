@@ -34,7 +34,7 @@ readForest <- function(rfobj  # a randomForest object with forest object
   rep.node <- rep(0, nrow(out$tree_info))
   select.node <- leaf.node
   
-  leaf.node <- out$tree_info$status == -1
+
   leaf.counts <- unname(unlist(apply(rfobj$obs.node, MAR=2, table)))
   out$tree_info$size_node[leaf.node] <- leaf.counts
  
