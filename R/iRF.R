@@ -22,7 +22,6 @@ iRF <- function(x, y,
   p <- ncol(x)
   class.irf <- is.factor(y)
   
-  # Check whether iRF can be run for given inputs
   if (!is.matrix(x) | (!is.null(xtest) & !is.matrix(xtest)))
     stop('either x or xtest is not a matrix !')
   if (!is.numeric(x) | (!is.null(xtest) & !is.numeric(xtest)))
@@ -30,7 +29,7 @@ iRF <- function(x, y,
   if (ncol(x) < 2 & !is.null(interactions.return))
     stop('cannot find interaction - X has less than two columns!')
   if (any(interactions.return > n.iter))
-    stop('interactions to return greater than niter')
+    stop('interaction iteration to return greater than n.iter')
   
   # initialize outputs
   rf.list <- list()
@@ -39,14 +38,14 @@ iRF <- function(x, y,
     stability.score <- list()
   }
   
-  # set number of trees to grow in each core
+  # Set number of trees to grow in each core
   a <- floor(ntree / n.core) 
   b <- ntree %% n.core
   ntree.id <- c(rep(a + 1, b), rep(a, n.core - b))
   
   for (iter in 1:n.iter){
-    ## 1: Grow Random Forest on full data using all available cores
     
+    ## 1: Grow Random Forest on full data
     print(paste('iteration = ', iter))
     rf.list[[iter]] <- foreach(nt=ntree.id, .combine=combine, 
                                .multicombine=TRUE, .packages='iRF') %dopar% {
@@ -58,8 +57,7 @@ iRF <- function(x, y,
                                               ...)
                                }
     
-    ## 2: Find interactions that are consistently recovered over bootstrap 
-    ## replicates
+    ## 2.1: Find interactions across bootstrap replicates
     if (iter %in% interactions.return){
       if (verbose){cat('finding interactions ... ')}
       
@@ -68,8 +66,8 @@ iRF <- function(x, y,
         
         if (class.irf) {
           n.class <- table(y)
-          sample.id <- mapply(function(cc, nn) 
-            sample(which(y == cc), nn, replace=TRUE),
+          sampleCl <- function(y, cc, n) sample(which(y == cc), n, replace=TRUE)
+          sample.id <- mapply(function(cc, nn) sampleCl(y, cc, nn),
             as.factor(names(n.class)), n.class)
           sample.id <- unlist(sample.id)
         } else {
@@ -85,6 +83,7 @@ iRF <- function(x, y,
                              track.nodes=TRUE, 
                              ...)
         
+        #2.1.2: run generalized RIT on rf.b to learn interactions
         ints <- generalizedRIT(rf=rf.b, x=x[sample.id,], y=y[sample.id], 
                                subsetFun=node.sample$subset, 
                                wtFun=node.sample$wt,
@@ -105,7 +104,7 @@ iRF <- function(x, y,
       else
         varnames.new <- 1:ncol(x)
       
-      stability.score[[iter]] <- summarize_interact(interact.list[[iter]], 
+      stability.score[[iter]] <- summarizeInteract(interact.list[[iter]], 
                                                     varnames=varnames.new)      
       
     } # end if (find_interaction)
@@ -145,17 +144,17 @@ generalizedRIT <- function(rf, x, y,
   
   # Extract decision paths from rf as binary matrix to be passed to RIT
   rforest <- readForest(rf, x=x, 
-                        return_node_feature=TRUE,
+                        return.node.feature=TRUE,
                         subsetFun=subsetFun, 
                         wtFun=wtFun)
   
   # Select class specific leaf nodes if classification
-  select.leaf.id <- rep(TRUE, nrow(rforest$tree_info))
+  select.leaf.id <- rep(TRUE, nrow(rforest$tree.info))
   if (class.irf & all(y %in% c(0, 1))) {
-    select.leaf.id <- rforest$tree_info$prediction == as.numeric(class.id) + 1
+    select.leaf.id <- rforest$tree.info$prediction == as.numeric(class.id) + 1
     rforest <- subsetReadForest(rforest, select.leaf.id)
   }
-  nf <- rforest$node_feature
+  nf <- rforest$node.feature
   
   
   if (sum(select.leaf.id) < 2){
@@ -171,8 +170,8 @@ generalizedRIT <- function(rf, x, y,
       else
         rfimp <- rf$importance[,'MeanDecreaseGini']
       
-      drop_id <- which(rfimp < quantile(rfimp, prob=cutoff.unimp.feature))
-      nf[,drop_id] <- FALSE
+      drop.id <- which(rfimp < quantile(rfimp, prob=cutoff.unimp.feature))
+      nf[,drop.id] <- FALSE
     }
     
     interactions <- RIT(nf, depth=rit.param[1], n_trees=rit.param[2], 
@@ -184,12 +183,51 @@ generalizedRIT <- function(rf, x, y,
 }
 
 subsetReadForest <- function(rforest, subset.idcs) {
-  # subset nodes from readforest output 
-  if (!is.null(rforest$node_feature)) 
-    rforest$node_feature <- rforest$node_feature[subset.idcs,]
-  if (!is.null(rforest$node_data)) 
-    rforest$node_data <- t(rforest$node_data[,subset.idcs])
-  if(!is.null(rforest$tree_info))
-    rforest$tree_info <- rforest$tree_info[subset.idcs,]
+  # Subset nodes from readforest output 
+  if (!is.null(rforest$node.feature)) 
+    rforest$node.feature <- rforest$node.feature[subset.idcs,]
+  if(!is.null(rforest$tree.info))
+    rforest$tree.info <- rforest$tree.info[subset.idcs,]
   return(rforest)
+}
+
+groupFeature <- function(node.feature, grp){
+  # Group feature level data in node.feature 
+  sparse.mat <- is(node.feature, 'Matrix')
+    
+  grp.names <- unique(grp)
+  makeGroup <- function(x, g) apply(as.matrix(x[,grp == g]), MAR=1, max) 
+  node.feature.new <- sapply(grp.names, makeGroup, x=node.feature)
+  if (sparse.mat) node.feature.new <- Matrix(node.feature.new, sparse=TRUE)
+  
+  colnames(node.feature.new) <- grp.names
+  
+  return(node.feature.new)
+}
+
+
+
+summarizeInteract <- function(store.out, varnames=NULL){
+  # Aggregate interactions across bootstrap samples
+  n.bootstrap <- length(store.out)
+  store <- unlist(store.out)
+  
+  if (length(store) >= 1){
+    store.tbl <- sort(table(store), decreasing = TRUE)
+    store.tbl <- store.tbl / n.bootstrap
+  } else {
+    return(character(0))
+  }
+  
+  if (!is.null(varnames)) {
+    names.int <- lapply(names(store.tbl), strsplit, split='_')
+    names.int <- lapply(names.int, unlist)
+    names.int <- sapply(names.int, function(n) {
+      nn <- as.numeric(n)
+      return(paste(varnames[nn], collapse='_'))
+    })
+    names(store.tbl) <- names.int
+  }
+  
+  return(store.tbl)
 }
