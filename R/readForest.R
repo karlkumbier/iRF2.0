@@ -4,63 +4,76 @@ readForest <- function(rfobj  # a randomForest object with forest object
                        , return.node.feature=TRUE
                        , subsetFun = function(x) rep(TRUE, nrow(x))
                        , wtFun = function(x) x$size_node
-                       ){
+                       , n.core=1
+){
   
+  require(data.table)
   if (is.null(rfobj$forest))
     stop('No Forest component in the randomForest object')
+ 
+  ntree <- rfobj$ntree
+  p <- ncol(x)
+  n <- nrow(x)
+  
+  out <- list()
+  a <- Sys.time()
+  rd.forest <- mclapply(1:ntree, readTree, rfobj=rfobj, x=x, 
+                        return.node.feature=return.node.feature,
+                        subsetFun=subsetFun, wtFun=wtFun,
+                        mc.cores=4)
+  out$tree.info <- rbindlist(lapply(rd.forest, function(tt) tt$tree.info))
+  temp <- do.call(rbind, lapply(rd.forest, function(tt) tt$node.feature))
+  out$node.feature <- sparseMatrix(i=temp[,1], j=temp[,2], dims=c(n * ntree, p))
+  b <- Sys.time()
+  
+  
+}
 
+readTree <- function(rfobj, k, x, return.node.feature, subsetFun, wtFun) {
+  
   n <- nrow(x)
   p <- ncol(x)
-  nrnodes <- rfobj$nrnodes
   ntree <- rfobj$ntree
-
-
+  
   # Read tree level data from RF
   out <- list()
-  out$tree.info <- lapply(1:rfobj$ntree, function(k) getTree(rfobj, k))
-  parent <- lapply(out$tree.info, getParent)
-  out$tree.info <- as.data.frame(do.call(rbind, out$tree.info), 
-                                 stringsAsFactors=FALSE)
+  out$tree.info <- as.data.frame(getTree(rfobj, k))
+  parents <- getParent(out$tree.info)
+  out$tree.info$parent <- parents
+  out$tree.info$tree <- k
   
-  n.node.t <- rfobj$forest$ndbigtree
-  out$tree.info$tree <- rep(1:rfobj$ntree, times=n.node.t)
-  out$tree.info$parent <- unlist(parent)
-  parents <- out$tree.info$parent
-
   # Repeat each leaf node in node.feature based on specified sampling:
   # importance sampling = size_node
   # uniform = 1
-  leaf.node <- out$tree.info$status == -1
+  select.node <- out$tree.info$status == -1
   rep.node <- rep(0, nrow(out$tree.info))
-  select.node <- leaf.node
   
-
-  leaf.counts <- unname(unlist(apply(rfobj$obs.node, MAR=2, table)))
-  out$tree.info$size_node[leaf.node] <- leaf.counts
- 
+  leaf.counts <- unname(table(rfobj$obs.nodes[,k]))
+  out$tree.info$size_node[select.node] <- leaf.counts
+  
   select.node <- select.node & subsetFun(out$tree.info)
   out$tree.info <- out$tree.info[select.node,]
   rep.node[select.node] <- trunc(wtFun(out$tree.info))
-
+  
   # Extract decision paths from leaf nodes as binary sparse matrix
-  if (return_node.feature) {
-    var.nodes <- rfobj$forest$bestvar
+  if (return.node.feature) {
+    row.offset <- (k - 1) * nrow(x)
+    var.nodes <- as.integer(rfobj$forest$bestvar[,k])
     total.rows <- sum(rep.node[select.node])
-    sparse.idcs <- nodeVars(var.nodes, as.integer(ntree), 
-                            as.integer(nrow(var.nodes)), 
+    sparse.idcs <- nodeVars(var.nodes, 
+                            as.integer(length(select.node)), 
                             as.integer(p),
                             as.integer(parents),
                             as.integer(select.node),
-                            as.integer(rep.node), 
-                            as.integer(n.node.t),
+                            as.integer(rep.node),
+                            as.integer(row.offset),
                             matrix(0L, nrow=(total.rows * p), ncol=2))
-    sparse.idcs <- sparse.idcs[!sparse.idcs[,1] == 0,]
-    out$node.feature <- sparseMatrix(i=sparse.idcs[,1], j=sparse.idcs[,2], 
-                                     dims=c(total.rows, p))
-
+    out$node.feature <- sparse.idcs[!sparse.idcs[,1] == 0,]
   }
+  
   return(out)
 }
+
 
 getParent <- function(tree.info) {
   # Generate a vector of parent node indices from output of getTree
@@ -70,3 +83,4 @@ getParent <- function(tree.info) {
   parent[1] <- 0
   return(parent)
 }
+
