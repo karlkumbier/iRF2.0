@@ -12,7 +12,8 @@ combine <- function(...) {
    ntree <- sum(trees)
    rf$ntree <- ntree
    nforest <- length(rflist)
-   haveTest <- ! any(sapply(rflist, function(x) is.null(x$test)))
+   haveTest <- !any(sapply(rflist, function(x) is.null(x$test)))
+   have.obsnodes <- !any(sapply(rflist, function(x) x$obs.nodes == 0))
    ## Check if predictor variables are identical.
    vlist <- lapply(rflist, function(x) rownames(importance(x)))
    numvars <- sapply(vlist, length)
@@ -150,6 +151,10 @@ combine <- function(...) {
        for(i in 1:nforest)
            rf$proximity <- rf$proximity + rflist[[i]]$proximity * rflist[[i]]$ntree
        rf$proximity <- rf$proximity / ntree
+   }
+
+   if (have.obsnodes) {
+    rf$obs.nodes <- do.call(cbind, lapply(rflist, function(x) x$obs.nodes))
    }
    
    ## Set confusion matrix and error rates to NULL

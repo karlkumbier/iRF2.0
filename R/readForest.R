@@ -5,7 +5,7 @@ readForest <- function(rfobj  # a randomForest object with forest object
                        , subsetFun = function(x) rep(TRUE, nrow(x))
                        , wtFun = function(x) x$size_node
                        , n.core=1
-){
+                      ){
   
   require(data.table)
   if (is.null(rfobj$forest))
@@ -19,7 +19,7 @@ readForest <- function(rfobj  # a randomForest object with forest object
   rd.forest <- mclapply(1:ntree, readTree, rfobj=rfobj, x=x, 
                         return.node.feature=return.node.feature,
                         subsetFun=subsetFun, wtFun=wtFun,
-                        mc.cores=4)
+                        mc.cores=n.core)
   out$tree.info <- rbindlist(lapply(rd.forest, function(tt) tt$tree.info))
   temp <- do.call(rbind, lapply(rd.forest, function(tt) tt$node.feature))
   out$node.feature <- sparseMatrix(i=temp[,1], j=temp[,2], dims=c(n * ntree, p))

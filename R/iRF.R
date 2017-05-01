@@ -17,7 +17,8 @@ iRF <- function(x, y,
                 n.bootstrap=30, 
                 verbose=TRUE, 
                 ...) {
-  
+
+  require(data.table)  
   n <- nrow(x)
   p <- ncol(x)
   class.irf <- is.factor(y)
@@ -62,7 +63,7 @@ iRF <- function(x, y,
       if (verbose){cat('finding interactions ... ')}
       
       stability.score[[iter]] <- list()      
-      interact.list[[iter]] <- mclapply(1:n.bootstrap, function(i.b) {
+      interact.list[[iter]] <- lapply(1:n.bootstrap, function(i.b) {
         
         if (class.irf) {
           n.class <- table(y)
@@ -75,13 +76,17 @@ iRF <- function(x, y,
         }
         
         #2.1.1: fit random forest on bootstrap sample
-        rf.b <- randomForest(x[sample.id,], y[sample.id], 
-                             xtest, ytest, 
-                             ntree=ntree, 
-                             mtry_select_prob=mtry.select.prob, 
-                             keep.forest=TRUE, 
-                             track.nodes=TRUE, 
-                             ...)
+        rf.b <- foreach(nt=ntree.id, .combine=combine, 
+                        .multicombine=TRUE, .packages='iRF') %dopar% {
+                          randomForest(x[sample.id,], y[sample.id], 
+                                       xtest, ytest, 
+                                       ntree=nt, 
+                                       mtry_select_prob=mtry.select.prob, 
+                                       keep.forest=TRUE, 
+                                       track.nodes=TRUE,
+                                       ...)
+                        }
+          
         
         #2.1.2: run generalized RIT on rf.b to learn interactions
         ints <- generalizedRIT(rf=rf.b, x=x[sample.id,], y=y[sample.id], 
@@ -89,12 +94,13 @@ iRF <- function(x, y,
                                wtFun=node.sample$wt,
                                class.irf=class.irf, 
                                class.id=class.id, 
-                               varnames.grp=varnames.grp, 
+                               varnames.grp=varnames.grp,
+                               cutoff.unimp.feature=cutoff.unimp.feature,
                                rit.param=rit.param,
-                               cutoff.unimp.feature=cutoff.unimp.feature) 
+                               n.core=n.core) 
         return(ints)       
         
-      }, mc.cores=n.core)
+      })
       
       # 2.2: calculate stability scores of interactions
       if (!is.null(varnames.grp))
@@ -140,13 +146,15 @@ generalizedRIT <- function(rf, x, y,
                            class.id, 
                            varnames.grp,
                            cutoff.unimp.feature, 
-                           rit.param) {
+                           rit.param,
+                           n.core) {
   
   # Extract decision paths from rf as binary matrix to be passed to RIT
   rforest <- readForest(rf, x=x, 
                         return.node.feature=TRUE,
                         subsetFun=subsetFun, 
-                        wtFun=wtFun)
+                        wtFun=wtFun,
+                        n.core=n.core)
   
   # Select class specific leaf nodes if classification
   select.leaf.id <- rep(TRUE, nrow(rforest$tree.info))
@@ -175,7 +183,7 @@ generalizedRIT <- function(rf, x, y,
     }
     
     interactions <- RIT(nf, depth=rit.param[1], n_trees=rit.param[2], 
-                        branch=rit.param[3])
+                        branch=rit.param[3], n_cores=n.core)
     interactions <- interactions$Interaction
     interactions <- gsub(' ', '_', interactions)
     return(interactions)
