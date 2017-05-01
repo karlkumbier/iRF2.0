@@ -16,7 +16,6 @@ readForest <- function(rfobj  # a randomForest object with forest object
   n <- nrow(x)
   
   out <- list()
-  a <- Sys.time()
   rd.forest <- mclapply(1:ntree, readTree, rfobj=rfobj, x=x, 
                         return.node.feature=return.node.feature,
                         subsetFun=subsetFun, wtFun=wtFun,
@@ -24,8 +23,7 @@ readForest <- function(rfobj  # a randomForest object with forest object
   out$tree.info <- rbindlist(lapply(rd.forest, function(tt) tt$tree.info))
   temp <- do.call(rbind, lapply(rd.forest, function(tt) tt$node.feature))
   out$node.feature <- sparseMatrix(i=temp[,1], j=temp[,2], dims=c(n * ntree, p))
-  b <- Sys.time()
-  
+  return(out)
   
 }
 
