@@ -10,7 +10,8 @@ Depends:
     graphics,
     akima,
     FSInteract,
-    Matrix
+    Matrix,
+    data.table
 Suggests:
     RColorBrewer,
     MASS,
