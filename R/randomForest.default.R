@@ -380,7 +380,7 @@ mylevels <- function(x) if (is.factor(x)) levels(x) else 0
                              nrnodes = max.nodes, ntree = ntree,
                              nclass = nclass, xlevels=xlevels)
                     },
-                    obs.nodes = rfout$obsnodes,
+                    obs.nodes = if (!track.nodes) NULL else rfout$obsnodes,
                     test = if(!testdat) NULL else list(
                     predicted = out.class.ts,
                     err.rate = if (labelts) t(matrix(rfout$errts, nclass+1,
@@ -512,7 +512,7 @@ mylevels <- function(x) if (is.factor(x)) levels(x) else 0
                     coefs = if (corr.bias) rfout$coef else NULL,
                     y = y + ymean,
                     feature.nodes = rfout$featurenodes,
-                    obs.nodes = rfout$obsnodes,
+                    obs.nodes = if (!track.nodes) NULL else rfout$obsnodes,
                     test = if(testdat) {
                         list(predicted = structure(rfout$ytestpred + ymean,
                              names=xts.row.names),
