@@ -6,7 +6,7 @@ To download and install the package, use `devtools`:
 
 ```r 
 library(devtools)
-devtools::install_github("sumbose/iRF")
+devtools::install_github("https://github.com/karlkumbier/iRF2.0")
 ```
 
 You can subsequently load the package with the usual R commands:
