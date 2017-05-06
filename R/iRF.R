@@ -53,7 +53,7 @@ iRF <- function(x, y,
                                  randomForest(x, y, 
                                               xtest, ytest, 
                                               ntree=nt, 
-                                              mtry_select_prob=mtry.select.prob, 
+                                              mtry.select.prob=mtry.select.prob, 
                                               keep.forest=TRUE, 
                                               ...)
                                }
@@ -81,7 +81,7 @@ iRF <- function(x, y,
                           randomForest(x[sample.id,], y[sample.id], 
                                        xtest, ytest, 
                                        ntree=nt, 
-                                       mtry_select_prob=mtry.select.prob, 
+                                       mtry.select.prob=mtry.select.prob, 
                                        keep.forest=TRUE, 
                                        track.nodes=TRUE,
                                        ...)

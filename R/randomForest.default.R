@@ -5,8 +5,8 @@ mylevels <- function(x) if (is.factor(x)) levels(x) else 0
     function(x, y=NULL,  xtest=NULL, ytest=NULL, ntree=500,
              mtry= if (!is.null(y) && !is.factor(y))
              max(floor(ncol(x)/3), 1) else floor(sqrt(ncol(x))),
-             mtry_select_prob = rep(1/ncol(x), ncol(x)),
-             keep_subset_var = NULL, 
+             mtry.select.prob = rep(1/ncol(x), ncol(x)),
+             keep.subset.var = NULL, 
              replace=TRUE, classwt=NULL, cutoff, strata,
              sampsize = if (replace) nrow(x) else ceiling(.632*nrow(x)),
              nodesize = if (!is.null(y) && !is.factor(y)) 5 else 1,
@@ -17,17 +17,17 @@ mylevels <- function(x) if (is.factor(x)) levels(x) else 0
              keep.forest=!is.null(y) && is.null(xtest), corr.bias=FALSE,
              keep.inbag=FALSE, track.nodes=FALSE,...) {
 
-        if (length(mtry_select_prob)!=ncol(x))
-            stop('length of mtry_select_prob != ncol(x)')
+        if (length(mtry.select.prob)!=ncol(x))
+            stop('length of mtry.select.prob != ncol(x)')
         
-        mtry = mtry + length(keep_subset_var)
+        mtry = mtry + length(keep.subset.var)
         if (mtry > ncol(x))
-            stop("mtry + length(keep_subset_var) exceeds total number of features")
+            stop("mtry + length(keep.subset.var) exceeds total number of features")
 
-	if (is.null(keep_subset_var))
+	if (is.null(keep.subset.var))
 	   subsetVar = as.integer(0)
 	else
-	   subsetVar = as.integer(keep_subset_var)
+	   subsetVar = as.integer(keep.subset.var)
 
     addclass <- is.null(y)
     classRF <- addclass || is.factor(y)
@@ -256,13 +256,13 @@ mylevels <- function(x) if (is.factor(x)) levels(x) else 0
                     keep.inbag)),
                     ntree = as.integer(ntree),
                     mtry = as.integer(mtry),
-                    selprob = as.double(mtry_select_prob),
+                    selprob = as.double(mtry.select.prob),
                     obsnodes = obs.nodes,
                     tracknodes = as.integer(track.nodes),
                     subsetVar = subsetVar, 
-                    subsetVarCard = ifelse(is.null(keep_subset_var)
+                    subsetVarCard = ifelse(is.null(keep.subset.var)
                                          , as.integer(0)
-                                         , as.integer(length(keep_subset_var))
+                                         , as.integer(length(keep.subset.var))
                                           ), 
                     ipi = as.integer(ipi),
                     classwt = as.double(cwt),
@@ -416,13 +416,13 @@ mylevels <- function(x) if (is.factor(x)) levels(x) else 0
                     as.integer(nrnodes),
                     as.integer(ntree),
                     as.integer(mtry),
-                    selprob = as.double(mtry_select_prob),
+                    selprob = as.double(mtry.select.prob),
                     obsnodes = obs.nodes,
                     trackodes = as.integer(track.nodes),
                     subsetVar = subsetVar,
-                    subsetVarCard = ifelse(is.null(keep_subset_var)
+                    subsetVarCard = ifelse(is.null(keep.subset.var)
                                          , as.integer(0)
-                                         , as.integer(length(keep_subset_var))
+                                         , as.integer(length(keep.subset.var))
                                           ),
                     as.integer(c(importance, localImp, nPerm)),
                     as.integer(ncat),
