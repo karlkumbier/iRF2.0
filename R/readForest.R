@@ -1,13 +1,12 @@
-#   PASS DATA THROUGH FOREST
-readForest <- function(rfobj  # a randomForest object with forest object
-                       , x   # n x p data matrix 
-                       , return.node.feature=TRUE
-                       , subsetFun = function(x) rep(TRUE, nrow(x))
-                       , wtFun = function(x) x$size_node
-                       , n.core=1
-                      ){
+readForest <- function(rfobj,  # a randomForest object with forest object
+                       x,   # n x p data matrix 
+                       return.node.feature=TRUE,
+                       subsetFun = function(x) rep(TRUE, nrow(x)),
+                       wtFun = function(x) x$size_node,
+                       n.core=1){
   
   require(data.table)
+  require(parallel)
   if (is.null(rfobj$forest))
     stop('No Forest component in the randomForest object')
  
@@ -41,12 +40,16 @@ readTree <- function(rfobj, k, x, return.node.feature, subsetFun, wtFun) {
   out$tree.info$tree <- k
   
   # Repeat each leaf node in node.feature based on specified sampling:
-  # importance sampling = size_node
-  # uniform = 1
+  # importance sampling = size_node; uniform = 1
   select.node <- out$tree.info$status == -1
   rep.node <- rep(0, nrow(out$tree.info))
   
-  leaf.counts <- unname(table(rfobj$obs.nodes[,k]))
+  if (is.null(rfobj$obs.nodes)) {
+    fit.data <- passData(rfobj, x, out$tree.info, k)
+    leaf.counts <- rowSums(fit.data[out$tree.info$status == -1,])
+  } else {
+    leaf.counts <- unname(table(rfobj$obs.nodes[,k]))
+  }
   out$tree.info$size_node[select.node] <- leaf.counts
   
   select.node <- select.node & subsetFun(out$tree.info)
@@ -80,5 +83,35 @@ getParent <- function(tree.info) {
   parent <- parent %% nrow(tree.info)
   parent[1] <- 0
   return(parent)
+}
+
+
+passData <- function(rfobj, x, tt, k) {
+  # Pass data through rf object
+  
+  leaf.id <- tt$status == -1
+  n <- nrow(x)
+  n.node <- rfobj$forest$ndbigtree[k]
+  node.composition <- matrix(FALSE, nrow=n.node, ncol=n)
+  node.composition[1,] <- TRUE
+  
+  
+  for (i in which(!leaf.id)){
+    
+    # determine children and split point for current node
+    d.left <- tt$"left daughter"[i]
+    d.right <- tt$"right daughter"[i]
+    split.var <- tt$"split var"[i]
+    split.pt <- tt$"split point"[i]
+    
+    parent.id <- node.composition[i,]
+    d.left.id <- (x[,split.var] < split.pt) & parent.id
+    d.right.id <- (x[,split.var] >= split.pt) & parent.id
+    
+    node.composition[d.left,] <- d.left.id
+    node.composition[d.right,] <- d.right.id
+  }
+  
+  return(node.composition)
 }
 
