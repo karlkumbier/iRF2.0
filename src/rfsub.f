@@ -26,7 +26,7 @@ c     SUBROUTINE BUILDTREE
      1     nclass, treemap, bestvar, bestsplit, bestsplitnext, tgini,
      1     nodestatus,nodepop, nodestart, classpop, tclasspop,
      1     tclasscat,ta,nrnodes, idmove, ndsize, ncase, mtry,
-     1     selprob, featuremat, obsmat, subsetvar, mcard,
+     1     selprob, subsetvar, mcard,
      1     iv,
      1     nodeclass, ndbigtree, win, wr, wl, mred, nuse, mind,
      1    	tmpcheck)
@@ -55,8 +55,6 @@ c     main program.
      1     ncase(nsample), b(mdim,nsample),
      1     iv(mred), nodeclass(nrnodes), mind(mred)
       integer tmpcheck, subsetvar(mcard)
-      integer featuremat(mdim, nrnodes)
-      integer obsmat(nsample, nrnodes)
       double precision selprob(mred)
 
       double precision tclasspop(nclass), classpop(nclass, nrnodes),
@@ -73,9 +71,7 @@ c     main program.
       call zermr(classpop,nclass,nrnodes)
 	  
 
-c     initialize matrices for tracking observations and variables
-      obsmat(:,:) = 0
-      featuremat(:,:) = 0
+c     initialize matrices for tracking observations and variables 
 
       do j=1,nclass
          classpop(j, 1) = tclasspop(j)
@@ -121,19 +117,6 @@ c     If the node is terminal, move on.  Otherwise, split.
             endif
          endif
 
-c     update featuremat to indicate that selected variable falls on path for
-c     each child node         
-        if (ncur .eq. 1) then
-          featuremat(msplit, ncur + 1) = 1
-          featuremat(msplit, ncur + 2) = 1
-        else
-          do j = 1,mdim
-            featuremat(j, ncur + 1) = featuremat(j, kbuild)
-            featuremat(j, ncur + 2) = featuremat(j, kbuild)
-          end do
-          featuremat(msplit, ncur + 1) = featuremat(msplit, kbuild) + 1
-          featuremat(msplit, ncur + 2) = featuremat(msplit, kbuild) + 1
-        end if
 
          call movedata(a,ta,mdim,nsample,ndstart,ndend,idmove,ncase,
      1        msplit,cat,best,ndendl)
@@ -143,17 +126,14 @@ c     each child node
          nodestart(ncur+1) = ndstart
          nodestart(ncur+2) = ndendl + 1
 
-c     find class populations in both nodes and increment obsmat
-c     accordingly
+c     find class populations in both nodes
          do n = ndstart, ndendl
             nc = ncase(n)
-            obsmat(nc, ncur + 1) = 1
             j=cl(nc)
             classpop(j,ncur+1) = classpop(j,ncur+1) + win(nc)
          end do
          do n = ndendl+1, ndend
             nc = ncase(n)
-            obsmat(nc, ncur + 2) = 1
             j = cl(nc)
             classpop(j,ncur+2) = classpop(j,ncur+2) + win(nc)
          end do

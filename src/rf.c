@@ -106,7 +106,6 @@ void classRF(double *x, int *dimx, int *cl, int *ncl, int *cat, int *maxcat,
 	*jtr, *classFreq, *idmove, *jvr,
 	*at, *a, *b, *mind, *nind, *jts, *oobpair;
     int **strata_idx, *strata_size, last, ktmp, nEmpty, ntry;
-    int *featuremat, *obsmat;
 
     double av=0.0, delta=0.0;
 
@@ -171,8 +170,8 @@ void classRF(double *x, int *dimx, int *cl, int *ncl, int *cat, int *maxcat,
     nright =        (int *) S_alloc(nclass, sizeof(int));
     nrightimp =     (int *) S_alloc(nclass, sizeof(int));
     nout =          (int *) S_alloc(nclass, sizeof(int));
-    featuremat =    (int *) S_alloc(mdim * *nrnodes, sizeof(int));
-    obsmat =        (int *) S_alloc(nsample * *nrnodes, sizeof(int));
+   
+    
 
     if (oobprox) {
     	oobpair = (int *) S_alloc(near*near, sizeof(int));
@@ -356,9 +355,7 @@ void classRF(double *x, int *dimx, int *cl, int *ncl, int *cat, int *maxcat,
 								ta, nrnodes, idmove, &ndsize, ncase,
 								&mtry, 
 								selprob,
-                featuremat,
-                obsmat,
-                                                                subsetVar, &subsetCard,
+                subsetVar, &subsetCard,
 								varUsed, nodeclass + idxByNnode,
 								ndbigtree + jb, win, wr, wl, &mdim,
 								&nuse, mind, &tmpcheck);

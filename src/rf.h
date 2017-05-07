@@ -102,9 +102,7 @@ extern void F77_NAME(buildtree)(int *a, int *b, int *cl, int *cat,
 				double *tclasspop, double *tclasscat, 
 				int *ta, int *nrnodes, int *, 
 				int *, int *, int *, 
-				double *,
-        int *, /*varmat*/
-        int *, /*obsmat*/
+				double *, 
 				int *, int *,
 				int *, int *, int *, 
 				double *, double *, double *,
