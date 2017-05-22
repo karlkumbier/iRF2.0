@@ -20,6 +20,7 @@ readForest <- function(rfobj,  # a randomForest object with forest object
                         subsetFun=subsetFun, wtFun=wtFun,
                         mc.cores=n.core)
   out$tree.info <- rbindlist(lapply(rd.forest, function(tt) tt$tree.info))
+  out$node.obs <- do.call(rbind, lapply(rd.forest, function(tt) tt$node.obs))
   temp <- do.call(rbind, lapply(rd.forest, function(tt) tt$node.feature))
   out$node.feature <- sparseMatrix(i=temp[,1], j=temp[,2], dims=c(n * ntree, p))
   return(out)
@@ -47,6 +48,7 @@ readTree <- function(rfobj, k, x, return.node.feature, subsetFun, wtFun) {
   if (is.null(rfobj$obs.nodes)) {
     fit.data <- passData(rfobj, x, out$tree.info, k)
     leaf.counts <- rowSums(fit.data[out$tree.info$status == -1,])
+    out$node.obs <- fit.data
   } else {
     leaf.counts <- unname(table(rfobj$obs.nodes[,k]))
   }
