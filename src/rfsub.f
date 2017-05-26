@@ -29,7 +29,7 @@ c     SUBROUTINE BUILDTREE
      1     selprob, subsetvar, mcard,
      1     iv,
      1     nodeclass, ndbigtree, win, wr, wl, mred, nuse, mind,
-     1    	tmpcheck)
+     1     tmpcheck)
 
 c     Buildtree consists of repeated calls to two subroutines, Findbestsplit
 c     and Movedata.  Findbestsplit does just that--it finds the best split of
@@ -69,7 +69,6 @@ c     main program.
       call zerv(nodestart,nrnodes)
       call zerv(nodepop,nrnodes)
       call zermr(classpop,nclass,nrnodes)
-	  
 
 c     initialize matrices for tracking observations and variables 
 
@@ -80,8 +79,19 @@ c     initialize matrices for tracking observations and variables
       nodestart(1) = 1
       nodepop(1) = nuse
       nodestatus(1) = 2
+
+      depth = 0
 c     start main loop
       do 30 kbuild = 1, nrnodes
+
+         if (kbuild .ge. 2 ** depth) then
+          depth = depth + 1
+         end if
+
+         if (depth .gt. mcard) then 
+          mcard = 0
+         end if  
+
 c         call intpr("kbuild", 6, kbuild, 1)
 c         call intpr("ncur", 4, ncur, 1)
          if (kbuild .gt. ncur) goto 50

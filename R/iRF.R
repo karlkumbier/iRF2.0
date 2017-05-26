@@ -15,7 +15,8 @@ iRF <- function(x, y,
                 rit.param=c(5, 100, 2), 
                 varnames.grp=NULL, 
                 n.bootstrap=30, 
-                verbose=TRUE, 
+                verbose=TRUE,
+                keep.subset.var=NULL, 
                 ...) {
 
   require(data.table)  
@@ -48,13 +49,18 @@ iRF <- function(x, y,
     
     ## 1: Grow Random Forest on full data
     print(paste('iteration = ', iter))
-    rf.list[[iter]] <- foreach(nt=ntree.id, .combine=combine, 
+    tree.idcs <- vector('list', length(ntree.id))
+    tree.idcs[[1]] <- 1:cumsum(ntree.id)[1]
+    for (i in 2:length(ntree.id)) 
+      tree.idcs[[i]] <- (cumsum(ntree.id)[i-1] + 1):cumsum(ntree.id)[i]
+    rf.list[[iter]] <- foreach(i=1:length(ntree.id), .combine=combine, 
                                .multicombine=TRUE, .packages='iRF') %dopar% {
                                  randomForest(x, y, 
                                               xtest, ytest, 
-                                              ntree=nt, 
+                                              ntree=ntree.id[i], 
                                               mtry.select.prob=mtry.select.prob, 
-                                              keep.forest=TRUE, 
+                                              keep.forest=TRUE,
+                                              keep.subset.var=keep.subset.var[tree.idcs[[i]]],
                                               ...)
                                }
     
@@ -76,14 +82,15 @@ iRF <- function(x, y,
         }
         
         #2.1.1: fit random forest on bootstrap sample
-        rf.b <- foreach(nt=ntree.id, .combine=combine, 
+        rf.b <- foreach(i=1:length(ntree.id), .combine=combine, 
                         .multicombine=TRUE, .packages='iRF') %dopar% {
                           randomForest(x[sample.id,], y[sample.id], 
                                        xtest, ytest, 
-                                       ntree=nt, 
+                                       ntree=ntree.id[i], 
                                        mtry.select.prob=mtry.select.prob, 
                                        keep.forest=TRUE, 
                                        track.nodes=TRUE,
+                                       keep.subset.var=tree.idcs[[i]],
                                        ...)
                         }
           
@@ -113,6 +120,16 @@ iRF <- function(x, y,
       stability.score[[iter]] <- summarizeInteract(interact.list[[iter]], 
                                                     varnames=varnames.new)      
       
+
+      # sample interaction and update keep.subset.var
+      sampled.int <- sample(1:length(stability.score[[iter]]), ntree, 
+                            prob=stability.score[[iter]], replace=TRUE)
+      sampled.int <- names(stability.score[[iter]])[sampled.int]
+      sampled.int <- strsplit(sampled.int, '_')
+      keep.subset.var <- lapply(sampled.int, function(ii) 
+        which(varnames.new %in% ii))
+      print(keep.subset.var)
+
     } # end if (find_interaction)
     
     ## 3: update mtry.select.prob 
