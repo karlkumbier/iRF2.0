@@ -23,7 +23,6 @@ mylevels <- function(x) if (is.factor(x)) levels(x) else 0
     #mtry <- mtry + length(keep.subset.var)
     #if (mtry > ncol(x))
     #  stop("mtry + length(keep.subset.var) exceeds total number of features")
-    
     if (is.null(keep.subset.var)) {
       subsetVar <- as.integer(0)
       subsetVarCard <- rep(0L, ntree)
@@ -44,6 +43,8 @@ mylevels <- function(x) if (is.factor(x)) levels(x) else 0
       maxCard <- as.integer(length(keep.subset.var))
       subsetVarCard <- rep(maxCard, ntree)
     }
+    
+    stopifnot(all(subsetVar) <= ncol(x))
     
     addclass <- is.null(y)
     classRF <- addclass || is.factor(y)
@@ -250,7 +251,7 @@ mylevels <- function(x) if (is.factor(x)) levels(x) else 0
       cwt <- classwt
       threshold <- cutoff
       error.test <- if (labelts) double((nclass+1) * ntree) else double(1)
-      
+     #46 
       rfout <- .C("classRF",
                   x = x,
                   xdim = as.integer(c(p, n)),
@@ -284,14 +285,14 @@ mylevels <- function(x) if (is.factor(x)) levels(x) else 0
                   nodesize = as.integer(nodesize),
                   outcl = integer(nsample),
                   counttr = integer(nclass * nsample),
-                  prox = prox,
+                  prox = prox,#
                   impout = impout,
                   impSD = impSD,
                   impmat = impmat,
-                  nrnodes = as.integer(nrnodes),
+                  nrnodes = as.integer(nrnodes),#
                   ndbigtree = integer(ntree),
                   nodestatus = integer(nt * nrnodes),
-                  bestvar = integer(nt * nrnodes),
+                  bestvar = integer(nt * nrnodes),#
                   treemap = integer(nt * 2 * nrnodes),
                   nodepred = integer(nt * nrnodes),
                   xbestsplit = double(nt * nrnodes),

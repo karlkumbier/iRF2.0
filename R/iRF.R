@@ -16,7 +16,8 @@ iRF <- function(x, y,
                 varnames.grp=NULL, 
                 n.bootstrap=30, 
                 verbose=TRUE,
-                keep.subset.var=NULL, 
+                keep.subset.var=NULL,
+                force.int=TRUE,
                 ...) {
 
   require(data.table)  
@@ -90,7 +91,7 @@ iRF <- function(x, y,
                                        mtry.select.prob=mtry.select.prob, 
                                        keep.forest=TRUE, 
                                        track.nodes=TRUE,
-                                       keep.subset.var=tree.idcs[[i]],
+                                       keep.subset.var=keep.subset.var[[i]],
                                        ...)
                         }
           
@@ -122,14 +123,14 @@ iRF <- function(x, y,
       
 
       # sample interaction and update keep.subset.var
+      if (force.int) {
       sampled.int <- sample(1:length(stability.score[[iter]]), ntree, 
                             prob=stability.score[[iter]], replace=TRUE)
       sampled.int <- names(stability.score[[iter]])[sampled.int]
       sampled.int <- strsplit(sampled.int, '_')
       keep.subset.var <- lapply(sampled.int, function(ii) 
         which(varnames.new %in% ii))
-      print(keep.subset.var)
-
+      }
     } # end if (find_interaction)
     
     ## 3: update mtry.select.prob 
