@@ -9,17 +9,17 @@ iRF <- function(x, y,
                 keep.impvar.quantile=NULL, 
                 interactions.return=NULL, 
                 node.sample=list(subset=function(x) rep(TRUE, nrow(x)),
-                                wt=function(x) x$size_node), 
+                                 wt=function(x) x$size.node), 
                 cutoff.unimp.feature=0, 
                 class.id=1, 
-                rit.param=c(5, 100, 2), 
+                rit.param=list(depth=5, ntree=100, nchild=2, class.cut=NULL), 
                 varnames.grp=NULL, 
                 n.bootstrap=30, 
                 verbose=TRUE,
                 keep.subset.var=NULL,
                 force.int=TRUE,
                 ...) {
-
+  
   require(data.table)  
   n <- nrow(x)
   p <- ncol(x)
@@ -50,10 +50,10 @@ iRF <- function(x, y,
     
     ## 1: Grow Random Forest on full data
     print(paste('iteration = ', iter))
-    tree.idcs <- vector('list', length(ntree.id))
-    tree.idcs[[1]] <- 1:cumsum(ntree.id)[1]
-    for (i in 2:length(ntree.id)) 
-      tree.idcs[[i]] <- (cumsum(ntree.id)[i-1] + 1):cumsum(ntree.id)[i]
+    tree.idcs <- c(1, cumsum(ntree.id) + 1)
+    tree.idcs <- lapply(2:length(tree.idcs), function(i)
+      tree.idcs[i-1]:(tree.idcs[i] - 1))
+    
     rf.list[[iter]] <- foreach(i=1:length(ntree.id), .combine=combine, 
                                .multicombine=TRUE, .packages='iRF') %dopar% {
                                  randomForest(x, y, 
@@ -74,9 +74,8 @@ iRF <- function(x, y,
         
         if (class.irf) {
           n.class <- table(y)
-          sampleCl <- function(y, cc, n) sample(which(y == cc), n, replace=TRUE)
-          sample.id <- mapply(function(cc, nn) sampleCl(y, cc, nn),
-            as.factor(names(n.class)), n.class)
+          sample.id <- mapply(function(cc, nn) sampleClass(y, cc, nn),
+                              as.factor(names(n.class)), n.class)
           sample.id <- unlist(sample.id)
         } else {
           sample.id <- sample(n, n, replace=TRUE)
@@ -91,13 +90,14 @@ iRF <- function(x, y,
                                        mtry.select.prob=mtry.select.prob, 
                                        keep.forest=TRUE, 
                                        track.nodes=TRUE,
-                                       keep.subset.var=keep.subset.var[[i]],
+                                       keep.subset.var=keep.subset.var[tree.idcs[[i]]],
                                        ...)
                         }
-          
+        
         
         #2.1.2: run generalized RIT on rf.b to learn interactions
-        ints <- generalizedRIT(rf=rf.b, x=x[sample.id,], y=y[sample.id], 
+        ints <- generalizedRIT(rf=rf.b, 
+                               x=x[sample.id,], y=y[sample.id], 
                                subsetFun=node.sample$subset, 
                                wtFun=node.sample$wt,
                                class.irf=class.irf, 
@@ -119,17 +119,17 @@ iRF <- function(x, y,
         varnames.new <- 1:ncol(x)
       
       stability.score[[iter]] <- summarizeInteract(interact.list[[iter]], 
-                                                    varnames=varnames.new)      
+                                                   varnames=varnames.new)      
       
-
-      # sample interaction and update keep.subset.var
+      
+      # Sample interactions for initial splits of next forest
       if (force.int) {
-      sampled.int <- sample(1:length(stability.score[[iter]]), ntree, 
-                            prob=stability.score[[iter]], replace=TRUE)
-      sampled.int <- names(stability.score[[iter]])[sampled.int]
-      sampled.int <- strsplit(sampled.int, '_')
-      keep.subset.var <- lapply(sampled.int, function(ii) 
-        which(varnames.new %in% ii))
+        sampled.int <- sample(1:length(stability.score[[iter]]), ntree, 
+                              prob=stability.score[[iter]], replace=TRUE)
+        sampled.int <- names(stability.score[[iter]])[sampled.int]
+        sampled.int <- strsplit(sampled.int, '_')
+        keep.subset.var <- lapply(sampled.int, function(ii) 
+          which(varnames.new %in% ii))
       }
     } # end if (find_interaction)
     
@@ -157,7 +157,8 @@ iRF <- function(x, y,
 }
 
 
-generalizedRIT <- function(rf, x, y,
+generalizedRIT <- function(rf, 
+                           x, y,
                            subsetFun, 
                            wtFun, 
                            class.irf, 
@@ -174,14 +175,18 @@ generalizedRIT <- function(rf, x, y,
                         wtFun=wtFun,
                         n.core=n.core)
   
-  # Select class specific leaf nodes if classification
+  # Select class specific leaf nodes
   select.leaf.id <- rep(TRUE, nrow(rforest$tree.info))
-  if (class.irf & all(y %in% c(0, 1))) {
+  if (class.irf) {
     select.leaf.id <- rforest$tree.info$prediction == as.numeric(class.id) + 1
-    rforest <- subsetReadForest(rforest, select.leaf.id)
+  } else if (is.null(rit.param$probs)) {
+    select.leaf.id <- rep(TRUE, nrow(rforest$tree.info))
+  } else {
+    select.leaf.id <- rforest$tree.info$prediction > rit.param$class.cut
   }
-  nf <- rforest$node.feature
   
+  rforest <- subsetReadForest(rforest, select.leaf.id)
+  nf <- rforest$node.feature
   
   if (sum(select.leaf.id) < 2){
     return(character(0))
@@ -200,8 +205,8 @@ generalizedRIT <- function(rf, x, y,
       nf[,drop.id] <- FALSE
     }
     
-    interactions <- RIT(nf, depth=rit.param[1], n_trees=rit.param[2], 
-                        branch=rit.param[3], n_cores=n.core)
+    interactions <- RIT(nf, depth=rit.param$depth, n_trees=rit.param$ntree, 
+                        branch=rit.param$nchild, n_cores=n.core)
     interactions <- interactions$Interaction
     interactions <- gsub(' ', '_', interactions)
     return(interactions)
@@ -220,7 +225,7 @@ subsetReadForest <- function(rforest, subset.idcs) {
 groupFeature <- function(node.feature, grp){
   # Group feature level data in node.feature 
   sparse.mat <- is(node.feature, 'Matrix')
-    
+  
   grp.names <- unique(grp)
   makeGroup <- function(x, g) apply(as.matrix(x[,grp == g]), MAR=1, max) 
   node.feature.new <- sapply(grp.names, makeGroup, x=node.feature)
@@ -257,3 +262,5 @@ summarizeInteract <- function(store.out, varnames=NULL){
   
   return(store.tbl)
 }
+
+sampleClass <- function(y, cl, n) sample(which(y == cl), n, replace=TRUE)

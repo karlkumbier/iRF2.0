@@ -2,7 +2,7 @@ readForest <- function(rfobj,  # a randomForest object with forest object
                        x,   # n x p data matrix 
                        return.node.feature=TRUE,
                        subsetFun = function(x) rep(TRUE, nrow(x)),
-                       wtFun = function(x) x$size_node,
+                       wtFun = function(x) x$size.node,
                        n.core=1){
   
   require(data.table)
@@ -20,9 +20,15 @@ readForest <- function(rfobj,  # a randomForest object with forest object
                         subsetFun=subsetFun, wtFun=wtFun,
                         mc.cores=n.core)
   out$tree.info <- rbindlist(lapply(rd.forest, function(tt) tt$tree.info))
-  out$node.obs <- do.call(rbind, lapply(rd.forest, function(tt) tt$node.obs))
-  temp <- do.call(rbind, lapply(rd.forest, function(tt) tt$node.feature))
-  out$node.feature <- sparseMatrix(i=temp[,1], j=temp[,2], dims=c(n * ntree, p))
+  
+  # aggregate sparse feature matrix across forest
+  temp <- lapply(rd.forest, function(tt) tt$node.feature)
+  row.offset <- c(0, cumsum(sapply(temp, function(z) max(z[,1])))[-ntree])
+  n.rows <- sapply(temp, nrow)
+  temp <- do.call(rbind, temp)
+  temp[,1] <- temp[,1] + rep(row.offset, times=n.rows)
+  out$node.feature <- sparseMatrix(i=temp[,1], j=temp[,2], 
+                                   dims=c(max(temp[,1]), p))
   return(out)
   
 }
@@ -52,7 +58,7 @@ readTree <- function(rfobj, k, x, return.node.feature, subsetFun, wtFun) {
   } else {
     leaf.counts <- unname(table(rfobj$obs.nodes[,k]))
   }
-  out$tree.info$size_node[select.node] <- leaf.counts
+  out$tree.info$size.node[select.node] <- leaf.counts
   
   select.node <- select.node & subsetFun(out$tree.info)
   out$tree.info <- out$tree.info[select.node,]
@@ -60,7 +66,7 @@ readTree <- function(rfobj, k, x, return.node.feature, subsetFun, wtFun) {
   
   # Extract decision paths from leaf nodes as binary sparse matrix
   if (return.node.feature) {
-    row.offset <- (k - 1) * nrow(x)
+    row.offset <- 0
     var.nodes <- as.integer(rfobj$forest$bestvar[,k])
     total.rows <- sum(rep.node[select.node])
     sparse.idcs <- nodeVars(var.nodes, 
