@@ -36,6 +36,7 @@ iRF <- function(x, y,
   
   # initialize outputs
   rf.list <- list()
+  forced.vars <- list()
   if (!is.null(interactions.return)) {
     interact.list <- list()
     stability.score <- list()
@@ -64,6 +65,7 @@ iRF <- function(x, y,
                                               keep.subset.var=keep.subset.var[tree.idcs[[i]]],
                                               ...)
                                }
+    forced.vars[[iter]] <- keep.subset.var
     
     ## 2.1: Find interactions across bootstrap replicates
     if (iter %in% interactions.return){
@@ -153,6 +155,7 @@ iRF <- function(x, y,
   if (!is.null(interactions.return)){
     out$interaction <- stability.score
   }
+  out$forced <- forced.vars
   return(out)
 }
 
@@ -169,7 +172,9 @@ generalizedRIT <- function(rf,
                            n.core) {
   
   # Extract decision paths from rf as binary matrix to be passed to RIT
-  rforest <- readForest(rf, x=x, 
+  yy <- y
+  if (class.irf) yy <- as.numeric(yy) - 1
+  rforest <- readForest(rf, x=x, y=yy, 
                         return.node.feature=TRUE,
                         subsetFun=subsetFun, 
                         wtFun=wtFun,

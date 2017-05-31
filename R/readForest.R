@@ -1,5 +1,4 @@
-readForest <- function(rfobj,  # a randomForest object with forest object
-                       x,   # n x p data matrix 
+readForest <- function(rfobj, x, y=NULL, 
                        return.node.feature=TRUE,
                        subsetFun = function(x) rep(TRUE, nrow(x)),
                        wtFun = function(x) x$size.node,
@@ -13,9 +12,9 @@ readForest <- function(rfobj,  # a randomForest object with forest object
   ntree <- rfobj$ntree
   p <- ncol(x)
   n <- nrow(x)
-  
   out <- list()
-  rd.forest <- mclapply(1:ntree, readTree, rfobj=rfobj, x=x, 
+  
+  rd.forest <- mclapply(1:ntree, readTree, rfobj=rfobj, x=x, y=y,
                         return.node.feature=return.node.feature,
                         subsetFun=subsetFun, wtFun=wtFun,
                         mc.cores=n.core)
@@ -33,7 +32,7 @@ readForest <- function(rfobj,  # a randomForest object with forest object
   
 }
 
-readTree <- function(rfobj, k, x, return.node.feature, subsetFun, wtFun) {
+readTree <- function(rfobj, k, x, y, return.node.feature, subsetFun, wtFun) {
   
   n <- nrow(x)
   p <- ncol(x)
@@ -54,14 +53,21 @@ readTree <- function(rfobj, k, x, return.node.feature, subsetFun, wtFun) {
   if (is.null(rfobj$obs.nodes)) {
     fit.data <- passData(rfobj, x, out$tree.info, k)
     leaf.counts <- rowSums(fit.data[out$tree.info$status == -1,])
-    out$node.obs <- fit.data
+    which.leaf <- apply(fit.data[out$tree.info$status == -1,], MAR=2, which)
+    if (!is.null(y)) leaf.sd <- c(by(y, which.leaf, sdNode))
   } else {
     leaf.counts <- unname(table(rfobj$obs.nodes[,k]))
+    if (!is.null(y)) leaf.sd <- c(by(y, rfobj$obs.nodes[,k], sdNode))
   }
   out$tree.info$size.node[select.node] <- leaf.counts
   
   select.node <- select.node & subsetFun(out$tree.info)
   out$tree.info <- out$tree.info[select.node,]
+  if (!is.null(y)) {
+    out$tree.info$purity <- leaf.sd
+    out$tree.info$dec.purity <- pmax((sd(y) - leaf.sd) / sd(y), 0)
+  }
+  
   rep.node[select.node] <- trunc(wtFun(out$tree.info))
   
   # Extract decision paths from leaf nodes as binary sparse matrix
@@ -123,3 +129,4 @@ passData <- function(rfobj, x, tt, k) {
   return(node.composition)
 }
 
+sdNode <- function(x) ifelse(length(x) == 1, 0, sd(x))
