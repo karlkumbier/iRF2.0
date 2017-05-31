@@ -17,7 +17,7 @@ iRF <- function(x, y,
                 n.bootstrap=30, 
                 verbose=TRUE,
                 keep.subset.var=NULL,
-                force.int=TRUE,
+                force.int=FALSE,
                 ...) {
   
   require(data.table)  
