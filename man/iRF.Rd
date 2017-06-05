@@ -9,12 +9,21 @@
   binary classification with numeric predictors and response taking values in {0,1}.
 }
 \usage{
-  iRF(x, y, xtest=NULL, ytest=NULL, n.iter=5, ntree=500, n.core=1,
+  iRF(x, y, xtest=NULL, ytest=NULL, 
+      n.iter=5, 
+      ntree=500, 
+      n.core=1,
       mtry.select.prob = rep(1/ncol(x), ncol(x)),
-      keep.impvar.quantile=NULL, interactions.return=NULL,
-      cutoff.nodesize.prop = 0.1, cutoff.unimp.feature = 0,
-      class.id=1, rit.param=c(5, 1000, 2), varnames.grp=NULL,
-      n.bootstrap=30, verbose=TRUE, ...
+      keep.impvar.quantile=NULL, 
+      interactions.return=NULL,
+      node.sample=list(subset=function(x) rep(TRUE, nrow(x)),
+                       wt=function(x) x$size.node),
+      cutoff.unimp.feature = 0,
+      class.id=1, 
+      rit.param=list(depth=5, ntree=100, nchild=2, class.cut=NULL), 
+      varnames.grp=NULL,
+      n.bootstrap=30, 
+      verbose=TRUE, ...
      )
 }
 \arguments{
@@ -29,11 +38,12 @@
   \item{keep.impvar.quantile}{a nonnegative fraction q. If provided, all
   the variables with Gini importance in the top 100*q percentile are
   retained during random splitting variable selection in the next iteration}
-  \item{find.interaction}{find stable feature interaction using random
-    intersection trees?}
+  \item{interactions.return}{a numeric vector specifying which iterations to 
+    calculate interactions for. Note: interaction computation is
+    computationally intensive particularly when \code{n.bootstrap} is large.}
   \item{node.sample}{a named list containing two entries (1) \code{subset} a
     function that takes the output of \code{getTree} as an input and returns a
-    vector of indices, specifying which nodes to keep for RIT. (2) \code{wt} a
+    vector of indices, specifying which leaf nodes to keep for RIT. (2) \code{wt} a
     function that takes the output of \code{getTree} as an input and retruns a
     vector of weights, specifying the probability with which RIT will sample
     each node. These functions are used to sample leaf nodes based on various
@@ -43,10 +53,13 @@
     percentile are used to find feature interactions}
   \item{class.id}{which class of observations will be used to find
     class-specific interaction? Choose between 0 or 1. Default is set to 1.}
-  \item{rit.param}{a numeric triplet, containing (in this order) (a)
-    depth of random intersection trees, (b) number of random
-    intersection trees, (c) number of children in each split of a
-    random intersection tree}
+  \item{rit.param}{a named list, containing entries to specify 
+    \code{depth}: depth of random intersection trees
+    \code{ntree} number of random intersection trees
+    \code{nchild}: number of children in each split of a random intersection tree
+    \code{class.cut}: for regression iRF, threshold to group responses into
+    binary responses for RIT. If \code{NULL}, all leaf nodes from regression iRF
+    will be used as input to RIT}
   \item{varnames.grp}{If features can be grouped based on their
     demographics or correlation patterns, use the group of features or
     ``hyper-feature''s to conduct random intersection trees}

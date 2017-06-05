@@ -17,8 +17,7 @@ iRF <- function(x, y,
                 n.bootstrap=30, 
                 verbose=TRUE,
                 keep.subset.var=NULL,
-                force.int=FALSE,
-                ...) {
+               ...) {
   
   require(data.table)  
   n <- nrow(x)
@@ -36,7 +35,6 @@ iRF <- function(x, y,
   
   # initialize outputs
   rf.list <- list()
-  forced.vars <- list()
   if (!is.null(interactions.return)) {
     interact.list <- list()
     stability.score <- list()
@@ -65,7 +63,6 @@ iRF <- function(x, y,
                                               keep.subset.var=keep.subset.var[tree.idcs[[i]]],
                                               ...)
                                }
-    forced.vars[[iter]] <- keep.subset.var
     
     ## 2.1: Find interactions across bootstrap replicates
     if (iter %in% interactions.return){
@@ -125,14 +122,6 @@ iRF <- function(x, y,
       
       
       # Sample interactions for initial splits of next forest
-      if (force.int) {
-        sampled.int <- sample(1:length(stability.score[[iter]]), ntree, 
-                              prob=stability.score[[iter]], replace=TRUE)
-        sampled.int <- names(stability.score[[iter]])[sampled.int]
-        sampled.int <- strsplit(sampled.int, '_')
-        keep.subset.var <- lapply(sampled.int, function(ii) 
-          which(varnames.new %in% ii))
-      }
     } # end if (find_interaction)
     
     ## 3: update mtry.select.prob 
@@ -155,7 +144,6 @@ iRF <- function(x, y,
   if (!is.null(interactions.return)){
     out$interaction <- stability.score
   }
-  out$forced <- forced.vars
   return(out)
 }
 
@@ -172,9 +160,7 @@ generalizedRIT <- function(rf,
                            n.core) {
   
   # Extract decision paths from rf as binary matrix to be passed to RIT
-  yy <- y
-  if (class.irf) yy <- as.numeric(yy) - 1
-  rforest <- readForest(rf, x=x, y=yy, 
+  rforest <- readForest(rf, x=x, 
                         return.node.feature=TRUE,
                         subsetFun=subsetFun, 
                         wtFun=wtFun,
@@ -184,7 +170,7 @@ generalizedRIT <- function(rf,
   select.leaf.id <- rep(TRUE, nrow(rforest$tree.info))
   if (class.irf) {
     select.leaf.id <- rforest$tree.info$prediction == as.numeric(class.id) + 1
-  } else if (is.null(rit.param$probs)) {
+  } else if (is.null(rit.param$class.cut)) {
     select.leaf.id <- rep(TRUE, nrow(rforest$tree.info))
   } else {
     select.leaf.id <- rforest$tree.info$prediction > rit.param$class.cut

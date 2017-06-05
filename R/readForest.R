@@ -1,4 +1,4 @@
-readForest <- function(rfobj, x, y=NULL, 
+readForest <- function(rfobj, x, 
                        return.node.feature=TRUE,
                        subsetFun = function(x) rep(TRUE, nrow(x)),
                        wtFun = function(x) x$size.node,
@@ -14,7 +14,7 @@ readForest <- function(rfobj, x, y=NULL,
   n <- nrow(x)
   out <- list()
   
-  rd.forest <- mclapply(1:ntree, readTree, rfobj=rfobj, x=x, y=y,
+  rd.forest <- mclapply(1:ntree, readTree, rfobj=rfobj, x=x,
                         return.node.feature=return.node.feature,
                         subsetFun=subsetFun, wtFun=wtFun,
                         mc.cores=n.core)
@@ -32,7 +32,7 @@ readForest <- function(rfobj, x, y=NULL,
   
 }
 
-readTree <- function(rfobj, k, x, y, return.node.feature, subsetFun, wtFun) {
+readTree <- function(rfobj, k, x, return.node.feature, subsetFun, wtFun) {
   
   n <- nrow(x)
   p <- ncol(x)
@@ -45,28 +45,20 @@ readTree <- function(rfobj, k, x, y, return.node.feature, subsetFun, wtFun) {
   out$tree.info$parent <- parents
   out$tree.info$tree <- k
   
-  # Repeat each leaf node in node.feature based on specified sampling:
-  # importance sampling = size_node; uniform = 1
+  # Repeat each leaf node in node.feature based on specified sampling function
   select.node <- out$tree.info$status == -1
   rep.node <- rep(0, nrow(out$tree.info))
   
   if (is.null(rfobj$obs.nodes)) {
     fit.data <- passData(rfobj, x, out$tree.info, k)
     leaf.counts <- rowSums(fit.data[out$tree.info$status == -1,])
-    which.leaf <- apply(fit.data[out$tree.info$status == -1,], MAR=2, which)
-    if (!is.null(y)) leaf.sd <- c(by(y, which.leaf, sdNode))
   } else {
     leaf.counts <- unname(table(rfobj$obs.nodes[,k]))
-    if (!is.null(y)) leaf.sd <- c(by(y, rfobj$obs.nodes[,k], sdNode))
   }
   out$tree.info$size.node[select.node] <- leaf.counts
   
   select.node <- select.node & subsetFun(out$tree.info)
   out$tree.info <- out$tree.info[select.node,]
-  if (!is.null(y)) {
-    out$tree.info$purity <- leaf.sd
-    out$tree.info$dec.purity <- pmax((sd(y) - leaf.sd) / sd(y), 0)
-  }
   
   rep.node[select.node] <- trunc(wtFun(out$tree.info))
   
@@ -128,5 +120,3 @@ passData <- function(rfobj, x, tt, k) {
   
   return(node.composition)
 }
-
-sdNode <- function(x) ifelse(length(x) == 1, 0, sd(x))
