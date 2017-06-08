@@ -44,7 +44,7 @@ iRF <- function(x, y,
   a <- floor(ntree / n.core)
   b <- ntree %% n.core
   ntree.id <- c(rep(a + 1, b), rep(a, n.core - b))
-
+  #ntree.id <- rep(a,n.core)
   for (iter in 1:n.iter){
 
     ## 1: Grow Random Forest on full data
@@ -60,17 +60,46 @@ iRF <- function(x, y,
         trackforinteractions=FALSE
       }
 
-    rf.list[[iter]] <- foreach(i=1:length(ntree.id), .combine=combine,
-                               .multicombine=TRUE, .packages='iRF') %dopar% {
-                                 randomForest(x, y,
+    #rf.list[[iter]] <- foreach(i=1:length(ntree.id), .combine=combine,
+    #                           .multicombine=TRUE, .packages='iRF') %dopar% {
+    #                             randomForest(x, y,
+    #                                          xtest, ytest,
+    #                                          ntree=ntree.id[i],
+    #                                          mtry.select.prob=mtry.select.prob,
+    #                                          keep.forest=TRUE,
+    #                                          track.nodes=trackforinteractions,
+    #                                          keep.subset.var=keep.subset.var[tree.idcs[[i]]],
+    #                                          ...)
+    #                           }
+
+    if (n.core >1 ){
+    forestlist <- pbdLapply(1:length(ntree.id), function(i) randomForest(x, y,
                                               xtest, ytest,
                                               ntree=ntree.id[i],
                                               mtry.select.prob=mtry.select.prob,
                                               keep.forest=TRUE,
                                               track.nodes=trackforinteractions,
                                               keep.subset.var=keep.subset.var[tree.idcs[[i]]],
-                                              ...)
-                               }
+                                              ...))
+
+    gatheredModels <- unlist(allgather(forestlist), recursive=FALSE)
+    rf.list[[iter]] <- do.call(combine,gatheredModels)
+
+    #rf.list[[iter]] <- combine(unlist(forestlist))
+    rm(forestlist)
+    rm(gatheredModels)
+    } else {
+      rf.list[[iter]] <- randomForest(x, y,
+                                                xtest, ytest,
+                                                ntree=ntree.id[1],
+                                                mtry.select.prob=mtry.select.prob,
+                                                keep.forest=TRUE,
+                                                track.nodes=trackforinteractions,
+                                                keep.subset.var=keep.subset.var[tree.idcs[[1]]],
+                                                ...)
+    }
+
+
 
     ## 2.1: Find interactions across bootstrap replicates
     if (iter %in% interactions.return){
