@@ -16,7 +16,7 @@ iRF <- function(x, y,
                 class.id=1,
                 rit.param=list(depth=5, ntree=100, nchild=2, class.cut=NULL),
                 varnames.grp=NULL,
-                n.bootstrap=30,
+                n.bootstrap= if (n.core > 30) n.core else 30,
                 verbose=TRUE,
                 keep.subset.var=NULL,
                ...) {
@@ -110,8 +110,8 @@ iRF <- function(x, y,
       if (verbose){cat('finding interactions ... ')}
 
       stability.score[[iter]] <- list()
-      interact.list[[iter]] <- lapply(1:n.bootstrap, function(i.b) {
-
+      #interact.list[[iter]] <- lapply(1:n.bootstrap, function(i.b) {
+      gatheredRITs <- pbdLapply(1:n.bootstrap, function(i.b) {
         if (class.irf) {
           n.class <- table(y)
           sample.id <- mapply(function(cc, nn) sampleClass(y, cc, nn),
@@ -149,10 +149,11 @@ iRF <- function(x, y,
                                varnames.grp=varnames.grp,
                                cutoff.unimp.feature=cutoff.unimp.feature,
                                rit.param=rit.param,
-                               n.core=n.core)
+                               n.core=1)
         return(ints)
 
       })
+      interact.list[[iter]] <- unlist(allgather(gatheredRITs), recursive=FALSE)
 
       # 2.2: calculate stability scores of interactions
       if (!is.null(varnames.grp))
