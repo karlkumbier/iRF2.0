@@ -10,16 +10,16 @@ iRF <- function(x, y,
                 interactions.return=NULL, 
                 node.sample=list(subset=function(x) rep(TRUE, nrow(x)),
                                  wt=function(x) x$size.node), 
-                cutoff.unimp.feature=0, 
-                class.id=1, 
-                rit.param=list(depth=5, ntree=100, nchild=2, class.cut=NULL), 
+                cutoff.unimp.feature=0,  
+                rit.param=list(depth=5, ntree=100, nchild=2, class.id=1, class.cut=NULL), 
                 varnames.grp=NULL, 
                 n.bootstrap=30, 
                 verbose=TRUE,
                 keep.subset.var=NULL,
                ...) {
   
-  require(data.table)  
+  require(pryr)
+  print(paste('MEM USED START:', mem_used())) 
   n <- nrow(x)
   p <- ncol(x)
   class.irf <- is.factor(y)
@@ -38,6 +38,7 @@ iRF <- function(x, y,
   if (!is.null(interactions.return)) {
     interact.list <- list()
     stability.score <- list()
+    prevalence <- list()
   }
   
   # Set number of trees to grow in each core
@@ -45,32 +46,29 @@ iRF <- function(x, y,
   b <- ntree %% n.core
   ntree.id <- c(rep(a + 1, b), rep(a, n.core - b))
   
-  for (iter in 1:n.iter){
+  for (iter in 1:n.iter) {
     
     ## 1: Grow Random Forest on full data
     print(paste('iteration = ', iter))
-    tree.idcs <- c(1, cumsum(ntree.id) + 1)
-    tree.idcs <- lapply(2:length(tree.idcs), function(i)
-      tree.idcs[i-1]:(tree.idcs[i] - 1))
-    
     rf.list[[iter]] <- foreach(i=1:length(ntree.id), .combine=combine, 
                                .multicombine=TRUE, .packages='iRF') %dopar% {
                                  randomForest(x, y, 
                                               xtest, ytest, 
                                               ntree=ntree.id[i], 
                                               mtry.select.prob=mtry.select.prob, 
-                                              keep.forest=TRUE,
-                                              keep.subset.var=keep.subset.var[tree.idcs[[i]]],
+                                              keep.forest=TRUE, 
                                               ...)
                                }
     
+    print(paste('MEM USED ITER:', mem_used()))
     ## 2.1: Find interactions across bootstrap replicates
     if (iter %in% interactions.return){
       if (verbose){cat('finding interactions ... ')}
       
-      stability.score[[iter]] <- list()      
-      interact.list[[iter]] <- lapply(1:n.bootstrap, function(i.b) {
-        
+      interact.list.b <- list()      
+      for (i.b in 1:n.bootstrap) {
+        print(paste('MEM USED BS:', mem_used(), 'BS:', i.b))
+
         if (class.irf) {
           n.class <- table(y)
           sample.id <- mapply(function(cc, nn) sampleClass(y, cc, nn),
@@ -88,8 +86,7 @@ iRF <- function(x, y,
                                        ntree=ntree.id[i], 
                                        mtry.select.prob=mtry.select.prob, 
                                        keep.forest=TRUE, 
-                                       track.nodes=TRUE,
-                                       keep.subset.var=keep.subset.var[tree.idcs[[i]]],
+                                       track.nodes=TRUE, 
                                        ...)
                         }
         
@@ -100,15 +97,16 @@ iRF <- function(x, y,
                                subsetFun=node.sample$subset, 
                                wtFun=node.sample$wt,
                                class.irf=class.irf, 
-                               class.id=class.id, 
                                varnames.grp=varnames.grp,
                                cutoff.unimp.feature=cutoff.unimp.feature,
                                rit.param=rit.param,
                                n.core=n.core) 
-        return(ints)       
+        interact.list.b[[i.b]] <- ints
+        rm(rf.b)       
         
-      })
-      
+      }
+     
+      interact.list[[iter]] <- interact.list.b 
       # 2.2: calculate stability scores of interactions
       if (!is.null(varnames.grp))
         varnames.new <- unique(varnames.grp)
@@ -117,9 +115,9 @@ iRF <- function(x, y,
       else
         varnames.new <- 1:ncol(x)
       
-      stability.score[[iter]] <- summarizeInteract(interact.list[[iter]], 
-                                                   varnames=varnames.new)      
-      
+      summary.interact <- summarizeInteract(interact.list[[iter]], varnames=varnames.new)
+      stability.score[[iter]] <- summary.interact$interaction
+      prevalence[[iter]] <- summary.interact$prevalence
       
       # Sample interactions for initial splits of next forest
     } # end if (find_interaction)
@@ -143,6 +141,7 @@ iRF <- function(x, y,
   out$rf.list <- rf.list
   if (!is.null(interactions.return)){
     out$interaction <- stability.score
+    out$prevalence <- prevalence
   }
   return(out)
 }
@@ -153,19 +152,19 @@ generalizedRIT <- function(rf,
                            subsetFun, 
                            wtFun, 
                            class.irf, 
-                           class.id, 
                            varnames.grp,
                            cutoff.unimp.feature, 
                            rit.param,
                            n.core) {
   
   # Extract decision paths from rf as binary matrix to be passed to RIT
-  rforest <- readForest(rf, x=x, 
+  rforest <- readForest(rf, x=x, y=y, 
                         return.node.feature=TRUE,
                         subsetFun=subsetFun, 
                         wtFun=wtFun,
                         n.core=n.core)
   
+  class.id <- rit.param$class.id 
   # Select class specific leaf nodes
   select.leaf.id <- rep(TRUE, nrow(rforest$tree.info))
   if (class.irf) {
@@ -178,12 +177,13 @@ generalizedRIT <- function(rf,
   
   rforest <- subsetReadForest(rforest, select.leaf.id)
   nf <- rforest$node.feature
+  rm(rforest)
   
   if (sum(select.leaf.id) < 2){
     return(character(0))
   } else {
     # group features if specified
-    if (!is.null(varnames.grp)) nf <- groupFeature(nf, grp = varnames.grp)
+    if (!is.null(varnames.grp)) nf <- groupFeature(nf, grp=varnames.grp)
     
     # drop feature if cutoff.unimp.feature is specified
     if (cutoff.unimp.feature > 0){
@@ -198,8 +198,7 @@ generalizedRIT <- function(rf,
     
     interactions <- RIT(nf, depth=rit.param$depth, n_trees=rit.param$ntree, 
                         branch=rit.param$nchild, n_cores=n.core)
-    interactions <- interactions$Interaction
-    interactions <- gsub(' ', '_', interactions)
+    interactions$Interaction <- gsub(' ', '_', interactions$Interaction)
     return(interactions)
   }
 }
@@ -232,26 +231,33 @@ groupFeature <- function(node.feature, grp){
 summarizeInteract <- function(store.out, varnames=NULL){
   # Aggregate interactions across bootstrap samples
   n.bootstrap <- length(store.out)
-  store <- unlist(store.out)
-  
+  store <- do.call(rbind, store.out)
+
   if (length(store) >= 1){
-    store.tbl <- sort(table(store), decreasing = TRUE)
-    store.tbl <- store.tbl / n.bootstrap
+    int.tbl <- sort(table(store$Interaction), decreasing = TRUE)
+    int.tbl <- int.tbl / n.bootstrap
+
+    prev.tbl <- c(by(store$Prevalence, store$Interaction, sum))
+    prev.tbl <- prev.tbl / n.bootstrap
+    prev.tbl <- prev.tbl[names(int.tbl)]
   } else {
     return(character(0))
   }
   
   if (!is.null(varnames)) {
-    names.int <- lapply(names(store.tbl), strsplit, split='_')
+    stopifnot (names(int.tbl) == names(prev.tbl))
+    names.int <- lapply(names(int.tbl), strsplit, split='_')
     names.int <- lapply(names.int, unlist)
     names.int <- sapply(names.int, function(n) {
       nn <- as.numeric(n)
       return(paste(varnames[nn], collapse='_'))
     })
-    names(store.tbl) <- names.int
+    names(int.tbl) <- names.int
+    names(prev.tbl) <- names.int
+
   }
-  
-  return(store.tbl)
+  out <- list(interaction=int.tbl, prevalence=prev.tbl)
+  return(out)
 }
 
 sampleClass <- function(y, cl, n) sample(which(y == cl), n, replace=TRUE)

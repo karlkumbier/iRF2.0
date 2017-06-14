@@ -13,7 +13,8 @@ readForest <- function(rfobj, x, y=NULL,
   p <- ncol(x)
   n <- nrow(x)
   out <- list()
- 
+  
+  # read leaf node data from each tree in the forest 
   rd.forest <- mclapply(1:ntree, readTree, rfobj=rfobj, x=x, y=y,
                         return.node.feature=return.node.feature,
                         subsetFun=subsetFun, wtFun=wtFun,
@@ -44,11 +45,13 @@ readTree <- function(rfobj, k, x, y, return.node.feature, subsetFun, wtFun) {
   out$tree.info$size.node <- 0
 
   
-  # Repeat each leaf node in node.feature based on specified sampling:
+  # replicate each leaf node in node.feature based on specified sampling.
+  # TODO: implement weighted sampling for RIT so we don't replicate
   select.node <- out$tree.info$status == -1
   rep.node <- rep(0, nrow(out$tree.info))
   
   if (is.null(rfobj$obs.nodes)) {
+    # if nodes not tracked, pass data through forest to get leaf counts
     fit.data <- passData(rfobj, x, out$tree.info, k)
     leaf.counts <- rowSums(fit.data[out$tree.info$status == -1,])
     which.leaf <- apply(fit.data[out$tree.info$status == -1,], MAR=2, which)
@@ -63,7 +66,7 @@ readTree <- function(rfobj, k, x, y, return.node.feature, subsetFun, wtFun) {
   out$tree.info$size.node[leaf.idx] <- leaf.counts
   select.node <- select.node & subsetFun(out$tree.info)
   if (!is.null(y)) {
-    out$tree.info$purity <- 1
+    out$tree.info$purity <- 0
     out$tree.info$purity[leaf.idx] <- leaf.sd
 
     out$tree.info$dec.purity <- 0
