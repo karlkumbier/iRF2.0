@@ -19,8 +19,8 @@
       node.sample=list(subset=function(x) rep(TRUE, nrow(x)),
                        wt=function(x) x$size.node),
       cutoff.unimp.feature = 0,
-      class.id=1, 
-      rit.param=list(depth=5, ntree=100, nchild=2, class.cut=NULL), 
+      rit.param=list(depth=5, ntree=100, nchild=2, 
+                     class.cut=NULL, class.id=1), 
       varnames.grp=NULL,
       n.bootstrap=30, 
       verbose=TRUE, ...
@@ -57,9 +57,14 @@
     \code{depth}: depth of random intersection trees
     \code{ntree} number of random intersection trees
     \code{nchild}: number of children in each split of a random intersection tree
-    \code{class.cut}: for regression iRF, threshold to group responses into
-    binary responses for RIT. If \code{NULL}, all leaf nodes from regression iRF
-    will be used as input to RIT}
+    \code{class.cut}: threshold to determine leaf nodes that are used to find
+    interactions. Any leaf nodes with prediction greater than
+    specified threshold will be used as input to RIT.  If \code{NULL}, all leaf 
+    nodes from regression iRF will be used as input to RIT. Ignored if
+    classification forest}
+    \code{class.id}{which class of observations will be used to find
+    class-specific interaction? Choose between 0 or 1. Default is set to 1. 
+    Ignored if regression forest.}
   \item{varnames.grp}{If features can be grouped based on their
     demographics or correlation patterns, use the group of features or
     ``hyper-feature''s to conduct random intersection trees}

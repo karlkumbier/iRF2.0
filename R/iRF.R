@@ -13,17 +13,13 @@ iRF <- function(x, y,
                 cutoff.unimp.feature=0,  
                 rit.param=list(depth=5, ntree=100, nchild=2, class.id=1, class.cut=NULL), 
                 varnames.grp=NULL, 
-                n.bootstrap=30, 
+                n.bootstrap=30,
+                bootstrap.forest=TRUE, 
                 verbose=TRUE,
                 keep.subset.var=NULL,
                ...) {
-  
-  require(pryr)
-  print(paste('MEM USED START:', mem_used())) 
-  n <- nrow(x)
-  p <- ncol(x)
-  class.irf <- is.factor(y)
-  
+ 
+
   if (!is.matrix(x) | (!is.null(xtest) & !is.matrix(xtest)))
     stop('either x or xtest is not a matrix !')
   if (!is.numeric(x) | (!is.null(xtest) & !is.numeric(xtest)))
@@ -32,7 +28,12 @@ iRF <- function(x, y,
     stop('cannot find interaction - X has less than two columns!')
   if (any(interactions.return > n.iter))
     stop('interaction iteration to return greater than n.iter')
-  
+ 
+  n <- nrow(x)
+  p <- ncol(x)
+  class.irf <- is.factor(y)
+  if (n.cores > 1) registerDoMC(n.cores)  
+
   # initialize outputs
   rf.list <- list()
   if (!is.null(interactions.return)) {
@@ -56,18 +57,17 @@ iRF <- function(x, y,
                                               xtest, ytest, 
                                               ntree=ntree.id[i], 
                                               mtry.select.prob=mtry.select.prob, 
-                                              keep.forest=TRUE, 
+                                              keep.forest=TRUE,
+                                              track.nodes=TRUE, 
                                               ...)
                                }
     
-    print(paste('MEM USED ITER:', mem_used()))
     ## 2.1: Find interactions across bootstrap replicates
     if (iter %in% interactions.return){
       if (verbose){cat('finding interactions ... ')}
       
       interact.list.b <- list()      
-      for (i.b in 1:n.bootstrap) {
-        print(paste('MEM USED BS:', mem_used(), 'BS:', i.b))
+      for (i.b in 1:n.bootstrap) { 
 
         if (class.irf) {
           n.class <- table(y)
@@ -78,17 +78,21 @@ iRF <- function(x, y,
           sample.id <- sample(n, n, replace=TRUE)
         }
         
+        if (bootstrap.forest) { 
         #2.1.1: fit random forest on bootstrap sample
-        rf.b <- foreach(i=1:length(ntree.id), .combine=combine, 
-                        .multicombine=TRUE, .packages='iRF') %dopar% {
-                          randomForest(x[sample.id,], y[sample.id], 
-                                       xtest, ytest, 
-                                       ntree=ntree.id[i], 
-                                       mtry.select.prob=mtry.select.prob, 
-                                       keep.forest=TRUE, 
-                                       track.nodes=TRUE, 
-                                       ...)
+          rf.b <- foreach(i=1:length(ntree.id), .combine=combine, 
+                          .multicombine=TRUE, .packages='iRF') %dopar% {
+                            randomForest(x[sample.id,], y[sample.id], 
+                                         xtest, ytest, 
+                                         ntree=ntree.id[i], 
+                                         mtry.select.prob=mtry.select.prob, 
+                                         keep.forest=TRUE, 
+                                         track.nodes=TRUE, 
+                                         ...)
                         }
+        } else {
+          rf.b <- rf.list[[iter]]
+        }
         
         
         #2.1.2: run generalized RIT on rf.b to learn interactions
