@@ -1,5 +1,4 @@
-# iteratively grows random forests, finds case specific feature interactions
-# in binary classification problems
+# Iteratively grows random forests, finds case specific feature interactions
 iRF <- function(x, y, 
                 xtest=NULL, ytest=NULL, 
                 n.iter=5, 
@@ -8,8 +7,7 @@ iRF <- function(x, y,
                 mtry.select.prob=rep(1/ncol(x), ncol(x)), 
                 keep.impvar.quantile=NULL, 
                 interactions.return=NULL, 
-                node.sample=list(subset=function(x) rep(TRUE, nrow(x)),
-                                 wt=function(x) x$size.node), 
+                wt.pred.accuracy=FALSE, 
                 cutoff.unimp.feature=0,  
                 rit.param=list(depth=5, ntree=100, nchild=2, class.id=1, class.cut=NULL), 
                 varnames.grp=NULL, 
@@ -34,7 +32,6 @@ iRF <- function(x, y,
   class.irf <- is.factor(y)
   if (n.cores > 1) registerDoMC(n.cores)  
 
-  # initialize outputs
   rf.list <- list()
   if (!is.null(interactions.return)) {
     interact.list <- list()
@@ -79,7 +76,7 @@ iRF <- function(x, y,
         }
         
         if (bootstrap.forest) { 
-        #2.1.1: fit random forest on bootstrap sample
+          #2.1.1: fit random forest on bootstrap sample
           rf.b <- foreach(i=1:length(ntree.id), .combine=combine, 
                           .multicombine=TRUE, .packages='iRF') %dopar% {
                             randomForest(x[sample.id,], y[sample.id], 
@@ -97,9 +94,8 @@ iRF <- function(x, y,
         
         #2.1.2: run generalized RIT on rf.b to learn interactions
         ints <- generalizedRIT(rf=rf.b, 
-                               x=x[sample.id,], y=y[sample.id], 
-                               subsetFun=node.sample$subset, 
-                               wtFun=node.sample$wt,
+                               x=x[sample.id,], y=y[sample.id],  
+                               wt.pred.accuracy=wt.pred.accuracy,
                                class.irf=class.irf, 
                                varnames.grp=varnames.grp,
                                cutoff.unimp.feature=cutoff.unimp.feature,
@@ -122,8 +118,7 @@ iRF <- function(x, y,
       summary.interact <- summarizeInteract(interact.list[[iter]], varnames=varnames.new)
       stability.score[[iter]] <- summary.interact$interaction
       prevalence[[iter]] <- summary.interact$prevalence
-      
-      # Sample interactions for initial splits of next forest
+       
     } # end if (find_interaction)
     
     ## 3: update mtry.select.prob 
@@ -151,23 +146,16 @@ iRF <- function(x, y,
 }
 
 
-generalizedRIT <- function(rf, 
-                           x, y,
-                           subsetFun, 
-                           wtFun, 
-                           class.irf, 
-                           varnames.grp,
-                           cutoff.unimp.feature, 
-                           rit.param,
-                           n.core) {
+generalizedRIT <- function(rf, x, y, wt.pred.accuracy, class.irf, varnames.grp,
+                           cutoff.unimp.feature, rit.param, n.core) {
   
-  # Extract decision paths from rf as binary matrix to be passed to RIT
+  # Extract decision paths from rf as sparse binary matrix to be passed to RIT
   rforest <- readForest(rf, x=x, y=y, 
                         return.node.feature=TRUE,
-                        subsetFun=subsetFun, 
+                        wt.pred.accuracy, 
                         n.core=n.core)
-  
   class.id <- rit.param$class.id 
+
   # Select class specific leaf nodes
   select.leaf.id <- rep(TRUE, nrow(rforest$tree.info))
   if (class.irf) {
@@ -180,7 +168,10 @@ generalizedRIT <- function(rf,
   
   rforest <- subsetReadForest(rforest, select.leaf.id)
   nf <- rforest$node.feature
-  wt <- wtFun(rforest$tree.info)
+  if (wt.pred.accuracy) 
+    wt <- rforest$tree.info$size.noe * rforest$tree.info$dec.purity
+  else
+    wt <- rforest$tree.info$size.node
   rm(rforest)
   
   if (sum(select.leaf.id) < 2){
@@ -194,8 +185,7 @@ generalizedRIT <- function(rf,
       if (!class.irf)
         rfimp <- rf$importance[,'IncNodePurity']
       else
-        rfimp <- rf$importance[,'MeanDecreaseGini']
-      
+        rfimp <- rf$importance[,'MeanDecreaseGini']   
       drop.id <- which(rfimp < quantile(rfimp, prob=cutoff.unimp.feature))
       nf[,drop.id] <- FALSE
     }
@@ -265,4 +255,8 @@ summarizeInteract <- function(store.out, varnames=NULL){
   return(out)
 }
 
-sampleClass <- function(y, cl, n) sample(which(y == cl), n, replace=TRUE)
+sampleClass <- function(y, cl, n) {
+  # Sample indices specific to a given class
+  sampled <- sample(which(y == cl), n, replace=TRUE)
+  return(sampled)
+}

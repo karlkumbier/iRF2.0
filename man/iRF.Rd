@@ -16,8 +16,7 @@
       mtry.select.prob = rep(1/ncol(x), ncol(x)),
       keep.impvar.quantile=NULL, 
       interactions.return=NULL,
-      node.sample=list(subset=function(x) rep(TRUE, nrow(x)),
-                       wt=function(x) x$size.node),
+      wt.pred.accuracy=FALSE, 
       cutoff.unimp.feature = 0,
       rit.param=list(depth=5, ntree=100, nchild=2, 
                      class.cut=NULL, class.id=1), 
@@ -41,13 +40,8 @@
   \item{interactions.return}{a numeric vector specifying which iterations to 
     calculate interactions for. Note: interaction computation is
     computationally intensive particularly when \code{n.bootstrap} is large.}
-  \item{node.sample}{a named list containing two entries (1) \code{subset} a
-    function that takes the output of \code{getTree} as an input and returns a
-    vector of indices, specifying which leaf nodes to keep for RIT. (2) \code{wt} a
-    function that takes the output of \code{getTree} as an input and retruns a
-    vector of weights, specifying the probability with which RIT will sample
-    each node. These functions are used to sample leaf nodes based on various
-    properties, the default being size.}
+  \item{wt.pred.accuracy}{Should leaf nodes be sampled proportional to both size
+    and decrease in variabiliy of responses?}
   \item{cutoff.unimp.feature}{a non-negative fraction r. If provided,
     only features with Gini importance score in the top 100*(1-r)
     percentile are used to find feature interactions}

@@ -10,9 +10,9 @@
   distribute computation across available cores.
 }
 \usage{
-  function(rfobj, x, return.node.feature=TRUE, 
-           subsetFun=function(x) rep(TRUE,nrow(x)),
-           wtFun=function(x) x$size_node,
+  function(rfobj, x, 
+           return.node.feature=TRUE, 
+           wt.pred.accuracy=FALSE,
            n.core=1)
 }
 \arguments{
@@ -23,28 +23,21 @@
   \item{y}{a numeric vector specifying response values}
   \item{return.node.feature}{if TRUE, returns a matrix containing features
     used to define the decision rule associated with a node}
-  \item{subsetFun}{a
-    function that takes the output of \code{getTree} as an input and returns a
-    vector of indices, specifying which nodes to keep for RIT.}  
-  \item{wtFun}{ a function that takes the output of \code{getTree} as an input
-    and retruns avector of weights, specifying the probability with which RIT
-    will sample each node.} 
+  \item{wt.pred.accuracy}{Should leaf nodes be sampled proportional to both
+    size and decrease in variabiliy of responses?}
 }
 \value{ A list containing the following items:
-  \item{tree.info}{a data frame with number of rows equal to total
-    number of nodes in the forest. The first six columns are as in 
-    the output of \code{\link{getTree}}: \code{left daughter}, \code{right daughter},
-    \code{split var}, \code{split point}, \code{status}, \code{prediction}. The
-    remaining columns indicate node-specific attributes: \code{node.idx} (the
-    forest level node index of the leaf), 
-    \code{parent} (parent of every node), \code{size.node} (number of data
-    points falling in a node), \code{tree} (index of the tree in the forest in which 
-    the node lives), \code{purity} (standard deviation of responses falling in
-    the node), \code{dec.purity} (the decrease in standard deviation opf
-    responses relative to the full data). 
-   }
+  \item{tree.info}{a data frame with number of rows equal to total number of
+    nodes in the forest, giving node level attributes: 
+    \code{prediction} (predicted response of leaf node), 
+    \code{node.idx} (the forest level node index of the leaf), 
+    \code{parent} (index of parent node), 
+    \code{size.node} (number of data points falling in a node), 
+    \code{tree} (index of the tree in the forest in which the node lives), 
+    \code{dec.purity} (if wt.pred.accuracy=TRUE, the decrease in standard 
+    deviation of responses relative to the full data).}
   \item{node.feature}{if return.node.feature = TRUE, returns a sparse matrix
-    with ncol(X) columns, each row corresponding to a leaf node in the
+    with ncol(x) columns, each row corresponding to a leaf node in the
     forest. The entries indicate which features were used to define the
     decision rule associated with a node}
 }
