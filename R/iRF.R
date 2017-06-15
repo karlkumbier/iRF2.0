@@ -165,7 +165,6 @@ generalizedRIT <- function(rf,
   rforest <- readForest(rf, x=x, y=y, 
                         return.node.feature=TRUE,
                         subsetFun=subsetFun, 
-                        wtFun=wtFun,
                         n.core=n.core)
   
   class.id <- rit.param$class.id 
@@ -181,6 +180,7 @@ generalizedRIT <- function(rf,
   
   rforest <- subsetReadForest(rforest, select.leaf.id)
   nf <- rforest$node.feature
+  wt <- wtFun(rforest$tree.info)
   rm(rforest)
   
   if (sum(select.leaf.id) < 2){
@@ -200,8 +200,9 @@ generalizedRIT <- function(rf,
       nf[,drop.id] <- FALSE
     }
     
-    interactions <- RIT(nf, depth=rit.param$depth, n_trees=rit.param$ntree, 
-                        branch=rit.param$nchild, n_cores=n.core)
+    interactions <- RIT(nf, weights=wt, depth=rit.param$depth, 
+                        n_trees=rit.param$ntree, branch=rit.param$nchild, 
+                        n_cores=n.core)
     interactions$Interaction <- gsub(' ', '_', interactions$Interaction)
     return(interactions)
   }

@@ -1,7 +1,6 @@
 readForest <- function(rfobj, x, y=NULL, 
                        return.node.feature=TRUE,
-                       subsetFun = function(x) rep(TRUE, nrow(x)),
-                       wtFun = function(x) x$size.node,
+                       subsetFun = function(x) rep(TRUE, nrow(x)), 
                        n.core=1){
   
   require(data.table)
@@ -17,7 +16,7 @@ readForest <- function(rfobj, x, y=NULL,
   # read leaf node data from each tree in the forest 
   rd.forest <- mclapply(1:ntree, readTree, rfobj=rfobj, x=x, y=y,
                         return.node.feature=return.node.feature,
-                        subsetFun=subsetFun, wtFun=wtFun,
+                        subsetFun=subsetFun,
                         mc.cores=n.core)
  
   out$tree.info <- rbindlist(lapply(rd.forest, function(tt) tt$tree.info))
@@ -30,7 +29,7 @@ readForest <- function(rfobj, x, y=NULL,
   
 }
 
-readTree <- function(rfobj, k, x, y, return.node.feature, subsetFun, wtFun) {
+readTree <- function(rfobj, k, x, y, return.node.feature, subsetFun) {
   n <- nrow(x)
   p <- ncol(x)
   ntree <- rfobj$ntree
@@ -46,7 +45,6 @@ readTree <- function(rfobj, k, x, y, return.node.feature, subsetFun, wtFun) {
 
   
   # replicate each leaf node in node.feature based on specified sampling.
-  # TODO: implement weighted sampling for RIT so we don't replicate
   select.node <- out$tree.info$status == -1
   rep.node <- rep(0, nrow(out$tree.info))
   
@@ -74,7 +72,7 @@ readTree <- function(rfobj, k, x, y, return.node.feature, subsetFun, wtFun) {
   }
   
   out$tree.info <- out$tree.info[select.node,]
-  rep.node[select.node] <- trunc(wtFun(out$tree.info))
+  rep.node[select.node] <- 1#trunc(wtFun(out$tree.info))
   
   # Extract decision paths from leaf nodes as binary sparse matrix
   if (return.node.feature) {

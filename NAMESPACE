@@ -1,9 +1,12 @@
 useDynLib(iRF)
 importFrom(Rcpp, evalCpp)
+importFrom(Matrix, Matrix)
+importFrom(Matrix, t)
+importFrom(methods, is)
 
 export(combine, getTree, grow, importance, margin, MDSplot, na.roughfix,
 partialPlot, randomForest, rfImpute, treesize, tuneRF, varImpPlot, varUsed,
-rfNews, outlier, classCenter, rfcv, readForest, iRF, partialPlot2var)
+rfNews, outlier, classCenter, rfcv, readForest, iRF, partialPlot2var, RIT)
 
 
 S3method(print, randomForest)

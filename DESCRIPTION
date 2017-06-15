@@ -9,7 +9,6 @@ Depends:
     doMC,
     graphics,
     akima,
-    FSInteract,
     Matrix,
     data.table
 Suggests:
@@ -17,7 +16,9 @@ Suggests:
     MASS,
     rgl
 Imports:
-    Rcpp
+    Rcpp,
+    Matrix,
+    methods
 LinkingTo:
     Rcpp
 Author: Sumanta Basu  (based on source codes from the R package 'randomForest' by Andy Liaw and Matthew Wiener and the original Fortran codes by Leo Breiman and Adele Cutler)
