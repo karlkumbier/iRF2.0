@@ -5,6 +5,7 @@ readForest <- function(rfobj, x, y=NULL,
   
   require(data.table)
   require(parallel)
+  require(dplyr)
   if (is.null(rfobj$forest))
     stop('No Forest component in the randomForest object')
  
@@ -13,6 +14,8 @@ readForest <- function(rfobj, x, y=NULL,
   n <- nrow(x)
   out <- list()
   
+  #TODO: change this
+  y <- NULL 
   # read leaf node data from each tree in the forest 
   rd.forest <- mclapply(1:ntree, readTree, rfobj=rfobj, x=x, y=y,
                         return.node.feature=return.node.feature,
@@ -39,40 +42,38 @@ readTree <- function(rfobj, k, x, y, return.node.feature, subsetFun) {
   out$tree.info <- as.data.frame(getTree(rfobj, k))
   out$tree.info$node.idx <- 1:nrow(out$tree.info)
   parents <- getParent(out$tree.info)
-  out$tree.info$parent <- parents
-  out$tree.info$tree <- k
-  out$tree.info$size.node <- 0
-
+  out$tree.info$parent <- as.integer(parents)
+  out$tree.info$tree <- as.integer(k)
+  out$tree.info$size.node <- 0L 
   
   # replicate each leaf node in node.feature based on specified sampling.
   select.node <- out$tree.info$status == -1
   rep.node <- rep(0, nrow(out$tree.info))
-  
+  out$tree.info <- select(out$tree.info, prediction, node.idx, parent, tree, size.node)
+
   if (is.null(rfobj$obs.nodes)) {
     # if nodes not tracked, pass data through forest to get leaf counts
     fit.data <- passData(rfobj, x, out$tree.info, k)
-    leaf.counts <- rowSums(fit.data[out$tree.info$status == -1,])
-    which.leaf <- apply(fit.data[out$tree.info$status == -1,], MAR=2, which)
-    leaf.idx <- which(out$tree.info$status == -1)
+    leaf.counts <- rowSums(fit.data[select.node,])
+    which.leaf <- apply(fit.data[select.node,], MAR=2, which)
+    leaf.idx <- as.integer(which(select.node))
     if (!is.null(y)) leaf.sd <- c(by(y, which.leaf, sdNode)) 
   } else {
     leaf.counts <- table(rfobj$obs.nodes[,k])
-    leaf.idx <- as.numeric(names(leaf.counts)) 
+    leaf.idx <- as.integer(names(leaf.counts)) 
     if (!is.null(y)) leaf.sd <- c(by(y, rfobj$obs.nodes[,k], sdNode))
   }
 
-  out$tree.info$size.node[leaf.idx] <- leaf.counts
+  out$tree.info$size.node[leaf.idx] <- as.integer(leaf.counts)
   select.node <- select.node & subsetFun(out$tree.info)
   if (!is.null(y)) {
-    out$tree.info$purity <- 0
-    out$tree.info$purity[leaf.idx] <- leaf.sd
 
     out$tree.info$dec.purity <- 0
     out$tree.info$dec.purity[leaf.idx] <- pmax((sd(y) - leaf.sd) / sd(y), 0)
   }
   
   out$tree.info <- out$tree.info[select.node,]
-  rep.node[select.node] <- 1#trunc(wtFun(out$tree.info))
+  rep.node[select.node] <- 1 #trunc(wtFun(out$tree.info))
   
   # Extract decision paths from leaf nodes as binary sparse matrix
   if (return.node.feature) {
