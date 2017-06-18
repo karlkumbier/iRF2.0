@@ -30,7 +30,7 @@ iRF <- function(x, y,
   n <- nrow(x)
   p <- ncol(x)
   class.irf <- is.factor(y)
-  if (n.cores > 1) registerDoMC(n.cores)  
+  if (n.core > 1) registerDoMC(n.core)  
 
   rf.list <- list()
   if (!is.null(interactions.return)) {

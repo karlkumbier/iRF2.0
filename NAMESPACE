@@ -2,7 +2,15 @@ useDynLib(iRF)
 importFrom(Rcpp, evalCpp)
 importFrom(Matrix, Matrix)
 importFrom(Matrix, t)
+importFrom(Matrix, sparseMatrix)
 importFrom(methods, is)
+importFrom(AUC, auc)
+importFrom(AUC, roc)
+importFrom(data.table, data.table)
+importFrom(data.table, rbindlist)
+importFrom(dplyr, select)
+
+
 
 export(combine, getTree, grow, importance, margin, MDSplot, na.roughfix,
 partialPlot, randomForest, rfImpute, treesize, tuneRF, varImpPlot, varUsed,

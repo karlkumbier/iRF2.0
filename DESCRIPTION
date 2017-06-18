@@ -5,15 +5,17 @@ Date: 2017-06-15
 Depends:
     R (>= 3.1.2),
     stats,
-    AUC,
+    randomForest,
     doMC,
     graphics,
     akima,
+    methods
+Imports:
+    AUC,
     Matrix,
     data.table,
     dplyr,
-    Rcpp,
-    methods
+    Rcpp
 Suggests:
     RColorBrewer,
     MASS,
