@@ -4,18 +4,15 @@ Version: 2.0.0
 Date: 2017-06-15
 Depends:
     R (>= 3.1.2),
-    stats,
-    randomForest,
     doMC,
-    graphics,
-    akima,
-    methods
+    randomForest
 Imports:
     AUC,
     Matrix,
     data.table,
     dplyr,
-    Rcpp
+    Rcpp,
+    methods
 Suggests:
     RColorBrewer,
     MASS,

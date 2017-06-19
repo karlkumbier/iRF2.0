@@ -11,10 +11,10 @@ importFrom(data.table, rbindlist)
 importFrom(dplyr, select)
 
 
-
 export(combine, getTree, grow, importance, margin, MDSplot, na.roughfix,
-partialPlot, randomForest, rfImpute, treesize, tuneRF, varImpPlot, varUsed,
-rfNews, outlier, classCenter, rfcv, readForest, iRF, partialPlot2var, RIT)
+       partialPlot, randomForest, rfImpute, treesize, tuneRF, varImpPlot, 
+       varUsed, rfNews, outlier, classCenter, rfcv, readForest, iRF, 
+       partialPlot2var, RIT)
 
 
 S3method(print, randomForest)
