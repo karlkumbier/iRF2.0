@@ -148,11 +148,11 @@ iRF <- function(x, y,
 
 generalizedRIT <- function(rf, x, y, wt.pred.accuracy, class.irf, varnames.grp,
                            cutoff.unimp.feature, rit.param, n.core) {
-  
+
   # Extract decision paths from rf as sparse binary matrix to be passed to RIT
   rforest <- readForest(rf, x=x, y=y, 
                         return.node.feature=TRUE,
-                        wt.pred.accuracy, 
+                        wt.pred.accuracy=wt.pred.accuracy, 
                         n.core=n.core)
   class.id <- rit.param$class.id 
 
@@ -168,10 +168,11 @@ generalizedRIT <- function(rf, x, y, wt.pred.accuracy, class.irf, varnames.grp,
   
   rforest <- subsetReadForest(rforest, select.leaf.id)
   nf <- rforest$node.feature
-  if (wt.pred.accuracy) 
-    wt <- rforest$tree.info$size.noe * rforest$tree.info$dec.purity
-  else
+  if (wt.pred.accuracy) {
+    wt <- rforest$tree.info$size.node * rforest$tree.info$dec.purity
+  } else {
     wt <- rforest$tree.info$size.node
+  }
   rm(rforest)
   
   if (sum(select.leaf.id) < 2){

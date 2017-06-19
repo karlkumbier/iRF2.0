@@ -25,6 +25,9 @@ set<vector<int> > RIT_basic(RaggedArray &x, NumericVector &weights, const int L,
   const int fl_branch=floor(branch);
   const int cl_branch=ceil(branch);
   const double branch_diff=branch-fl_branch;
+  double r1, r2, r;
+  int i1, i2, i;
+  // TODO: check edge case sampling
 
   // Set up vector of seeds for RNG
   vector<unsigned int> seeds(n_cores);
@@ -54,9 +57,9 @@ set<vector<int> > RIT_basic(RaggedArray &x, NumericVector &weights, const int L,
 		for (int tree = 0; tree < n_trees; tree++) {
         set<vector<int> > candidate_interactions; //set of candidate interactions for each tree
       vector<int> root;
-      // first intersection computed by walking along arrays as sets will be of similar size
-      double r1, r2;
-      int i1 = n, i2 = n;
+      // first intersection computed by walking along arrays as sets will be of
+      // similar size 
+      i1 = n - 1; i2 = n - 1;
       r1 = r_obs(mt); r2 = r_obs(mt);
       for (int i = 0; i < n; i++) {
           if (r1 < weights[i]) {
@@ -72,7 +75,7 @@ set<vector<int> > RIT_basic(RaggedArray &x, NumericVector &weights, const int L,
           break;
         }
         r2 -= weights[i];
-      }
+      } 
 
       set_intersection(x.begin(i1), x.end(i1), x.begin(i2), x.end(i2), back_inserter(root));
       if (root.size() >= min_inter_sz) {
@@ -94,15 +97,16 @@ set<vector<int> > RIT_basic(RaggedArray &x, NumericVector &weights, const int L,
                 cur_branch=fl_branch;
               } //if random number in (0,1) is greater than decimal part of branch
               for (int k = 0; k < cur_branch; k++) {
-                double r = r_obs(mt);
-                int i = n;
+                r = r_obs(mt);
+                i = n - 1;
                 for (int ii = 0; ii < n; ii++) {
                   if (r < weights[i]) {
                     i = ii;
                     break;
                   } 
                   r -= weights[i];
-                }
+                } 
+
                 vector<int> temp_interaction = binary_intersect(x.begin(i), x.end(i),parents[depth-1].begin(node), parents[depth-1].end(node));
                 if (temp_interaction.size() >= min_inter_sz) {
                   if ((depth == depthFinal) || (temp_interaction.size() == min_inter_sz)) {                 
