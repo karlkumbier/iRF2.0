@@ -1,14 +1,21 @@
 useDynLib(iRF)
 importFrom(Rcpp, evalCpp)
-importFrom(Matrix, Matrix)
-importFrom(Matrix, t)
-importFrom(Matrix, sparseMatrix)
+importFrom(Matrix, Matrix, t, sparseMatrix)
 importFrom(methods, is)
-importFrom(AUC, auc)
-importFrom(AUC, roc)
-importFrom(data.table, data.table)
-importFrom(data.table, rbindlist)
+importFrom(AUC, auc, roc)
+importFrom(data.table, data.table, rbindlist)
 importFrom(dplyr, select)
+importFrom(grDevices, rainbow)
+importFrom(graphics, axis, barplot, dotchart, lines,
+           matplot, mtext, pairs, par, plot, plot.default,
+           points)
+importFrom(stats, delete.response, mad, median, model.frame,
+           model.response, na.fail, na.omit, napredict,
+           predict, quantile, reformulate, terms, update,
+           var, weighted.mean)
+importFrom(doMC, registerDoMC)
+importFrom(foreach, foreach, "%dopar%")
+importFrom(parallel, mclapply)
 
 
 export(combine, getTree, grow, importance, margin, MDSplot, na.roughfix,

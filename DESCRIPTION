@@ -4,15 +4,14 @@ Version: 2.0.0
 Date: 2017-06-15
 Depends:
     R (>= 3.1.2),
-    doMC,
-    randomForest
 Imports:
     AUC,
     Matrix,
     data.table,
     dplyr,
     Rcpp,
-    methods
+    methods,
+    doMC
 Suggests:
     RColorBrewer,
     MASS,
