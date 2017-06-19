@@ -2,7 +2,7 @@
 
 The R package *iRF* implements iterative Random Forests, a method for iteratively growing ensemble of weighted decision trees, and detecting high-order feature interactions by analyzing feature usage on decision paths. This version uses source codes from the R package `randomForest` by Andy Liaw and Matthew Weiner, the original Fortran codes by Leo Breiman and Adele Cutler, and source codes from the R package `FSInteract` by Hyun Jik Kim and Rajen D. Shah.
 
-iRF can be loaded using the `library` command:
+`iRF` can be loaded using the `library` command:
 ```{r, message=FALSE}
 library(iRF)
 ```
@@ -11,7 +11,7 @@ library(iRF)
 
 ##  A. Weighted random forest
 
-Unlike Breiman's original random forest, which uses uniform random sampling to select \texttt{mtry} variables during each node split, the 'randomForest' function in 'iRF' allows non-uniform sampling using a given vector of nonnegative weights (e.g., feature importances from a previous model fit). In particular, given a vector of weights $\mathbf{w} = (w_1, \ldots, w_p)$, the `mtry` variables are selected so that $P($variable $j$ is selected) = w_j/\sum_{j=1}^p w_j$, for $j = 1, \ldots, p$. In addition, one can supply a subset of features which will always be selected during split selection, in addition to the \texttt{mtry} features (as if setting $w_j = \infty$ for a subset of features).
+Unlike Breiman's original random forest, which uses uniform random sampling to select \texttt{mtry} variables during each node split, the 'randomForest' function in 'iRF' allows non-uniform sampling using a given vector of nonnegative weights (e.g., feature importances from a previous model fit). In particular, given a vector of weights $\mathbf{w} = (w_1, \ldots, w_p)$, the `mtry` variables are selected so that $P($variable $j$ is selected)$ = w_j/\sum_{j=1}^p w_j$, for $j = 1, \ldots, p$. In addition, one can supply a subset of features which will always be selected during split selection, in addition to the \texttt{mtry} features (as if setting $w_j = \infty$ for a subset of features).
 
 Based on this weighting scheme, we can iteratively grow weighted random forests, where Gini importances from the previous random forest fit are used as weights in the current iteration.
 
