@@ -140,7 +140,7 @@ iRF <- function(x, y,
   out$rf.list <- rf.list
   if (!is.null(interactions.return)){
     out$interaction <- stability.score
-    out$prevalence <- prevalence
+    #out$prevalence <- prevalence weighted RIT prevalence not accurate
   }
   return(out)
 }

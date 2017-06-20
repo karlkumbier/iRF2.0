@@ -25,9 +25,7 @@ set<vector<int> > RIT_basic(RaggedArray &x, NumericVector &weights, const int L,
   const int fl_branch=floor(branch);
   const int cl_branch=ceil(branch);
   const double branch_diff=branch-fl_branch;
-  double r1, r2, r;
   int i1, i2, i;
-  // TODO: check edge case sampling
 
   // Set up vector of seeds for RNG
   vector<unsigned int> seeds(n_cores);
@@ -50,7 +48,7 @@ set<vector<int> > RIT_basic(RaggedArray &x, NumericVector &weights, const int L,
     #else
     mt19937_64 mt(seeds[0]); //Use Mersenne Twister as RNG
     #endif
-    uniform_real_distribution<> r_obs(0,1);
+    discrete_distribution<int> r_obs(weights.begin(), weights.end());
     uniform_real_distribution<> r_unif(0,1); //use for random number of branches
     
   	#pragma omp for schedule(static) nowait
@@ -59,24 +57,8 @@ set<vector<int> > RIT_basic(RaggedArray &x, NumericVector &weights, const int L,
       vector<int> root;
       // first intersection computed by walking along arrays as sets will be of
       // similar size 
-      i1 = n - 1; i2 = n - 1;
-      r1 = r_obs(mt); r2 = r_obs(mt);
-      for (int i = 0; i < n; i++) {
-          if (r1 < weights[i]) {
-            i1 = i;
-            break;      
-          }
-          r1 -= weights[i];
-      }
-
-      for (int i = 0; i < n; i++) {
-        if (r2 < weights[i]) {
-          i2 = i;
-          break;
-        }
-        r2 -= weights[i];
-      } 
-
+      
+      i1 = r_obs(mt); i2 = r_obs(mt);
       set_intersection(x.begin(i1), x.end(i1), x.begin(i2), x.end(i2), back_inserter(root));
       if (root.size() >= min_inter_sz) {
         // interactions must have size at least min_inter_sz
@@ -97,16 +79,8 @@ set<vector<int> > RIT_basic(RaggedArray &x, NumericVector &weights, const int L,
                 cur_branch=fl_branch;
               } //if random number in (0,1) is greater than decimal part of branch
               for (int k = 0; k < cur_branch; k++) {
-                r = r_obs(mt);
-                i = n - 1;
-                for (int ii = 0; ii < n; ii++) {
-                  if (r < weights[i]) {
-                    i = ii;
-                    break;
-                  } 
-                  r -= weights[i];
-                } 
-
+              
+                i = r_obs(mt);
                 vector<int> temp_interaction = binary_intersect(x.begin(i), x.end(i),parents[depth-1].begin(node), parents[depth-1].end(node));
                 if (temp_interaction.size() >= min_inter_sz) {
                   if ((depth == depthFinal) || (temp_interaction.size() == min_inter_sz)) {                 
