@@ -12,7 +12,8 @@ iRF <- function(x, y,
                 rit.param=list(depth=5, ntree=100, nchild=2, class.id=1, class.cut=NULL), 
                 varnames.grp=NULL, 
                 n.bootstrap=30,
-                bootstrap.forest=TRUE, 
+                bootstrap.forest=TRUE,
+                escv.select=FALSE,
                 verbose=TRUE,
                 keep.subset.var=NULL,
                ...) {
@@ -38,6 +39,9 @@ iRF <- function(x, y,
     stability.score <- list()
     prevalence <- list()
   }
+
+  weight.mat <- matrix(0, nrow=p, ncol=n.iter)
+  weight.mat[,1] <- mtry.select.prob
   
   # Set number of trees to grow in each core
   a <- floor(ntree / n.core) 
@@ -53,12 +57,36 @@ iRF <- function(x, y,
                                  randomForest(x, y, 
                                               xtest, ytest, 
                                               ntree=ntree.id[i], 
-                                              mtry.select.prob=mtry.select.prob, 
+                                              mtry.select.prob=weight.mat[,iter], 
                                               keep.forest=TRUE,
                                               track.nodes=TRUE, 
                                               ...)
                                }
+
+    ## 3: update mtry.select.prob 
+    if (!class.irf) 
+      weight.mat[,iter + 1] <- rf.list[[iter]]$importance[,'IncNodePurity']
+    else
+      weight.mat[, iter + 1] <- rf.list[[iter]]$importance[,'MeanDecreaseGini']
     
+    
+    if (!is.null(xtest) & class.irf){
+      auroc <- auc(roc(rf.list[[iter]]$test$votes[,2], ytest))
+      print(paste('AUROC: ', round(auroc, 2)))
+    } else if (!is.null(xtest)) {
+      pct.var <- 1 - mean((rf.list[[iter]]$test - ytest) ^ 2) / var(y)
+      print(paste('% var explained:', pct.var))
+    }
+  }
+
+  # If escv.select = TRUE, determine optimal iteration #
+  if (escv.select) {
+    opt.k <- escv(rf.list, x=x, y=y)
+    interactions.return <- opt.k
+  }
+ 
+
+  for (iter in 1:n.iter) {
     ## 2.1: Find interactions across bootstrap replicates
     if (iter %in% interactions.return){
       if (verbose){cat('finding interactions ... ')}
@@ -82,7 +110,7 @@ iRF <- function(x, y,
                             randomForest(x[sample.id,], y[sample.id], 
                                          xtest, ytest, 
                                          ntree=ntree.id[i], 
-                                         mtry.select.prob=mtry.select.prob, 
+                                         mtry.select.prob=weight.mat[,iter], 
                                          keep.forest=TRUE, 
                                          track.nodes=TRUE, 
                                          ...)
@@ -117,22 +145,10 @@ iRF <- function(x, y,
       
       summary.interact <- summarizeInteract(interact.list[[iter]], varnames=varnames.new)
       stability.score[[iter]] <- summary.interact$interaction
-      prevalence[[iter]] <- summary.interact$prevalence
-       
+    
     } # end if (find_interaction)
     
-    ## 3: update mtry.select.prob 
-    if (!class.irf) 
-      mtry.select.prob <- rf.list[[iter]]$importance[,'IncNodePurity']
-    else
-      mtry.select.prob <- rf.list[[iter]]$importance[,'MeanDecreaseGini']
-    
-    
-    if (!is.null(xtest) & class.irf){
-      auroc <- auc(roc(rf.list[[iter]]$test$votes[,2], ytest))
-      print(paste('AUROC: ', round(auroc, 2)))
-    }
-    
+   
   } # end for (iter in ... )
   
   
@@ -140,7 +156,13 @@ iRF <- function(x, y,
   out$rf.list <- rf.list
   if (!is.null(interactions.return)){
     out$interaction <- stability.score
-    #out$prevalence <- prevalence weighted RIT prevalence not accurate
+  }
+
+  if (escv.select) {
+    out$rf.list <- out$rf.list[[opt.k]]
+    out$interaction <- out$interaction[[opt.k]]
+    out$opt.k <- opt.k
+    out$weights <- weight.mat[,opt.k]
   }
   return(out)
 }
@@ -237,7 +259,7 @@ summarizeInteract <- function(store.out, varnames=NULL){
     prev.tbl <- prev.tbl / n.bootstrap
     prev.tbl <- prev.tbl[names(int.tbl)]
   } else {
-    return(character(0))
+    return(list(interaction=numeric(0), prevalence=numeric(0)))
   }
   
   if (!is.null(varnames)) {
@@ -261,3 +283,23 @@ sampleClass <- function(y, cl, n) {
   sampled <- sample(which(y == cl), n, replace=TRUE)
   return(sampled)
 }
+
+estStabilityIter <- function(rfobj, x, y) {
+  # Evaluate estimation stability for an RF object
+  y.hat <- predict(rfobj, newdata=x, predict.all=TRUE)
+  y.bar <- y.hat$aggregate
+  y.agg <- apply(y.hat$individual, MAR=2, function(z) sum((z - y.bar) ^ 2))
+  es <- mean(y.agg) 
+
+  error <- mean((rfobj$predicted - y) ^ 2, na.rm=TRUE)
+  return(c(es=es, cv=error))
+}
+
+escv <- function(rf.list, x, y) {
+  # Evaluate optimal iteration based on ESCV critereon 
+  escv.list <- sapply(rf.list, estStabilityIter, x=x, y=y)
+  min.cv <- which.min(escv.list[2,])
+  min.es <- which.min(escv.list[1,min.cv:ncol(escv.list)])
+  escv.opt <- min.cv + min.es - 1
+  return(escv.opt)
+} 
