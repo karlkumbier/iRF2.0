@@ -40,7 +40,7 @@ iRF <- function(x, y,
     prevalence <- list()
   }
 
-  weight.mat <- matrix(0, nrow=p, ncol=n.iter)
+  weight.mat <- matrix(0, nrow=p, ncol=(n.iter + 1))
   weight.mat[,1] <- mtry.select.prob
   
   # Set number of trees to grow in each core
@@ -74,8 +74,8 @@ iRF <- function(x, y,
       auroc <- auc(roc(rf.list[[iter]]$test$votes[,2], ytest))
       print(paste('AUROC: ', round(auroc, 2)))
     } else if (!is.null(xtest)) {
-      pct.var <- 1 - mean((rf.list[[iter]]$test - ytest) ^ 2) / var(y)
-      print(paste('% var explained:', pct.var))
+      pct.var <- 1 - mean((rf.list[[iter]]$test$predicted - ytest) ^ 2) / var(ytest)
+      print(paste('% var explained:', pct.var * 100))
     }
   }
 
