@@ -16,11 +16,10 @@
       mtry.select.prob = rep(1/ncol(x), ncol(x)),
       keep.impvar.quantile=NULL, 
       interactions.return=NULL,
-      node.sample=list(subset=function(x) rep(TRUE, nrow(x)),
-                       wt=function(x) x$size.node),
+      wt.pred.accuracy=FALSE, 
       cutoff.unimp.feature = 0,
-      class.id=1, 
-      rit.param=list(depth=5, ntree=100, nchild=2, class.cut=NULL), 
+      rit.param=list(depth=5, ntree=100, nchild=2, 
+                     class.cut=NULL, class.id=1), 
       varnames.grp=NULL,
       n.bootstrap=30, 
       verbose=TRUE, ...
@@ -41,13 +40,8 @@
   \item{interactions.return}{a numeric vector specifying which iterations to 
     calculate interactions for. Note: interaction computation is
     computationally intensive particularly when \code{n.bootstrap} is large.}
-  \item{node.sample}{a named list containing two entries (1) \code{subset} a
-    function that takes the output of \code{getTree} as an input and returns a
-    vector of indices, specifying which leaf nodes to keep for RIT. (2) \code{wt} a
-    function that takes the output of \code{getTree} as an input and retruns a
-    vector of weights, specifying the probability with which RIT will sample
-    each node. These functions are used to sample leaf nodes based on various
-    properties, the default being size.}
+  \item{wt.pred.accuracy}{Should leaf nodes be sampled proportional to both size
+    and decrease in variabiliy of responses?}
   \item{cutoff.unimp.feature}{a non-negative fraction r. If provided,
     only features with Gini importance score in the top 100*(1-r)
     percentile are used to find feature interactions}
@@ -57,9 +51,14 @@
     \code{depth}: depth of random intersection trees
     \code{ntree} number of random intersection trees
     \code{nchild}: number of children in each split of a random intersection tree
-    \code{class.cut}: for regression iRF, threshold to group responses into
-    binary responses for RIT. If \code{NULL}, all leaf nodes from regression iRF
-    will be used as input to RIT}
+    \code{class.cut}: threshold to determine leaf nodes that are used to find
+    interactions. Any leaf nodes with prediction greater than
+    specified threshold will be used as input to RIT.  If \code{NULL}, all leaf 
+    nodes from regression iRF will be used as input to RIT. Ignored if
+    classification forest}
+    \code{class.id}{which class of observations will be used to find
+    class-specific interaction? Choose between 0 or 1. Default is set to 1. 
+    Ignored if regression forest.}
   \item{varnames.grp}{If features can be grouped based on their
     demographics or correlation patterns, use the group of features or
     ``hyper-feature''s to conduct random intersection trees}
