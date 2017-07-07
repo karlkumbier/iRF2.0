@@ -42,7 +42,7 @@ iRF <- function(x, y,
     prevalence <- list()
   }
 
-  weight.mat <- matrix(0, nrow=p, ncol=n.iter)
+  weight.mat <- matrix(0, nrow=p, ncol=n.iter+1)
   weight.mat[,1] <- mtry.select.prob
 
   # Set number of trees to grow in each core
