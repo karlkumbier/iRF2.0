@@ -165,7 +165,7 @@ iRF <- function(x, y,
             #                     keep.forest=TRUE,
             #                     track.nodes=TRUE,
             #                     ...)
-                }
+            #    }
         } else {
           rf.b <- rf.list[[iter]]
         }
