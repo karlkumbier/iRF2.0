@@ -120,6 +120,8 @@ iRF <- function(x, y,
     }
   }
 
+  if (verbose) { print('iterations complete')}
+
 # If escv.select = TRUE, determine optimal iteration #
   if (escv.select) {
     opt.k <- escv(rf.list, x=x, y=y)
