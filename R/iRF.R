@@ -1,4 +1,4 @@
-# Iteratively grows random forests, finds case specific feature interactions
+## Iteratively grows random forests, finds case specific feature interactions
 iRF <- function(x, y,
                 xtest=NULL, ytest=NULL,
                 n.iter=5,
@@ -9,10 +9,10 @@ iRF <- function(x, y,
                 interactions.return=NULL,
                 wt.pred.accuracy=FALSE,
                 cutoff.unimp.feature=0,
-                rit.param=list(depth=5, ntree=100, nchild=2, class.id=1, class.cut=NULL),
+                rit.param=list(depth=4, ntree=50, nchild=2, class.id=1, class.cut=NULL),
                 varnames.grp=NULL,
-                n.bootstrap=30,
-                bootstrap.forest=TRUE,
+                n.bootstrap= if (n.core > 30) n.core else 30,
+                bootstrap.forest=FALSE,
                 escv.select=FALSE,
                 verbose=TRUE,
                 keep.subset.var=NULL,
@@ -47,7 +47,6 @@ iRF <- function(x, y,
   a <- floor(ntree / n.core)
   b <- ntree %% n.core
   ntree.id <- c(rep(a + 1, b), rep(a, n.core - b))
-<<<<<<< HEAD
   #ntree.id <- rep(a,n.core)
   for (iter in 1:n.iter){
 
@@ -80,11 +79,9 @@ iRF <- function(x, y,
     forestlist <- pbdLapply(1:length(ntree.id), function(i) randomForest(x, y,
                                               xtest, ytest,
                                               ntree=ntree.id[i],
-                                              mtry = mtry,
-                                              mtry.select.prob=mtry.select.prob,
+                                              mtry.select.prob=weight.mat[,iter],
                                               keep.forest=TRUE,
                                               track.nodes=trackforinteractions,
-                                              keep.subset.var=keep.subset.var[tree.idcs[[i]]],
                                               ...))
 
     gatheredModels <- unlist(allgather(forestlist), recursive=FALSE)
@@ -97,39 +94,11 @@ iRF <- function(x, y,
       rf.list[[iter]] <- randomForest(x, y,
                                                 xtest, ytest,
                                                 ntree=ntree.id[1],
-                                                mtry = mtry,
-                                                mtry.select.prob=mtry.select.prob,
+                                                mtry.select.prob=weight.mat[,iter],
                                                 keep.forest=TRUE,
                                                 track.nodes=trackforinteractions,
-                                                keep.subset.var=keep.subset.var[tree.idcs[[1]]],
                                                 ...)
     }
-
-
-
-    ## 2.1: Find interactions across bootstrap replicates
-    if (iter %in% interactions.return){
-      if (verbose){cat('finding interactions ... ')}
-
-      stability.score[[iter]] <- list()
-      #interact.list[[iter]] <- lapply(1:n.bootstrap, function(i.b) {
-      gatheredRITs <- pbdLapply(1:n.bootstrap, function(i.b) {
-=======
-
-  for (iter in 1:n.iter) {
-
-    ## 1: Grow Random Forest on full data
-    print(paste('iteration = ', iter))
-    rf.list[[iter]] <- foreach(i=1:length(ntree.id), .combine=combine,
-                               .multicombine=TRUE, .packages='iRF') %dopar% {
-                                 randomForest(x, y,
-                                              xtest, ytest,
-                                              ntree=ntree.id[i],
-                                              mtry.select.prob=weight.mat[,iter],
-                                              keep.forest=TRUE,
-                                              track.nodes=TRUE,
-                                              ...)
-                               }
 
     ## 3: update mtry.select.prob
     if (!class.irf)
@@ -147,7 +116,7 @@ iRF <- function(x, y,
     }
   }
 
-  # If escv.select = TRUE, determine optimal iteration #
+# If escv.select = TRUE, determine optimal iteration #
   if (escv.select) {
     opt.k <- escv(rf.list, x=x, y=y)
     interactions.return <- opt.k
@@ -160,9 +129,8 @@ iRF <- function(x, y,
       if (verbose){cat('finding interactions ... ')}
 
       interact.list.b <- list()
-      for (i.b in 1:n.bootstrap) {
-
->>>>>>> master
+      #interact.list[[iter]] <- lapply(1:n.bootstrap, function(i.b) {
+      gatheredRITs <- pbdLapply(1:n.bootstrap, function(i.b) {
         if (class.irf) {
           n.class <- table(y)
           sample.id <- mapply(function(cc, nn) sampleClass(y, cc, nn),
@@ -171,26 +139,36 @@ iRF <- function(x, y,
         } else {
           sample.id <- sample(n, n, replace=TRUE)
         }
-<<<<<<< HEAD
 
-        #2.1.1: fit random forest on bootstrap sample
+        if (bootstrap.forest) {
+          #2.1.1: fit random forest on bootstrap sample
 
-        #use main forest instead of building a new for each bootstrap
+          forestlist <- pbdLapply(1:length(ntree.id), function(i) randomForest(x, y,
+                                                    xtest, ytest,
+                                                    ntree=ntree.id[i],
+                                                    mtry.select.prob=weight.mat[,iter],
+                                                    keep.forest=TRUE,
+                                                    track.nodes=trackforinteractions,
+                                                    ...))
 
-
-        #rf.b <- foreach(i=1:length(ntree.id), .combine=combine,
-        #                .multicombine=TRUE, .packages='iRF') %dopar% {
-        #                  randomForest(x[sample.id,], y[sample.id],
-        #                               xtest, ytest,
-        #                               ntree=ntree.id[i],
-        #                               mtry.select.prob=mtry.select.prob,
-        #                               keep.forest=TRUE,
-        #                               track.nodes=TRUE,
-        #                               keep.subset.var=keep.subset.var[tree.idcs[[i]]],
-        #                               ...)
-        #                }
-        #use the orginal forest for RIT
-        rf.b <- rf.list[[iter]]
+          gatheredModels <- unlist(allgather(forestlist), recursive=FALSE)
+          rf.b <- do.call(combine,gatheredModels)
+          rm(forestlist)
+          rm(gatheredModels)
+            #rf.b <- foreach(i=1:length(ntree.id), .combine=combine,
+            #      .multicombine=TRUE, .packages='iRF') %dopar% {
+            #
+            #        randomForest(x[sample.id,], y[sample.id],
+            #                     xtest, ytest,
+            #                     ntree=ntree.id[i],
+            #                     mtry.select.prob=weight.mat[,iter],
+            #                     keep.forest=TRUE,
+            #                     track.nodes=TRUE,
+            #                     ...)
+                }
+        } else {
+          rf.b <- rf.list[[iter]]
+        }
         #2.1.2: run generalized RIT on rf.b to learn interactions
         ints <- generalizedRIT(rf=rf.b,
                                x=x[sample.id,], y=y[sample.id],
@@ -207,42 +185,6 @@ iRF <- function(x, y,
       })
       interact.list[[iter]] <- unlist(allgather(gatheredRITs), recursive=FALSE)
 
-=======
-
-        if (bootstrap.forest) {
-          #2.1.1: fit random forest on bootstrap sample
-          rf.b <- foreach(i=1:length(ntree.id), .combine=combine,
-                          .multicombine=TRUE, .packages='iRF') %dopar% {
-                            randomForest(x[sample.id,], y[sample.id],
-                                         xtest, ytest,
-                                         ntree=ntree.id[i],
-                                         mtry.select.prob=weight.mat[,iter],
-                                         keep.forest=TRUE,
-                                         track.nodes=TRUE,
-                                         ...)
-                        }
-        } else {
-          rf.b <- rf.list[[iter]]
-        }
-
-
-        #2.1.2: run generalized RIT on rf.b to learn interactions
-        ints <- generalizedRIT(rf=rf.b,
-                               x=x[sample.id,], y=y[sample.id],
-                               wt.pred.accuracy=wt.pred.accuracy,
-                               class.irf=class.irf,
-                               varnames.grp=varnames.grp,
-                               cutoff.unimp.feature=cutoff.unimp.feature,
-                               rit.param=rit.param,
-                               n.core=n.core)
-        interact.list.b[[i.b]] <- ints
-        rm(rf.b)
-
-      }
-
-      interact.list[[iter]] <- interact.list.b
-      #interact.list[[iter]] <- unlist(allgather(gatheredRITs), recursive=FALSE)
->>>>>>> master
       # 2.2: calculate stability scores of interactions
       if (!is.null(varnames.grp))
         varnames.new <- unique(varnames.grp)
