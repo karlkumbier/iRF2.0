@@ -198,6 +198,7 @@ iRF <- function(x, y,
       else
         varnames.new <- 1:ncol(x)
 
+      if (verbose){cat('summarizing interactions ... ')}
       summary.interact <- summarizeInteract(interact.list[[iter]], varnames=varnames.new)
       stability.score[[iter]] <- summary.interact$interaction
 
