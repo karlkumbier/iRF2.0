@@ -4,6 +4,7 @@ iRF <- function(x, y,
                 n.iter=5,
                 ntree=500,
                 n.core=1,
+                n.cpupercore=1,
                 mtry= if (!is.null(y) && !is.factor(y))
                   max(floor(ncol(x)/3), 1) else floor(sqrt(ncol(x))),
                 mtry.select.prob=rep(1/ncol(x), ncol(x)),
@@ -33,7 +34,7 @@ iRF <- function(x, y,
   n <- nrow(x)
   p <- ncol(x)
   class.irf <- is.factor(y)
-  if (n.core > 1) registerDoMC(n.core)
+  #if (n.core > 1) registerDoMC(n.core)
 
   rf.list <- list()
   if (!is.null(interactions.return)) {
@@ -78,14 +79,16 @@ iRF <- function(x, y,
     #                           }
 
     if (n.core >1 ){
-    forestlist <- pbdLapply(1:length(ntree.id), function(i) randomForest(x, y,
+    forestlist <- pbdLapply(1:length(ntree.id), function(i)
+                                  mclapply(1:length(ntree.id[i])
+                                              randomForest(x, y,
                                               xtest, ytest,
                                               ntree=ntree.id[i],
                                               mtry=mtry,
                                               mtry.select.prob=weight.mat[,iter],
                                               keep.forest=TRUE,
                                               track.nodes=trackforinteractions,
-                                              ...))
+                                              ...)))
 
     gatheredModels <- unlist(allgather(forestlist), recursive=FALSE)
     rf.list[[iter]] <- do.call(combine,gatheredModels)
