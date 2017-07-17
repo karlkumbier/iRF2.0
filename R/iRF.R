@@ -35,7 +35,7 @@ iRF <- function(x, y,
   p <- ncol(x)
   class.irf <- is.factor(y)
   #if (n.core > 1) registerDoMC(n.core)
-
+  n.totalcores=(n.core*n.cpupercore)
   rf.list <- list()
   if (!is.null(interactions.return)) {
     interact.list <- list()
@@ -47,8 +47,8 @@ iRF <- function(x, y,
   weight.mat[,1] <- mtry.select.prob
 
   # Set number of trees to grow in each core
-  a <- floor(ntree / n.core)
-  b <- ntree %% n.core
+  a <- floor(ntree / n.totalcores)
+  b <- ntree %% n.totalcores
   ntree.id <- c(rep(a + 1, b), rep(a, n.core - b))
   #ntree.id <- rep(a,n.core)
   for (iter in 1:n.iter){
@@ -78,24 +78,28 @@ iRF <- function(x, y,
     #                                          ...)
     #                           }
 
-    if (n.core >1 ){
-    forestlist <- pbdLapply(1:length(ntree.id), function(i)
-                                  mclapply(1:length(ntree.id[i])
+    if (n.totalcores >1 ){
+    forestlist <- pbdLapply(1:n.core, function(i)
+                                  mclapply(1:n.cpupercore, function(j)
                                               randomForest(x, y,
                                               xtest, ytest,
-                                              ntree=ntree.id[i],
+                                              ntree=ntree.id[(i-1)*n.cpupercore+j],
                                               mtry=mtry,
                                               mtry.select.prob=weight.mat[,iter],
                                               keep.forest=TRUE,
                                               track.nodes=trackforinteractions,
-                                              ...)))
+                                              ...),
+                                              mc.cores = n.cpupercore
+                                            )
+                            )
 
-    gatheredModels <- unlist(allgather(forestlist), recursive=FALSE)
+    gatheredModels <- unlist(allgather(unlist(forestlist)), recursive=FALSE)
     rf.list[[iter]] <- do.call(combine,gatheredModels)
 
     #rf.list[[iter]] <- combine(unlist(forestlist))
     rm(forestlist)
     rm(gatheredModels)
+    gc(verbose = FALSE)
     } else {
       rf.list[[iter]] <- randomForest(x, y,
                                                 xtest, ytest,
@@ -137,8 +141,9 @@ iRF <- function(x, y,
     if (iter %in% interactions.return){
       if (verbose){cat('finding interactions ... ')}
 
-      interact.list.b <- list()
+      #interact.list.b <- list()
       #interact.list[[iter]] <- lapply(1:n.bootstrap, function(i.b) {
+      #for (i.b in 1:n.bootstrap) {
       gatheredRITs <- pbdLapply(1:n.bootstrap, function(i.b) {
         if (class.irf) {
           n.class <- table(y)
@@ -152,19 +157,6 @@ iRF <- function(x, y,
         if (bootstrap.forest) {
           #2.1.1: fit random forest on bootstrap sample
 
-          forestlist <- pbdLapply(1:length(ntree.id), function(i) randomForest(x, y,
-                                                    xtest, ytest,
-                                                    ntree=ntree.id[i],
-                                                    mtry=mtry,
-                                                    mtry.select.prob=weight.mat[,iter],
-                                                    keep.forest=TRUE,
-                                                    track.nodes=trackforinteractions,
-                                                    ...))
-
-          gatheredModels <- unlist(allgather(forestlist), recursive=FALSE)
-          rf.b <- do.call(combine,gatheredModels)
-          rm(forestlist)
-          rm(gatheredModels)
             #rf.b <- foreach(i=1:length(ntree.id), .combine=combine,
             #      .multicombine=TRUE, .packages='iRF') %dopar% {
             #
@@ -176,6 +168,38 @@ iRF <- function(x, y,
             #                     track.nodes=TRUE,
             #                     ...)
             #    }
+
+
+            if (n.totalcores >1 ){
+            forestlist <- mclapply(1:length(ntree.id), function(i)
+                                                      randomForest(x[sample.id], y[sample.id],
+                                                      xtest, ytest,
+                                                      ntree=ntree.id[i],
+                                                      mtry=mtry,
+                                                      mtry.select.prob=weight.mat[,iter],
+                                                      keep.forest=TRUE,
+                                                      track.nodes=TRUE,
+                                                      ...),
+                                                      mc.cores = n.cpupercore
+                                  )
+
+
+            rf.b <- do.call(combine,forestlist)
+
+            #rf.list[[iter]] <- combine(unlist(forestlist))
+            rm(forestlist)
+            gc(verbose = FALSE)
+            } else {
+              rf.b <- randomForest(x[sample.id], y[sample.id],
+                                                        xtest, ytest,
+                                                        ntree=ntree.id[1],
+                                                        mtry=mtry,
+                                                        mtry.select.prob=weight.mat[,iter],
+                                                        keep.forest=TRUE,
+                                                        track.nodes=TRUE,
+                                                        ...)
+            }
+
         } else {
           rf.b <- rf.list[[iter]]
         }
@@ -187,11 +211,11 @@ iRF <- function(x, y,
                                varnames.grp=varnames.grp,
                                cutoff.unimp.feature=cutoff.unimp.feature,
                                rit.param=rit.param,
-                               n.core=1)
-        return(ints)
+                               n.core=n.cpupercore)
 
+        return(ints)
       })
-      interact.list[[iter]] <- unlist(allgather(gatheredRITs), recursive=FALSE)
+      interact.list[[iter]] <- unlist(allgather(fgatheredRITs), recursive=FALSE)
 
       # 2.2: calculate stability scores of interactions
       if (!is.null(varnames.grp))
@@ -271,7 +295,7 @@ generalizedRIT <- function(rf, x, y, wt.pred.accuracy, class.irf, varnames.grp,
       drop.id <- which(rfimp < quantile(rfimp, prob=cutoff.unimp.feature))
       nf[,drop.id] <- FALSE
     }
-
+    if (n.core > 1) registerDoMC(n.core)
     interactions <- RIT(nf, weights=wt, depth=rit.param$depth,
                         n_trees=rit.param$ntree, branch=rit.param$nchild,
                         n_cores=n.core)
