@@ -49,7 +49,7 @@ iRF <- function(x, y,
   # Set number of trees to grow in each core
   a <- floor(ntree / n.totalcores)
   b <- ntree %% n.totalcores
-  ntree.id <- c(rep(a + 1, b), rep(a, n.core - b))
+  ntree.id <- c(rep(a + 1, b), rep(a, n.totalcores - b))
   #ntree.id <- rep(a,n.core)
   for (iter in 1:n.iter){
 
