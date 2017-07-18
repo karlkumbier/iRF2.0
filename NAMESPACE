@@ -21,7 +21,7 @@ importFrom(parallel, mclapply)
 export(combine, getTree, grow, importance, margin, MDSplot, na.roughfix,
        partialPlot, randomForest, rfImpute, treesize, tuneRF, varImpPlot, 
        varUsed, rfNews, outlier, classCenter, rfcv, readForest, iRF, 
-       partialPlot2var, RIT)
+       partialPlot2var, RIT, conditionalPred, permImportance, predictInteract)
 
 
 S3method(print, randomForest)
