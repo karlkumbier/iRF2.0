@@ -16,6 +16,7 @@ iRF <- function(x, y,
                 escv.select=FALSE,
                 verbose=TRUE,
                 keep.subset.var=NULL,
+                obs.weights=NULL,
                ...) {
  
 
@@ -34,7 +35,7 @@ iRF <- function(x, y,
   if (n.core > 1) registerDoMC(n.core)  
 
   rf.list <- list()
-  if (!is.null(interactions.return)) {
+  if (!is.null(interactions.return) | escv.select) {
     interact.list <- list()
     stability.score <- list()
     prevalence <- list()
@@ -82,6 +83,7 @@ iRF <- function(x, y,
   # If escv.select = TRUE, determine optimal iteration #
   if (escv.select) {
     opt.k <- escv(rf.list, x=x, y=y)
+    print(opt.k)
     interactions.return <- opt.k
   }
  
@@ -90,7 +92,7 @@ iRF <- function(x, y,
     ## 2.1: Find interactions across bootstrap replicates
     if (iter %in% interactions.return){
       if (verbose){cat('finding interactions ... ')}
-      
+
       interact.list.b <- list()      
       for (i.b in 1:n.bootstrap) { 
 
@@ -102,39 +104,54 @@ iRF <- function(x, y,
         } else {
           sample.id <- sample(n, n, replace=TRUE)
         }
-        
+
         if (bootstrap.forest) { 
           #2.1.1: fit random forest on bootstrap sample
           rf.b <- foreach(i=1:length(ntree.id), .combine=combine, 
                           .multicombine=TRUE, .packages='iRF') %dopar% {
-                            randomForest(x[sample.id,], y[sample.id], 
-                                         xtest, ytest, 
-                                         ntree=ntree.id[i], 
-                                         mtry.select.prob=weight.mat[,iter], 
-                                         keep.forest=TRUE, 
-                                         track.nodes=TRUE, 
-                                         ...)
-                        }
+            randomForest(x[sample.id,], y[sample.id], 
+                         xtest, ytest, 
+                         ntree=ntree.id[i], 
+                         mtry.select.prob=weight.mat[,iter], 
+                         keep.forest=TRUE, 
+                         track.nodes=TRUE, 
+                         ...)
+          }
         } else {
           rf.b <- rf.list[[iter]]
         }
-        
-        
+
+
         #2.1.2: run generalized RIT on rf.b to learn interactions
-        ints <- generalizedRIT(rf=rf.b, 
-                               x=x[sample.id,], y=y[sample.id],  
-                               wt.pred.accuracy=wt.pred.accuracy,
-                               class.irf=class.irf, 
-                               varnames.grp=varnames.grp,
-                               cutoff.unimp.feature=cutoff.unimp.feature,
-                               rit.param=rit.param,
-                               n.core=n.core) 
+        if (is.null(obs.weights)) {
+          ints <- generalizedRIT(rf=rf.b, 
+                                 x=x[sample.id,], y=y[sample.id],  
+                                 wt.pred.accuracy=wt.pred.accuracy,
+                                 class.irf=class.irf, 
+                                 varnames.grp=varnames.grp,
+                                 cutoff.unimp.feature=cutoff.unimp.feature,
+                                 rit.param=rit.param,
+                                 obs.weight=obs.weights,
+                                 n.core=n.core)
+        } else {
+          ints <- lapply(obs.weights, function(w) {
+                           generalizedRIT(rf=rf.b, 
+                                          x=x[sample.id,], y=y[sample.id],
+                                          wt.pred.accuracy=wt.pred.accuracy,
+                                          class.irf=class.irf,
+                                          varnames.grp=varnames.grp,
+                                          cutoff.unimp.feature=cutoff.unimp.feature,
+                                          rit.param=rit.param,
+                                          obs.weight=w,
+                                          n.core=n.core)
+                                 })
+        }
+        
         interact.list.b[[i.b]] <- ints
         rm(rf.b)       
         
       }
      
-      interact.list[[iter]] <- interact.list.b 
       # 2.2: calculate stability scores of interactions
       if (!is.null(varnames.grp))
         varnames.new <- unique(varnames.grp)
@@ -143,8 +160,23 @@ iRF <- function(x, y,
       else
         varnames.new <- 1:ncol(x)
       
-      summary.interact <- summarizeInteract(interact.list[[iter]], varnames=varnames.new)
-      stability.score[[iter]] <- summary.interact$interaction
+      if (is.null(obs.weights)) {
+        interact.list[[iter]] <- interact.list.b 
+        summary.interact <- summarizeInteract(interact.list[[iter]], 
+                                              varnames=varnames.new)
+        stability.score[[iter]] <- summary.interact$interaction
+      } else {
+        interact.list[[iter]] <- interact.list.b
+        interact.list[[iter]] <- lapply(1:length(interact.list[[iter]][[1]]), function(i) {
+                                           lapply(interact.list[[iter]], function(ll) {
+                                                    return(ll[[i]])})
+                                          })
+        summary.interact <- lapply(interact.list[[iter]], summarizeInteract, 
+                                   varnames=varnames.new)
+        stability.score[[iter]] <- lapply(summary.interact, function(i) i$interaction)
+        #prevalence[[iter]] <- lapply(summary.interact, function(i) i$prevalence)
+
+      }
     
     } # end if (find_interaction)
     
@@ -156,69 +188,73 @@ iRF <- function(x, y,
   out$rf.list <- rf.list
   if (!is.null(interactions.return)){
     out$interaction <- stability.score
+    #out$prevalence <- prevalence
   }
 
   if (escv.select) {
     out$rf.list <- out$rf.list[[opt.k]]
     out$interaction <- out$interaction[[opt.k]]
     out$opt.k <- opt.k
+    #out$prevalence <- out$prevalence[[opt.k]]
     out$weights <- weight.mat[,opt.k]
   }
   return(out)
 }
 
-
 generalizedRIT <- function(rf, x, y, wt.pred.accuracy, class.irf, varnames.grp,
-                           cutoff.unimp.feature, rit.param, n.core) {
+                           cutoff.unimp.feature, rit.param, obs.weight, n.core) {
 
   # Extract decision paths from rf as sparse binary matrix to be passed to RIT
-  rforest <- readForest(rf, x=x, y=y, 
+  rforest <- readForest(rf, x=x, y=y,
                         return.node.feature=TRUE,
-                        wt.pred.accuracy=wt.pred.accuracy, 
-                        n.core=n.core)
-  class.id <- rit.param$class.id 
+                        wt.pred.accuracy=wt.pred.accuracy,             
+                        obs.weight=obs.weight,                         
+                        n.core=n.core)                                                        
+  class.id <- rit.param$class.id
 
   # Select class specific leaf nodes
   select.leaf.id <- rep(TRUE, nrow(rforest$tree.info))
-  if (class.irf) {
+  if (class.irf) { 
     select.leaf.id <- rforest$tree.info$prediction == as.numeric(class.id) + 1
   } else if (is.null(rit.param$class.cut)) {
     select.leaf.id <- rep(TRUE, nrow(rforest$tree.info))
   } else {
     select.leaf.id <- rforest$tree.info$prediction > rit.param$class.cut
-  }
-  
+    if (sum(select.leaf.id) < 2)
+      select.leaf.id <- rforest$tree.info$prediction > rit.param$class.cut / 2
+  }       
+
   rforest <- subsetReadForest(rforest, select.leaf.id)
   nf <- rforest$node.feature
   if (wt.pred.accuracy) {
     wt <- rforest$tree.info$size.node * rforest$tree.info$dec.purity
   } else {
     wt <- rforest$tree.info$size.node
-  }
+  }         
   rm(rforest)
-  
+
   if (sum(select.leaf.id) < 2){
     return(character(0))
-  } else {
+  } else {  
     # group features if specified
     if (!is.null(varnames.grp)) nf <- groupFeature(nf, grp=varnames.grp)
-    
+
     # drop feature if cutoff.unimp.feature is specified
     if (cutoff.unimp.feature > 0){
-      if (!class.irf)
+      if (!class.irf)   
         rfimp <- rf$importance[,'IncNodePurity']
-      else
-        rfimp <- rf$importance[,'MeanDecreaseGini']   
+      else            
+        rfimp <- rf$importance[,'MeanDecreaseGini']
       drop.id <- which(rfimp < quantile(rfimp, prob=cutoff.unimp.feature))
-      nf[,drop.id] <- FALSE
-    }
-    
-    interactions <- RIT(nf, weights=wt, depth=rit.param$depth, 
-                        n_trees=rit.param$ntree, branch=rit.param$nchild, 
-                        n_cores=n.core)
+      nf[,drop.id] <- FALSE 
+    }                     
+
+    interactions <- RIT(nf, weights=wt, depth=rit.param$depth,
+                        n_trees=rit.param$ntree, branch=rit.param$nchild,
+                        n_cores=n.core)                                                 
     interactions$Interaction <- gsub(' ', '_', interactions$Interaction)
     return(interactions)
-  }
+  }                   
 }
 
 subsetReadForest <- function(rforest, subset.idcs) {
