@@ -81,14 +81,14 @@ iRF <- function(x, y,
     if (n.totalcores >1 ){
     forestlist <- pbdLapply(1:n.core, function(i)
                                   mclapply((i-1)*n.cpupercore+1:i*n.cpupercore+1, function(j)
-                                              randomForest(x, y,
+                                              {randomForest(x, y,
                                               xtest, ytest,
                                               ntree=ntree.id[j],
                                               mtry=mtry,
                                               mtry.select.prob=weight.mat[,iter],
                                               keep.forest=TRUE,
                                               track.nodes=trackforinteractions,
-                                              ...),
+                                              ...)},
                                               mc.cores = n.cpupercore
                                             )
                             )
