@@ -94,7 +94,7 @@ iRF <- function(x, y,
                             )
 
     if (verbose) { print('unlist and combine forestlist')}
-    gatheredModels <- unlist(unlist(allgather(forestlist))
+    gatheredModels <- unlist(unlist(allgather(forestlist)))
     if (verbose) { print(paste('type of gatheredModels', typeof(gatheredModels)))}
     #if (verbose) { print(paste('type of gatheredModels[[1]]', typeof(gatheredModels[[1]])))}
     rf.list[[iter]] <- do.call(combine,gatheredModels)
