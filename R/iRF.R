@@ -95,7 +95,7 @@ iRF <- function(x, y,
 
     if (verbose) { print('unlist and combine forestlist')}
 
-    gatheredModels <- unlist(allgather(forestlist), recursive=FALSE)
+    gatheredModels <- unlist(unlist(allgather(forestlist), recursive=FALSE))
     rf.list[[iter]] <- do.call(combine,gatheredModels)
     if (verbose) { print('finished unlist and combine forestlist')}
     #rf.list[[iter]] <- combine(unlist(forestlist))
