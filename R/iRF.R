@@ -49,7 +49,7 @@ iRF <- function(x, y,
   # Set number of trees to grow in each core
   a <- floor(ntree / n.totalcores)
   b <- ntree %% n.totalcores
-  ntree.id <- c(rep(a + 1, b), rep(a, n.totalcores - b))
+  ntree.id <- a
   #ntree.id <- rep(a,n.core)
   for (iter in 1:n.iter){
 
@@ -80,10 +80,10 @@ iRF <- function(x, y,
 
     if (n.totalcores >1 ){
     forestlist <- pbdLapply(1:n.core, function(i)
-                                  mclapply((i-1)*n.cpupercore+1:i*n.cpupercore+1, function(j)
+                                  mclapply(1:n.cpupercore, function(j)
                                               {randomForest(x, y,
                                               xtest, ytest,
-                                              ntree=ntree.id[j],
+                                              ntree=ntree.id,
                                               mtry=mtry,
                                               mtry.select.prob=weight.mat[,iter],
                                               keep.forest=TRUE,
