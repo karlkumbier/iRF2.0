@@ -127,8 +127,8 @@ iRF <- function(x, y,
       auroc <- auc(roc(rf.list[[iter]]$test$votes[,2], ytest))
       print(paste('AUROC: ', round(auroc, 2)))
     } else if (!is.null(xtest)) {
-      pct.var <- 1 - mean((rf.list[[iter]]$test - ytest) ^ 2) / var(y)
-      print(paste('% var explained:', pct.var))
+      #pct.var <- 1 - mean((rf.list[[iter]]$test - ytest) ^ 2) / var(y)
+      #print(paste('% var explained:', pct.var))
     }
   }
 
@@ -220,7 +220,7 @@ iRF <- function(x, y,
 
         return(ints)
       })
-      interact.list[[iter]] <- unlist(allgather(fgatheredRITs), recursive=FALSE)
+      interact.list[[iter]] <- allgather(fgatheredRITs)
 
       # 2.2: calculate stability scores of interactions
       if (!is.null(varnames.grp))
