@@ -80,7 +80,7 @@ iRF <- function(x, y,
     if (verbose) { print('begin pbdLapply and mclapply for randomForest')}
     if (n.totalcores >1 ){
     forestlist <- pbdLapply(1:n.core, function(i)
-                                  mclapply(1:n.cpupercore, function(j)
+                                  forests <- mclapply(1:n.cpupercore, function(j)
                                               {randomForest(x, y,
                                               xtest, ytest,
                                               ntree=ntree.id,
@@ -91,10 +91,12 @@ iRF <- function(x, y,
                                               ...)},
                                               mc.cores = n.cpupercore
                                             )
+                                  forest <- do.call(combine,forests)
+                                  return(forest)
                             )
 
     if (verbose) { print('unlist and combine forestlist')}
-    gatheredModels <- unlist(unlist(allgather(forestlist)))
+    gatheredModels <- unlist(allgather(forestlist))
     if (verbose) { print(paste('type of gatheredModels', typeof(gatheredModels)))}
     #if (verbose) { print(paste('type of gatheredModels[[1]]', typeof(gatheredModels[[1]])))}
     rf.list[[iter]] <- do.call(combine,gatheredModels)
