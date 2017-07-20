@@ -220,7 +220,8 @@ iRF <- function(x, y,
 
         return(ints)
       })
-      interact.list[[iter]] <- allgather(fgatheredRITs)
+      if (verbose){cat('gathering interactions ... ')}
+      interact.list[[iter]] <- allgather(gatheredRITs)
 
       # 2.2: calculate stability scores of interactions
       if (!is.null(varnames.grp))
