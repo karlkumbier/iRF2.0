@@ -79,7 +79,7 @@ iRF <- function(x, y,
     #                           }
     if (verbose) { print('begin pbdLapply and mclapply for randomForest')}
     if (n.totalcores >1 ){
-    forestlist <- pbdLapply(1:n.core, function(i)
+    forestlist <- pbdLapply(1:n.core, function(i) {
                                   forests <- mclapply(1:n.cpupercore, function(j)
                                               {randomForest(x, y,
                                               xtest, ytest,
@@ -92,7 +92,7 @@ iRF <- function(x, y,
                                               mc.cores = n.cpupercore
                                             )
                                   forest <- do.call(combine,forests)
-                                  return(forest)
+                                  return(forest)}
                             )
 
     if (verbose) { print('unlist and combine forestlist')}
