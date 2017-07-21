@@ -34,7 +34,7 @@ iRF <- function(x, y,
   n <- nrow(x)
   p <- ncol(x)
   class.irf <- is.factor(y)
-  #if (n.core > 1) registerDoMC(n.core)
+  if (n.cpupercore > 1) registerDoMC(n.cpupercore)
   n.totalcores=(n.core*n.cpupercore)
   rf.list <- list()
   if (!is.null(interactions.return)) {
@@ -209,6 +209,7 @@ iRF <- function(x, y,
           rf.b <- rf.list[[iter]]
         }
         #2.1.2: run generalized RIT on rf.b to learn interactions
+        if (verbose){cat('before generalizedRIT ... ')}
         ints <- generalizedRIT(rf=rf.b,
                                x=x[sample.id,], y=y[sample.id],
                                wt.pred.accuracy=wt.pred.accuracy,
@@ -217,11 +218,11 @@ iRF <- function(x, y,
                                cutoff.unimp.feature=cutoff.unimp.feature,
                                rit.param=rit.param,
                                n.core=n.cpupercore)
-
+        if (verbose){cat('after generalizedRIT ... ')}
         return(ints)
       })
       if (verbose){cat('gathering interactions ... ')}
-      interact.list[[iter]] <- allgather(gatheredRITs)
+      interact.list[[iter]] <- unlist(allgather(gatheredRITs),recursive = FALSE)
 
       # 2.2: calculate stability scores of interactions
       if (!is.null(varnames.grp))
