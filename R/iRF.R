@@ -262,12 +262,13 @@ generalizedRIT <- function(rf, x, y, wt.pred.accuracy, class.irf, varnames.grp,
                            cutoff.unimp.feature, rit.param, n.core) {
 
   # Extract decision paths from rf as sparse binary matrix to be passed to RIT
+  print('before readForest')
   rforest <- readForest(rf, x=x, y=y,
                         return.node.feature=TRUE,
                         wt.pred.accuracy=wt.pred.accuracy,
                         n.core=n.core)
   class.id <- rit.param$class.id
-
+  print('after readForest')
   # Select class specific leaf nodes
   select.leaf.id <- rep(TRUE, nrow(rforest$tree.info))
   if (class.irf) {
@@ -277,7 +278,7 @@ generalizedRIT <- function(rf, x, y, wt.pred.accuracy, class.irf, varnames.grp,
   } else {
     select.leaf.id <- rforest$tree.info$prediction > rit.param$class.cut
   }
-
+  print('before subsetReadForest')
   rforest <- subsetReadForest(rforest, select.leaf.id)
   nf <- rforest$node.feature
   if (wt.pred.accuracy) {
@@ -291,6 +292,7 @@ generalizedRIT <- function(rf, x, y, wt.pred.accuracy, class.irf, varnames.grp,
     return(character(0))
   } else {
     # group features if specified
+    print('before groupFeature')
     if (!is.null(varnames.grp)) nf <- groupFeature(nf, grp=varnames.grp)
 
     # drop feature if cutoff.unimp.feature is specified
@@ -302,10 +304,13 @@ generalizedRIT <- function(rf, x, y, wt.pred.accuracy, class.irf, varnames.grp,
       drop.id <- which(rfimp < quantile(rfimp, prob=cutoff.unimp.feature))
       nf[,drop.id] <- FALSE
     }
+    print(paste('before registerDoMC with cores: ',n.core))
     if (n.core > 1) registerDoMC(n.core)
+    print('before RIT')
     interactions <- RIT(nf, weights=wt, depth=rit.param$depth,
                         n_trees=rit.param$ntree, branch=rit.param$nchild,
                         n_cores=n.core)
+    print('after RIT')
     interactions$Interaction <- gsub(' ', '_', interactions$Interaction)
     return(interactions)
   }
