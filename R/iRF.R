@@ -161,13 +161,15 @@ iRF <- function(x, y,
         varnames.new <- 1:ncol(x)
       
       if (is.null(obs.weights)) {
-        interact.list[[iter]] <- interact.list.b 
+        interact.list[[iter]] <- interact.list.b
+        pp <- length(unique(varnames.new)) 
         summary.interact <- summarizeInteract(interact.list[[iter]], 
                                               varnames=varnames.new,
-                                              p=p)
+                                              p=pp)
         stability.score[[iter]] <- summary.interact$interaction
       } else {
         interact.list[[iter]] <- interact.list.b
+        pp <- length(unique(varnames.new))
         interact.list[[iter]] <- lapply(1:length(interact.list[[iter]][[1]]), function(i) {
                                            lapply(interact.list[[iter]], function(ll) {
                                                     return(ll[[i]])})
@@ -269,15 +271,18 @@ subsetReadForest <- function(rforest, subset.idcs) {
 
 groupFeature <- function(node.feature, grp){
   # Group feature level data in node.feature 
+  p <- ncol(node.feature)
+  pp <- p / 2
   sparse.mat <- is(node.feature, 'Matrix')
-  
   grp.names <- unique(grp)
   makeGroup <- function(x, g) apply(as.matrix(x[,grp == g]), MAR=1, max) 
-  node.feature.new <- sapply(grp.names, makeGroup, x=node.feature)
+  node.feature.new0 <- sapply(grp.names, makeGroup, x=node.feature[,1:pp])
+  node.feature.new1 <- sapply(grp.names, makeGroup, x=node.feature[,(pp + 1):p])
+  node.feature.new <- cbind(node.feature.new0, node.feature.new1)
+  
   if (sparse.mat) node.feature.new <- Matrix(node.feature.new, sparse=TRUE)
   
-  colnames(node.feature.new) <- grp.names
-  
+  colnames(node.feature.new) <- c(grp.names, grp.names)
   return(node.feature.new)
 }
 
