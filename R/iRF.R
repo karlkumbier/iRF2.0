@@ -163,7 +163,8 @@ iRF <- function(x, y,
       if (is.null(obs.weights)) {
         interact.list[[iter]] <- interact.list.b 
         summary.interact <- summarizeInteract(interact.list[[iter]], 
-                                              varnames=varnames.new)
+                                              varnames=varnames.new,
+                                              p=p)
         stability.score[[iter]] <- summary.interact$interaction
       } else {
         interact.list[[iter]] <- interact.list.b
@@ -172,7 +173,7 @@ iRF <- function(x, y,
                                                     return(ll[[i]])})
                                           })
         summary.interact <- lapply(interact.list[[iter]], summarizeInteract, 
-                                   varnames=varnames.new)
+                                   varnames=varnames.new, p=p)
         stability.score[[iter]] <- lapply(summary.interact, function(i) i$interaction)
         #prevalence[[iter]] <- lapply(summary.interact, function(i) i$prevalence)
 
@@ -282,7 +283,7 @@ groupFeature <- function(node.feature, grp){
 
 
 
-summarizeInteract <- function(store.out, varnames=NULL){
+summarizeInteract <- function(store.out, varnames=NULL, p){
   # Aggregate interactions across bootstrap samples
   n.bootstrap <- length(store.out)
   store <- do.call(rbind, store.out)
@@ -304,7 +305,11 @@ summarizeInteract <- function(store.out, varnames=NULL){
     names.int <- lapply(names.int, unlist)
     names.int <- sapply(names.int, function(n) {
       nn <- as.numeric(n)
-      return(paste(varnames[nn], collapse='_'))
+      direction <- as.numeric(nn > p)
+      nn <- nn %% p
+      nn[nn == 0] <- p
+      nn.direction <- paste0(varnames[nn], 'dd', direction)
+      return(paste(nn.direction, collapse='_'))
     })
     names(int.tbl) <- names.int
     names(prev.tbl) <- names.int

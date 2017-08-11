@@ -25,12 +25,75 @@ readForest <- function(rfobj, x, y=NULL,
   # aggregate sparse feature matrix across forest
   nf <- lapply(rd.forest, function(tt) tt$node.feature)
   nf <- aggregateNodeFeature(nf)
-  out$node.feature <- sparseMatrix(i=nf[,1], j=nf[,2], dims=c(max(nf[,1]), p))
+  out$node.feature <- sparseMatrix(i=nf[,1], j=nf[,2], dims=c(max(nf[,1]), 2 * p))
   return(out)
 
 }
 
-readTree <- function(rfobj, k, x, y, return.node.feature, wt.pred.accuracy,
+readTree <- function(rfobj, k, x, y, 
+                     return.node.feature=TRUE, 
+                     wt.pred.accuracy=FALSE,
+                     obs.weights=NULL) {
+  
+  n <- nrow(x)
+  p <- ncol(x)
+  ntree <- rfobj$ntree
+  tree.info <- as.data.frame(getTree(rfobj, k))
+  tree.info$node.idx <- 1:nrow(tree.info)
+  parents <- getParent(tree.info)
+  tree.info$parent <- as.integer(parents)
+  tree.info$parent.var <- getParentVar(tree.info, tree.info$parent)
+  tree.info$direction <- ifelse(tree.info$parent > nrow(tree.info), 1, 0)
+  tree.info$direction[1] <- 0
+  tree.info$tree <- as.integer(k)
+  tree.info$size.node <- 0L
+  
+  leaf.idcs <- tree.info$node.idx[tree.info$status == -1]
+  ancestors <- lapply(leaf.idcs, getAncestorPath, tree.info=tree.info)
+  node.feature <- sapply(ancestors, path2Binary, p=p)
+  
+  select.node <- tree.info$status == -1
+  rep.node <- rep(0L, nrow(tree.info))
+  tree.info <- select(tree.info, prediction, node.idx, parent, tree, size.node)
+  
+  if (is.null(rfobj$obs.nodes)) {
+    # if nodes not tracked, pass data through forest to get leaf
+    # counts
+    # TODO: node weighted sampling here
+    fit.data <- passData(rfobj, x, tree.info, k)
+    leaf.counts <- rowSums(fit.data[select.node,])
+    which.leaf <- apply(fit.data[select.node,], MAR=2, which)
+    leaf.idx <- as.integer(which(select.node))
+    if (wt.pred.accuracy) leaf.sd <- c(by(y, which.leaf, sdNode))
+  } else {
+    if (is.null(obs.weights)) {
+      leaf.counts <- table(rfobj$obs.nodes[,k])
+      leaf.idx <- as.integer(names(leaf.counts))
+      if (wt.pred.accuracy) leaf.sd <- c(by(y, rfobj$obs.nodes[,k], sdNode))
+    } else {
+      leaf.counts <- c(by(obs.weights, rfobj$obs.nodes[,k], sum))
+      leaf.idx <- as.integer(names(leaf.counts))
+      if (wt.pred.accuracy) leaf.sd <- c(by(y, rfobj$obs.nodes[,k], sdNode))
+    }
+    
+  }
+  
+  tree.info$size.node[leaf.idx] <- leaf.counts
+  if (wt.pred.accuracy) {
+    tree.info$dec.purity <- 0
+    tree.info$dec.purity[leaf.idx] <- pmax((sd(y) - leaf.sd) / sd(y), 0)
+  }
+  
+  tree.info <- tree.info[select.node,]
+  out <- list()
+  out$tree.info <- tree.info
+  nf <- t(node.feature) == 1
+  nf <- which(nf, arr.ind=TRUE)
+  out$node.feature <- nf
+  return(out)
+}
+
+readTree2 <- function(rfobj, k, x, y, return.node.feature, wt.pred.accuracy,
                      obs.weights) {
   n <- nrow(x)
   p <- ncol(x)
@@ -102,7 +165,7 @@ readTree <- function(rfobj, k, x, y, return.node.feature, wt.pred.accuracy,
   return(out)
 }
 
-getParent <- function(tree.info) {
+getParent2 <- function(tree.info) {
   # Generate a vector of parent node indices from output of getTree
   parent <- match(1:nrow(tree.info), c(tree.info[,'left daughter'],
                                        tree.info[,'right daughter']))
@@ -153,4 +216,41 @@ aggregateNodeFeature <- function(nf) {
 sdNode <- function(x) {
   sd.node <- ifelse(length(x) == 1, 0, sd(x))
   return(sd.node)
+}
+
+
+## NEW FUNCTIONS FOR HYPERRECTANGLE INTERSECTION
+getParent <- function(tree.info) {
+  # Generate a vector of parent node indices from output of getTree
+  parent <- match(1:nrow(tree.info), c(tree.info[,'left daughter'],
+                                       tree.info[,'right daughter']))
+  parent[1] <- 0
+  return(parent)
+}
+
+getParentVar <- function(tree.info, parents) {
+  n <- nrow(tree.info)
+  parent.var <- tree.info[parents %% n, 'split var']
+  parent.var <- c(0, parent.var)
+  return(parent.var)
+}
+
+getAncestorPath <- function(tree.info, node.idx, path=matrix(0, nrow=node.idx, ncol=2), i=1) {
+  
+  path[i,] <- as.matrix(tree.info[node.idx, c('parent.var', 'direction')])
+  parent.idx <- tree.info$parent[node.idx] %% nrow(tree.info)
+  if (parent.idx > 0) {
+    return(getAncestorPath(tree.info, node.idx=parent.idx, path=path, i=(i+1)))
+  } else {
+    return(path[1:i,])
+  }
+}
+
+path2Binary <- function(path, p) {
+  binary <- rep(0L, 2 * p)
+  path.vars <- path[,1]
+  path.adj <- (path[,2] * p)
+  path.vars <- path.adj + path.vars
+  binary[path.vars] <- 1L
+  return(binary)
 }
