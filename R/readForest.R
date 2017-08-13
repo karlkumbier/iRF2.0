@@ -15,15 +15,22 @@ readForest <- function(rfobj, x, y=NULL,
   out <- list()
 
   # read leaf node data from each tree in the forest 
-  rd.forest <- mclapply(1:ntree, readTree, rfobj=rfobj, x=x, y=y,
-                        return.node.feature=return.node.feature,
-                        wt.pred.accuracy=wt.pred.accuracy,
-                        obs.weights=obs.weights,
-                        mc.cores=n.core)
+  rd.forest <- mclapply(1:ntree, function(tt) {
+                          tryCatch({
+                            readTree(rfobj=rfobj, k=tt, x=x, y=y,
+                              return.node.feature=return.node.feature,
+                              wt.pred.accuracy=wt.pred.accuracy,
+                              obs.weights=obs.weights
+                              )
+                          }, error=function(e) print(e),
+                          warning=function(w) print(w))
+                       }, mc.cores=n.core)
 
   out$tree.info <- rbindlist(lapply(rd.forest, function(tt) tt$tree.info))
   # aggregate sparse feature matrix across forest
   nf <- lapply(rd.forest, function(tt) tt$node.feature)
+  #id.rm <- sapply(nf, is.null)
+  #nf <- nf[!id.rm]
   nf <- aggregateNodeFeature(nf)
   out$node.feature <- sparseMatrix(i=nf[,1], j=nf[,2], dims=c(max(nf[,1]), 2 * p))
   return(out)
@@ -50,6 +57,17 @@ readTree <- function(rfobj, k, x, y,
   
   leaf.idcs <- tree.info$node.idx[tree.info$status == -1]
   ancestors <- lapply(leaf.idcs, getAncestorPath, tree.info=tree.info)
+  # TODO: only take earliest splitting node for variables that are used more
+  # than once
+ # if (TRUE) {
+ #   getUniqueFeature <- function(an) {
+ #     unq <- unique(an[,1])
+ #     unq.idcs <- sapply(unq, function(u) max(which(an[,1] == u)))
+ #     print(unq.idcs)
+ #     return(an[unq.idcs,])
+ #   }
+ #   ancestors <- lapply(ancestors, getUniqueFeature)
+ # }
   node.feature <- sapply(ancestors, path2Binary, p=p)
   
   select.node <- tree.info$status == -1
@@ -90,6 +108,7 @@ readTree <- function(rfobj, k, x, y,
   nf <- t(node.feature) == 1
   nf <- which(nf, arr.ind=TRUE)
   out$node.feature <- nf
+
   return(out)
 }
 
@@ -242,7 +261,7 @@ getAncestorPath <- function(tree.info, node.idx, path=matrix(0, nrow=node.idx, n
   if (parent.idx > 0) {
     return(getAncestorPath(tree.info, node.idx=parent.idx, path=path, i=(i+1)))
   } else {
-    return(path[1:i,])
+    return(path[1:(i - 1),])
   }
 }
 
