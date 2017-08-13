@@ -16,14 +16,14 @@ readForest <- function(rfobj, x, y=NULL,
 
   # read leaf node data from each tree in the forest 
   rd.forest <- mclapply(1:ntree, function(tt) {
-                          tryCatch({
+                          #tryCatch({
                             readTree(rfobj=rfobj, k=tt, x=x, y=y,
                               return.node.feature=return.node.feature,
                               wt.pred.accuracy=wt.pred.accuracy,
                               obs.weights=obs.weights
                               )
-                          }, error=function(e) print(e),
-                          warning=function(w) print(w))
+                          #}, error=function(e) print(e),
+                          #warning=function(w) print(w))
                        }, mc.cores=n.core)
 
   out$tree.info <- rbindlist(lapply(rd.forest, function(tt) tt$tree.info))

@@ -123,7 +123,6 @@ iRF <- function(x, y,
 
 
         #2.1.2: run generalized RIT on rf.b to learn interactions
-        if (is.null(obs.weights)) {
           ints <- generalizedRIT(rf=rf.b, 
                                  x=x[sample.id,], y=y[sample.id],  
                                  wt.pred.accuracy=wt.pred.accuracy,
@@ -133,21 +132,14 @@ iRF <- function(x, y,
                                  rit.param=rit.param,
                                  obs.weight=obs.weights,
                                  n.core=n.core)
-        } else {
-          ints <- lapply(obs.weights, function(w) {
-                           generalizedRIT(rf=rf.b, 
-                                          x=x[sample.id,], y=y[sample.id],
-                                          wt.pred.accuracy=wt.pred.accuracy,
-                                          class.irf=class.irf,
-                                          varnames.grp=varnames.grp,
-                                          cutoff.unimp.feature=cutoff.unimp.feature,
-                                          rit.param=rit.param,
-                                          obs.weight=w,
-                                          n.core=n.core)
-                                 })
-        }
+          
+          ints0 <- ints$i0
+          ints1 <- ints$i1
+         
         
-        interact.list.b[[i.b]] <- ints
+        interact.list.b0[[i.b]] <- ints0
+        interact.list.b1[[i.b]] <- ints1
+        
         rm(rf.b)       
         
       }
@@ -160,28 +152,20 @@ iRF <- function(x, y,
       else
         varnames.new <- 1:ncol(x)
       
-      if (is.null(obs.weights)) {
-        interact.list[[iter]] <- interact.list.b
-        pp <- length(unique(varnames.new)) 
-        summary.interact <- summarizeInteract(interact.list[[iter]], 
-                                              varnames=varnames.new,
-                                              p=pp)
-        stability.score[[iter]] <- summary.interact$interaction
-      } else {
-        interact.list[[iter]] <- interact.list.b
-        pp <- length(unique(varnames.new))
-        interact.list[[iter]] <- lapply(1:length(interact.list[[iter]][[1]]), function(i) {
-                                           lapply(interact.list[[iter]], function(ll) {
-                                                    return(ll[[i]])})
-                                          })
-        summary.interact <- lapply(interact.list[[iter]], summarizeInteract, 
-                                   varnames=varnames.new, p=p)
-        stability.score[[iter]] <- list(i1=lapply(summary.interact, function(i) i$interaction1),
-                                        i0=lapply(summary.interact, function(i) i$interaction0))
-        #prevalence[[iter]] <- lapply(summary.interact, function(i) i$prevalence)
-
-      }
-    
+        
+      interact.list0[[iter]] <- interact.list.b0
+      interact.list1[[iter]] <- interact.list.b1
+      
+      pp <- length(unique(varnames.new)) 
+      summary.interact0 <- summarizeInteract(interact.list0[[iter]], 
+                                            varnames=varnames.new,
+                                            p=pp)
+      summary.interact1 <- summarizeInteract(interact.list1[[iter]], 
+                                             varnames=varnames.new,
+                                             p=pp)
+      stability.score[[iter]] <- list(i0=summary.interact0$interaction,
+                                      i1=summary.interact1$interaction)
+       
     } # end if (find_interaction)
     
    
@@ -246,8 +230,6 @@ generalizedRIT <- function(rf, x, y, wt.pred.accuracy, class.irf, varnames.grp,
     #wt <- rforest$tree.info$size.node
   }         
   rm(rforest)
-  print(wt1)
-  print(wt0)
 
   if (sum(select.leaf.id) < 2){
     return(character(0))
@@ -273,6 +255,8 @@ generalizedRIT <- function(rf, x, y, wt.pred.accuracy, class.irf, varnames.grp,
     interactions0 <- RIT(nf0, weights=wt0,
                          depth=rit.param$depth, n_trees=rit.param$ntree,
                          branch=rit.param$nchild, n_cores=n.core)
+    print(head(interactions1))
+    print(head(interactions0))
     interactions1$Interaction <- gsub(' ', '_', interactions1$Interaction)
     interactions0$Interaction <- gsub(' ', '_', interactions0$Interaction)
 
@@ -312,35 +296,25 @@ groupFeature <- function(node.feature, grp){
 summarizeInteract <- function(store.out, varnames=NULL, p){
   # Aggregate interactions across bootstrap samples
   n.bootstrap <- length(store.out)
-  s1 <- lapply(store.out, function(ll) ll[[1]])
-  s0 <- lapply(store.out, function(ll) ll[[2]])
+  store <- do.call(rbind, store.out)
   
-  store1 <- do.call(rbind, s1)
-  store0 <- do.call(rbind, s0)
 
   if (length(store1) >= 1){
-    int.tbl1 <- sort(table(store1$Interaction), decreasing = TRUE)
-    int.tbl1 <- int.tbl1 / n.bootstrap
+    int.tbl <- sort(table(store$Interaction), decreasing = TRUE)
+    int.tbl <- int.tbl / n.bootstrap
 
-    prev.tbl1 <- c(by(store1$Prevalence, store1$Interaction, sum))
-    prev.tbl1 <- prev.tbl1 / n.bootstrap
-    prev.tbl1 <- prev.tbl1[names(int.tbl1)]
-
-    int.tbl0 <- sort(table(store0$Interaction), decreasing = TRUE)
-    int.tbl0 <- int.tbl0 / n.bootstrap
-
-    prev.tbl0 <- c(by(store0$Prevalence, store0$Interaction, sum))
-    prev.tbl0 <- prev.tbl0 / n.bootstrap
-    prev.tbl0 <- prev.tbl0[names(int.tbl0)]    
+    prev.tbl <- c(by(store$Prevalence, store$Interaction, sum))
+    prev.tbl <- prev.tbl / n.bootstrap
+    prev.tbl <- prev.tbl[names(int.tbl)]
   } else {
     return(list(interaction=numeric(0), prevalence=numeric(0)))
   }
   
   if (!is.null(varnames)) {
-    stopifnot (names(int.tbl1) == names(prev.tbl1))
-    names.int1 <- lapply(names(int.tbl1), strsplit, split='_')
-    names.int1 <- lapply(names.int1, unlist)
-    names.int1 <- sapply(names.int1, function(n) {
+    stopifnot (names(int.tbl) == names(prev.tbl))
+    names.int <- lapply(names(int.tbl), strsplit, split='_')
+    names.int <- lapply(names.int, unlist)
+    names.int <- sapply(names.int, function(n) {
       nn <- as.numeric(n)
       direction <- as.numeric(nn > p)
       nn <- nn %% p
@@ -348,23 +322,11 @@ summarizeInteract <- function(store.out, varnames=NULL, p){
       nn.direction <- paste0(varnames[nn], 'dd', direction)
       return(paste(nn.direction, collapse='_'))
     })
-    names(int.tbl1) <- names.int1
-    names(prev.tbl1) <- names.int1
+    names(int.tbl) <- names.int
+    names(prev.tbl) <- names.int
 
-    names.int0 <- lapply(names(int.tbl0), strsplit, split='_')
-    names.int0 <- lapply(names.int0, unlist)
-    names.int0 <- sapply(names.int0, function(n) {
-                           nn <- as.numeric(n)
-                           direction <- as.numeric(nn > p)
-                           nn <- nn %% p
-                           nn[nn == 0] <- p
-                           nn.direction <- paste0(varnames[nn], 'dd', direction)
-                           return(paste(nn.direction, collapse='_'))
-    })
-    names(int.tbl0) <- names.int0
-    names(prev.tbl0) <- names.int0 
   }
-  out <- list(interaction1=int.tbl1, interaction0=int.tbl0)
+  out <- list(interaction=int.tbl)
   return(out)
 }
 
