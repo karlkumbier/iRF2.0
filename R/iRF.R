@@ -37,6 +37,8 @@ iRF <- function(x, y,
   rf.list <- list()
   if (!is.null(interactions.return) | escv.select) {
     interact.list <- list()
+    interact.list0 <- list()
+    interact.list1 <- list()
     stability.score <- list()
     prevalence <- list()
   }
@@ -93,7 +95,8 @@ iRF <- function(x, y,
     if (iter %in% interactions.return){
       if (verbose){cat('finding interactions ... ')}
 
-      interact.list.b <- list()      
+      interact.list.b0 <- list()      
+      interact.list.b1 <- list()
       for (i.b in 1:n.bootstrap) { 
 
         if (class.irf) {
@@ -299,7 +302,7 @@ summarizeInteract <- function(store.out, varnames=NULL, p){
   store <- do.call(rbind, store.out)
   
 
-  if (length(store1) >= 1){
+  if (length(store) >= 1){
     int.tbl <- sort(table(store$Interaction), decreasing = TRUE)
     int.tbl <- int.tbl / n.bootstrap
 
