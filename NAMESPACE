@@ -16,7 +16,7 @@ importFrom(stats, delete.response, mad, median, model.frame,
 importFrom(doMC, registerDoMC)
 importFrom(foreach, foreach, "%dopar%")
 importFrom(parallel, mclapply)
-
+importFrom(FSInteract, RIT)
 
 export(combine, getTree, grow, importance, margin, MDSplot, na.roughfix,
        partialPlot, randomForest, rfImpute, treesize, tuneRF, varImpPlot, 

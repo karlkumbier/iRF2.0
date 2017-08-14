@@ -11,7 +11,8 @@ Imports:
     dplyr,
     Rcpp,
     methods,
-    doMC
+    doMC,
+    FSInteract
 Suggests:
     RColorBrewer,
     MASS,

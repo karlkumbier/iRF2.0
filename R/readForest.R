@@ -1,7 +1,6 @@
 readForest <- function(rfobj, x, y=NULL,
                        return.node.feature=TRUE,
                        wt.pred.accuracy=FALSE,
-                       obs.weights=NULL,
                        n.core=1){
 
   if (is.null(rfobj$forest))
@@ -16,21 +15,14 @@ readForest <- function(rfobj, x, y=NULL,
 
   # read leaf node data from each tree in the forest 
   rd.forest <- mclapply(1:ntree, function(tt) {
-                          #tryCatch({
                             readTree(rfobj=rfobj, k=tt, x=x, y=y,
                               return.node.feature=return.node.feature,
-                              wt.pred.accuracy=wt.pred.accuracy,
-                              obs.weights=obs.weights
-                              )
-                          #}, error=function(e) print(e),
-                          #warning=function(w) print(w))
+                              wt.pred.accuracy=wt.pred.accuracy)
                        }, mc.cores=n.core)
 
-  out$tree.info <- rbindlist(lapply(rd.forest, function(tt) tt$tree.info))
+  out$tree.info <- rbindlist(lapply(rd.forest, function(z) z$tree.info))
   # aggregate sparse feature matrix across forest
   nf <- lapply(rd.forest, function(tt) tt$node.feature)
-  #id.rm <- sapply(nf, is.null)
-  #nf <- nf[!id.rm]
   nf <- aggregateNodeFeature(nf)
   out$node.feature <- sparseMatrix(i=nf[,1], j=nf[,2], dims=c(max(nf[,1]), 2 * p))
   return(out)
@@ -39,11 +31,12 @@ readForest <- function(rfobj, x, y=NULL,
 
 readTree <- function(rfobj, k, x, y, 
                      return.node.feature=TRUE, 
-                     wt.pred.accuracy=FALSE,
-                     obs.weights=NULL) {
+                     wt.pred.accuracy=FALSE) {
   
   n <- nrow(x)
   p <- ncol(x)
+  if (is.factor(y)) y <- as.numeric(y) - 1
+  
   ntree <- rfobj$ntree
   tree.info <- as.data.frame(getTree(rfobj, k))
   tree.info$node.idx <- 1:nrow(tree.info)
@@ -57,17 +50,6 @@ readTree <- function(rfobj, k, x, y,
   
   leaf.idcs <- tree.info$node.idx[tree.info$status == -1]
   ancestors <- lapply(leaf.idcs, getAncestorPath, tree.info=tree.info)
-  # TODO: only take earliest splitting node for variables that are used more
-  # than once
- # if (TRUE) {
- #   getUniqueFeature <- function(an) {
- #     unq <- unique(an[,1])
- #     unq.idcs <- sapply(unq, function(u) max(which(an[,1] == u)))
- #     print(unq.idcs)
- #     return(an[unq.idcs,])
- #   }
- #   ancestors <- lapply(ancestors, getUniqueFeature)
- # }
   node.feature <- sapply(ancestors, path2Binary, p=p)
   
   select.node <- tree.info$status == -1
@@ -76,24 +58,16 @@ readTree <- function(rfobj, k, x, y,
   
   if (is.null(rfobj$obs.nodes)) {
     # if nodes not tracked, pass data through forest to get leaf
-    # counts
-    # TODO: node weighted sampling here
+    # counts.
     fit.data <- passData(rfobj, x, tree.info, k)
     leaf.counts <- rowSums(fit.data[select.node,])
     which.leaf <- apply(fit.data[select.node,], MAR=2, which)
     leaf.idx <- as.integer(which(select.node))
     if (wt.pred.accuracy) leaf.sd <- c(by(y, which.leaf, sdNode))
   } else {
-    if (is.null(obs.weights)) {
-      leaf.counts <- table(rfobj$obs.nodes[,k])
-      leaf.idx <- as.integer(names(leaf.counts))
-      if (wt.pred.accuracy) leaf.sd <- c(by(y, rfobj$obs.nodes[,k], sdNode))
-    } else {
-      leaf.counts <- c(by(obs.weights, rfobj$obs.nodes[,k], sum))
-      leaf.idx <- as.integer(names(leaf.counts))
-      if (wt.pred.accuracy) leaf.sd <- c(by(y, rfobj$obs.nodes[,k], sdNode))
-    }
-    
+    leaf.counts <- table(rfobj$obs.nodes[,k])
+    leaf.idx <- as.integer(names(leaf.counts))
+    if (wt.pred.accuracy) leaf.sd <- c(by(y, rfobj$obs.nodes[,k], sdNode))
   }
   
   tree.info$size.node[leaf.idx] <- leaf.counts
@@ -117,6 +91,7 @@ readTree2 <- function(rfobj, k, x, y, return.node.feature, wt.pred.accuracy,
   n <- nrow(x)
   p <- ncol(x)
   ntree <- rfobj$ntree
+  if (is.factor(y)) y <- as.numeric(y) - 1
 
   # Read tree level data from RF
   out <- list()
@@ -136,7 +111,6 @@ readTree2 <- function(rfobj, k, x, y, return.node.feature, wt.pred.accuracy,
   if (is.null(rfobj$obs.nodes)) {
     # if nodes not tracked, pass data through forest to get leaf
     # counts
-    # TODO: node weighted sampling here
     fit.data <- passData(rfobj, x, out$tree.info, k)
     leaf.counts <- rowSums(fit.data[select.node,])
     which.leaf <- apply(fit.data[select.node,], MAR=2, which)
@@ -255,7 +229,6 @@ getParentVar <- function(tree.info, parents) {
 }
 
 getAncestorPath <- function(tree.info, node.idx, path=matrix(0, nrow=node.idx, ncol=2), i=1) {
-  
   path[i,] <- as.matrix(tree.info[node.idx, c('parent.var', 'direction')])
   parent.idx <- tree.info$parent[node.idx] %% nrow(tree.info)
   if (parent.idx > 0) {
@@ -266,6 +239,7 @@ getAncestorPath <- function(tree.info, node.idx, path=matrix(0, nrow=node.idx, n
 }
 
 path2Binary <- function(path, p) {
+  if (is.null(dim(path))) path <- matrix(path, nrow=1)
   binary <- rep(0L, 2 * p)
   path.vars <- path[,1]
   path.adj <- (path[,2] * p)
