@@ -37,6 +37,8 @@ iRF <- function(x, y,
   rf.list <- list()
   if (!is.null(interactions.return) | escv.select) {
     interact.list <- list()
+    interact.list0 <- list()
+    interact.list1 <- list()
     stability.score <- list()
     prevalence <- list()
   }
@@ -92,7 +94,8 @@ iRF <- function(x, y,
     if (iter %in% interactions.return){
       if (verbose){cat('finding interactions ... ')}
       
-      interact.list.b <- list()      
+      interact.list.b0 <- list()
+      interact.list.b1 <- list()    
       for (i.b in 1:n.bootstrap) { 
         
         if (class.irf) {
@@ -129,7 +132,10 @@ iRF <- function(x, y,
                                rit.param=rit.param,
                                n.core=n.core)
 
-        interact.list.b[[i.b]] <- ints
+        ints0 <- ints$i0
+        ints1 <- ints$i1
+        interact.list.b0[[i.b]] <- ints0
+        interact.list.b1[[i.b]] <- ints1
         rm(rf.b)       
       }
       
@@ -141,12 +147,20 @@ iRF <- function(x, y,
       else
         varnames.new <- 1:ncol(x)
       
-      interact.list[[iter]] <- interact.list.b
+      interact.list0[[iter]] <- interact.list.b0
+      interact.list1[[iter]] <- interact.list.b1
       pp <- length(varnames.new)
       summary.interact <- summarizeInteract(interact.list[[iter]], 
                                              varnames=varnames.new,
                                              p=pp)
-      stability.score[[iter]] <- summary.interact
+      summary.interact0 <- summarizeInteract(interact.list0[[iter]],
+                                             varnames=varnames.new,
+                                             p=pp)
+      summary.interact1 <- summarizeInteract(interact.list1[[iter]],
+                                             varnames=varnames.new,
+                                             p=pp)
+      stability.score[[iter]] <- list(i0=summary.interact0$interaction,
+                                      i1=summary.interact1$interaction)
       
     } # end if (find_interaction)
     
@@ -238,20 +252,16 @@ generalizedRIT <- function(rf, x, y, wt.pred.accuracy, class.irf, varnames.grp,
       nf0[,drop.id] <- FALSE
     }                     
     
-    if (rit.param$class.id == 1) {
-      z <- nf1 != 0
-      z0 <- nf0 != 0
-    } else {
-      z <- nf0 != 0
-      z0 <- nf1 != 0
-    }
+    interactions1 <- RIT(nf1, depth=rit.param$depth, n_trees=rit.param$ntree,
+                         branch=rit.param$nchild, n_cores=n.core)
     
-    interactions <- RIT(z=z, z0=z0, depth=rit.param$depth, n_trees=rit.param$ntree, 
-                         branch=rit.param$nchild, n_cores=n.core) 
+    interactions0 <- RIT(nf0, depth=rit.param$depth, n_trees=rit.param$ntree,
+                         branch=rit.param$nchild, n_cores=n.core)
     
-    interactions <- interactions$Class1
-    interactions$Interaction <- gsub(' ', '_', interactions$Interaction)
-    return(interactions)
+    interactions1$Interaction <- gsub(' ', '_', interactions1$Interaction)
+    interactions0$Interaction <- gsub(' ', '_', interactions0$Interaction)
+    
+    return(list(i1=interactions1, i0=interactions0))
   }                   
 }
 
