@@ -16,6 +16,7 @@ iRF <- function(x, y,
                 escv.select=FALSE,
                 verbose=TRUE,
                 keep.subset.var=NULL,
+                return.node.feature=FALSE,
                 ...) {
   
   
@@ -36,8 +37,6 @@ iRF <- function(x, y,
   rf.list <- list()
   if (!is.null(interactions.return) | escv.select) {
     interact.list <- list()
-    interact.list0 <- list()
-    interact.list1 <- list()
     stability.score <- list()
     prevalence <- list()
   }
@@ -93,8 +92,7 @@ iRF <- function(x, y,
     if (iter %in% interactions.return){
       if (verbose){cat('finding interactions ... ')}
       
-      interact.list.b0 <- list()      
-      interact.list.b1 <- list()
+      interact.list.b <- list()      
       for (i.b in 1:n.bootstrap) { 
         
         if (class.irf) {
@@ -130,13 +128,9 @@ iRF <- function(x, y,
                                cutoff.unimp.feature=cutoff.unimp.feature,
                                rit.param=rit.param,
                                n.core=n.core)
-        ints0 <- ints$i0
-        ints1 <- ints$i1
-        interact.list.b0[[i.b]] <- ints0
-        interact.list.b1[[i.b]] <- ints1
-        
+
+        interact.list.b[[i.b]] <- ints
         rm(rf.b)       
-        
       }
       
       # 2.2: calculate stability scores of interactions
@@ -147,18 +141,12 @@ iRF <- function(x, y,
       else
         varnames.new <- 1:ncol(x)
       
-      
-      interact.list0[[iter]] <- interact.list.b0
-      interact.list1[[iter]] <- interact.list.b1
-      pp <- length(unique(varnames.new)) 
-      summary.interact0 <- summarizeInteract(interact.list0[[iter]], 
+      interact.list[[iter]] <- interact.list.b
+      pp <- length(varnames.new)
+      summary.interact <- summarizeInteract(interact.list[[iter]], 
                                              varnames=varnames.new,
                                              p=pp)
-      summary.interact1 <- summarizeInteract(interact.list1[[iter]], 
-                                             varnames=varnames.new,
-                                             p=pp)
-      stability.score[[iter]] <- list(i0=summary.interact0$interaction,
-                                      i1=summary.interact1$interaction)
+      stability.score[[iter]] <- summary.interact
       
     } # end if (find_interaction)
     
@@ -179,6 +167,15 @@ iRF <- function(x, y,
     out$weights <- weight.mat[,opt.k]
   }
   
+  if (return.node.feature) {
+    rdf <- readForest(rf.list[[n.iter]], x=x, y=y,
+                     return.node.feature=TRUE,
+                     wt.pred.accuracy=wt.pred.accuracy,
+                     varnames.grp=varnames.grp,
+                     n.core=n.core)
+    out$nf <- rdf$node.feature
+  }
+  
   return(out)
 }
 
@@ -189,7 +186,8 @@ generalizedRIT <- function(rf, x, y, wt.pred.accuracy, class.irf, varnames.grp,
   rforest <- readForest(rf, x=x, y=y,
                         return.node.feature=TRUE,
                         wt.pred.accuracy=wt.pred.accuracy,             
-                        n.core=n.core)                                                        
+                        n.core=n.core,
+                        varnames.grp=varnames.grp)                                                        
   class.id <- rit.param$class.id
 
   # Select class specific leaf nodes
@@ -207,8 +205,6 @@ generalizedRIT <- function(rf, x, y, wt.pred.accuracy, class.irf, varnames.grp,
   
   rforest1 <- subsetReadForest(rforest, select.leaf.id1)
   rforest0 <- subsetReadForest(rforest, select.leaf.id0)
-  nf1 <- rforest1$node.feature
-  nf0 <- rforest0$node.feature
   if (wt.pred.accuracy) {
     wt1 <- rforest1$tree.info$size.node * rforest1$tree.info$dec.purity
     wt0 <- rforest0$tree.info$size.node * rforest0$tree.info$dec.purity
@@ -216,9 +212,11 @@ generalizedRIT <- function(rf, x, y, wt.pred.accuracy, class.irf, varnames.grp,
     wt1 <- rforest1$tree.info$size.node
     wt0 <- rforest0$tree.info$size.node
   }         
-  rm(rforest)
+  #rm(rforest)
   
   # sample w/ replacement...
+  nf1 <- rforest1$node.feature
+  nf0 <- rforest0$node.feature
   nf1 <- nf1[sample(nrow(nf1), prob=wt1, replace=TRUE),]
   nf0 <- nf0[sample(nrow(nf0), prob=wt0, replace=TRUE),]
   
@@ -240,16 +238,20 @@ generalizedRIT <- function(rf, x, y, wt.pred.accuracy, class.irf, varnames.grp,
       nf0[,drop.id] <- FALSE
     }                     
     
-    interactions1 <- RIT(nf1, depth=rit.param$depth, n_trees=rit.param$ntree, 
+    if (rit.param$class.id == 1) {
+      z <- nf1 != 0
+      z0 <- nf0 != 0
+    } else {
+      z <- nf0 != 0
+      z0 <- nf1 != 0
+    }
+    
+    interactions <- RIT(z=z, z0=z0, depth=rit.param$depth, n_trees=rit.param$ntree, 
                          branch=rit.param$nchild, n_cores=n.core) 
     
-    interactions0 <- RIT(nf0, depth=rit.param$depth, n_trees=rit.param$ntree,
-                         branch=rit.param$nchild, n_cores=n.core)
-
-    interactions1$Interaction <- gsub(' ', '_', interactions1$Interaction)
-    interactions0$Interaction <- gsub(' ', '_', interactions0$Interaction)
-    
-    return(list(i1=interactions1, i0=interactions0))
+    interactions <- interactions$Class1
+    interactions$Interaction <- gsub(' ', '_', interactions$Interaction)
+    return(interactions)
   }                   
 }
 
@@ -268,6 +270,7 @@ groupFeature <- function(node.feature, grp){
   pp <- p / 2
   sparse.mat <- is(node.feature, 'Matrix')
   grp.names <- unique(grp)
+  # TODO: is max correct for hyperrectangle? Should depend on direction
   makeGroup <- function(x, g) apply(as.matrix(x[,grp == g]), MAR=1, max) 
   node.feature.new0 <- sapply(grp.names, makeGroup, x=node.feature[,1:pp])
   node.feature.new1 <- sapply(grp.names, makeGroup, x=node.feature[,(pp + 1):p])
@@ -285,7 +288,6 @@ summarizeInteract <- function(store.out, varnames=NULL, p){
   # Aggregate interactions across bootstrap samples
   n.bootstrap <- length(store.out)
   store <- do.call(rbind, store.out)
-  
   
   if (length(store) >= 1){
     int.tbl <- sort(table(store$Interaction), decreasing = TRUE)
@@ -305,9 +307,10 @@ summarizeInteract <- function(store.out, varnames=NULL, p){
     names.int <- sapply(names.int, function(n) {
       nn <- as.numeric(n)
       direction <- as.numeric(nn > p)
+      direction <- c('-', '+')[direction + 1]
       nn <- nn %% p
       nn[nn == 0] <- p
-      nn.direction <- paste0(varnames[nn], 'dd', direction)
+      nn.direction <- paste0(varnames[nn], direction)
       return(paste(nn.direction, collapse='_'))
     })
     names(int.tbl) <- names.int
