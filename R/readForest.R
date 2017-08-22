@@ -241,9 +241,12 @@ getAncestorPath <- function(tree.info, node.idx, path=matrix(0, nrow=node.idx, n
 path2Binary <- function(path, p) {
   if (is.null(dim(path))) path <- matrix(path, nrow=1)
   binary <- rep(0L, 2 * p)
-  path.vars <- path[,1]
-  path.adj <- (path[,2] * p)
+  
+  replicated <- duplicated(rev(path[, 1]))
+  path.vars <- rev(path[, 1])[!replicated]
+  path.adj <- rev(path[, 2])[!replicated] * p
   path.vars <- path.adj + path.vars
   binary[path.vars] <- 1L
+  if (sum(binary) == 0) print('NULL PATH')
   return(binary)
 }
