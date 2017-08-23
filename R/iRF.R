@@ -9,7 +9,8 @@ iRF <- function(x, y,
                 interactions.return=NULL, 
                 wt.pred.accuracy=FALSE, 
                 cutoff.unimp.feature=0,  
-                rit.param=list(depth=5, ntree=100, nchild=2, class.id=1, class.cut=NULL), 
+                rit.param=list(depth=5, ntree=100, nchild=2, 
+                  class.id=1, class.cut=NULL), 
                 varnames.grp=NULL, 
                 n.bootstrap=30,
                 bootstrap.forest=TRUE,
@@ -150,10 +151,7 @@ iRF <- function(x, y,
       interact.list0[[iter]] <- interact.list.b0
       interact.list1[[iter]] <- interact.list.b1
       pp <- length(varnames.new)
-      summary.interact <- summarizeInteract(interact.list[[iter]], 
-                                             varnames=varnames.new,
-                                             p=pp)
-      summary.interact0 <- summarizeInteract(interact.list0[[iter]],
+     summary.interact0 <- summarizeInteract(interact.list0[[iter]],
                                              varnames=varnames.new,
                                              p=pp)
       summary.interact1 <- summarizeInteract(interact.list1[[iter]],
@@ -181,15 +179,6 @@ iRF <- function(x, y,
     out$weights <- weight.mat[,opt.k]
   }
   
-  if (return.node.feature) {
-    rdf <- readForest(rf.list[[n.iter]], x=x, y=y,
-                     return.node.feature=TRUE,
-                     wt.pred.accuracy=wt.pred.accuracy,
-                     varnames.grp=varnames.grp,
-                     n.core=n.core)
-    out$nf <- rdf$node.feature
-  }
-  
   return(out)
 }
 
@@ -212,8 +201,10 @@ generalizedRIT <- function(rf, x, y, wt.pred.accuracy, class.irf, varnames.grp,
   } else if (is.null(rit.param$class.cut)) {
     select.leaf.id <- rep(TRUE, nrow(rforest$tree.info))
   } else {
-    select.leaf.id1 <- rforest$tree.info$prediction > rit.param$class.cut
-    select.leaf.id0 <- rforest$tree.info$prediction <= rit.param$class.cut
+    cuts <- rit.param$class.cut
+    if (length(cuts) == 1) cuts < <-  rep(cuts, 2)
+    select.leaf.id1 <- rforest$tree.info$prediction > cuts[2]
+    select.leaf.id0 <- rforest$tree.info$prediction <= cuts[1]
   }       
   
   
@@ -226,7 +217,6 @@ generalizedRIT <- function(rf, x, y, wt.pred.accuracy, class.irf, varnames.grp,
     wt1 <- rforest1$tree.info$size.node
     wt0 <- rforest0$tree.info$size.node
   }         
-  #rm(rforest)
   
   # sample w/ replacement...
   nf1 <- rforest1$node.feature
