@@ -202,7 +202,7 @@ generalizedRIT <- function(rf, x, y, wt.pred.accuracy, class.irf, varnames.grp,
     select.leaf.id <- rep(TRUE, nrow(rforest$tree.info))
   } else {
     cuts <- rit.param$class.cut
-    if (length(cuts) == 1) cuts < <-  rep(cuts, 2)
+    if (length(cuts) == 1) cuts <-  rep(cuts, 2)
     select.leaf.id1 <- rforest$tree.info$prediction > cuts[2]
     select.leaf.id0 <- rforest$tree.info$prediction <= cuts[1]
   }       
