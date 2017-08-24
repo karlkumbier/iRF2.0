@@ -97,7 +97,7 @@ permImportance <- function(rfobj, x, y, int, n.perms=3,
   return(interact.scores)
 }
 
-predictInteract <- function(rfobj, x, int, n.perms=3, varnames.group=NULL) {
+predictInteract <- function(rfobj, x, int, n.perms=3, varnames.group=NULL, n.cores=1) {
   # Evaluates predictions from RF when all other variables have been permuted
   require(iRF)
 
@@ -114,7 +114,8 @@ predictInteract <- function(rfobj, x, int, n.perms=3, varnames.group=NULL) {
     return(pred.fixed)
   }
 
-  pred.ints <- sapply(int, predInt)
+  pred.ints <- mclapply(int, predInt, mc.cores=n.cores)
+  pred.ints <- do.call(cbind, pred.ints)
   return(pred.ints)
 }
 
