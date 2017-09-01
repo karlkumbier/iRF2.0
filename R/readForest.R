@@ -13,13 +13,14 @@ readForest <- function(rfobj, x, y=NULL,
   p <- ncol(x)
   n <- nrow(x)
   out <- list()
-
+  print("readForest")
   # read leaf node data from each tree in the forest
   rd.forest <- mclapply(1:ntree, readTree, rfobj=rfobj, x=x, y=y,
                         return.node.feature=return.node.feature,
                         wt.pred.accuracy=wt.pred.accuracy,
                         obs.weights=obs.weights,
                         mc.cores=n.core)
+  print("bind Forest info")
 
   out$tree.info <- rbindlist(lapply(rd.forest, function(tt) tt$tree.info))
   # aggregate sparse feature matrix across forest
