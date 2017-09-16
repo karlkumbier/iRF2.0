@@ -178,6 +178,6 @@ path2Binary <- function(path, p, varnames.grp) {
   path.vars <- path.vars[!dup]
   path.adj <- (path[!dup, 2] * p)
   path.vars <- path.adj + path.vars
-  binary[path.vars] <- 1 * path[!dup,3]
+  binary[path.vars] <- 1 #* path[!dup,3]
   return(binary)
 }
