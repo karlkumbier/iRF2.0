@@ -13,7 +13,7 @@ iRF <- function(x, y,
                 varnames.grp=NULL, 
                 n.bootstrap=30,
                 bootstrap.forest=TRUE,
-                escv.select=FALSE,
+                cv.select=FALSE,
                 verbose=TRUE,
                 keep.subset.var=NULL,
                 obs.weights=NULL,
@@ -35,7 +35,7 @@ iRF <- function(x, y,
   if (n.core > 1) registerDoMC(n.core)  
 
   rf.list <- list()
-  if (!is.null(interactions.return) | escv.select) {
+  if (!is.null(interactions.return) | cv.select) {
     interact.list <- list()
     stability.score <- list()
     prevalence <- list()
@@ -80,8 +80,8 @@ iRF <- function(x, y,
     }
   }
 
-  # If escv.select = TRUE, determine optimal iteration #
-  if (escv.select) {
+  # If cv.select = TRUE, determine optimal iteration #
+  if (cv.select) {
     opt.k <- escv(rf.list, x=x, y=y)
     print(opt.k)
     interactions.return <- opt.k
@@ -191,7 +191,7 @@ iRF <- function(x, y,
     #out$prevalence <- prevalence
   }
 
-  if (escv.select) {
+  if (cv.select) {
     out$rf.list <- out$rf.list[[opt.k]]
     out$interaction <- out$interaction[[opt.k]]
     out$opt.k <- opt.k
@@ -322,6 +322,11 @@ sampleClass <- function(y, cl, n) {
 
 estStabilityIter <- function(rfobj, x, y) {
   # Evaluate estimation stability for an RF object
+  if (is.factor(y)) {
+    yy <- as.numeric(y)
+    error <- mean((as.numeric(rfobj$predicted) - yy)^2, na.rm=TRUE)
+    return(c(es=1, cv=error))
+  }
   y.hat <- predict(rfobj, newdata=x, predict.all=TRUE)
   y.bar <- y.hat$aggregate
   y.agg <- apply(y.hat$individual, MAR=2, function(z) sum((z - y.bar) ^ 2))
@@ -336,6 +341,8 @@ escv <- function(rf.list, x, y) {
   escv.list <- sapply(rf.list, estStabilityIter, x=x, y=y)
   min.cv <- which.min(escv.list[2,])
   min.es <- which.min(escv.list[1,min.cv:ncol(escv.list)])
+
+  # TODO: clean
   escv.opt <- min.cv + min.es - 1
-  return(escv.opt)
+  return(min.cv)
 } 
