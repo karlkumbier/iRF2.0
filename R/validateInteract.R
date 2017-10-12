@@ -73,6 +73,16 @@ getInteractNodes <- function(nf, x.names, int) {
   return(is.interact)
 }
 
+permImportanceWrapper <- function(rfobjs, x, y, ints, n.perms=3, 
+                                  weight=rep(1, length(y)), 
+                                  varnames.group=NULL, n.cores=1) {
+  
+  perm.importance <- mapply(function(rf, int) {
+    unlist(mclapply(int, permImportance, rfobj=rf, x=x, y=y, n.perms=n.perms, 
+             weight=weight, varnames.group=varnames.group, mc.cores=n.cores))
+    }, rfobjs, ints, SIMPLIFY=FALSE)
+  return(perm.importance)
+}
 
 permImportance <- function(rfobj, x, y, int, n.perms=3, 
                            weight=rep(1, length(y)), varnames.group=NULL) {
@@ -82,6 +92,8 @@ permImportance <- function(rfobj, x, y, int, n.perms=3,
   
   if (is.null(varnames.group) & !is.null(colnames(x)))
     varnames.group <- colnames(x)
+  if (is.null(colnames(x)))
+    varnames.group <- as.character(1:ncol(x))
   
   predInt <- function(int) {
     pred.type <- ifelse(rfobj$type == 'regression', 'response', 'prob')
@@ -123,8 +135,8 @@ predAccuracy <- function(y.hat, y, weight=weight) {
   # Evaluate prediction accuracy, scaled to interavl [0,1]
   require(AUC)
   if (is.factor(y)) {
-    accuracy <- auc(roc(pred, y))
-    accuracy <- 2 * (accuracy - 0.5)
+    accuracy <- auc(roc(y.hat, y))
+    accuracy <- 2 * (max(accuracy, 0.5) - 0.5)
   } else {
     if (any(weight < 0)) stop('negative weights')
     weight <- weight / sum(weight)
