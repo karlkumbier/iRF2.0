@@ -76,7 +76,6 @@ iRF <- function(x, y,
       print(paste('% var explained:', pct.var * 100))
     }
   }
-<<<<<<< HEAD
   
   # Select iteration for which to return interactions based on minimizing 
   # prediction error on OOB samples
