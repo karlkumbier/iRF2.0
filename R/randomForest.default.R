@@ -5,7 +5,7 @@ mylevels <- function(x) if (is.factor(x)) levels(x) else 0
   function(x, y=NULL,  xtest=NULL, ytest=NULL, ntree=500,
            mtry= if (!is.null(y) && !is.factor(y))
              max(floor(ncol(x)/3), 1) else floor(sqrt(ncol(x))),
-           mtry.select.prob = rep(1/ncol(x), ncol(x)),
+           mtry.select.prob = matrix(1/ncol(x), nrow=nrow(x), ncol=ncol(x)),
            keep.subset.var = NULL, 
            replace=TRUE, classwt=NULL, cutoff, strata,
            sampsize = if (replace) nrow(x) else ceiling(.632*nrow(x)),
@@ -17,8 +17,8 @@ mylevels <- function(x) if (is.factor(x)) levels(x) else 0
            keep.forest=!is.null(y) && is.null(xtest), corr.bias=FALSE,
            keep.inbag=FALSE, track.nodes=FALSE,...) {
     
-    if (length(mtry.select.prob)!=ncol(x))
-      stop('length of mtry.select.prob != ncol(x)')
+    #if (length(mtry.select.prob)!=ncol(x))
+    #  stop('length of mtry.select.prob != ncol(x)')
     
     #mtry <- mtry + length(keep.subset.var)
     #if (mtry > ncol(x))
@@ -274,6 +274,7 @@ mylevels <- function(x) if (is.factor(x)) levels(x) else 0
                   ntree = as.integer(ntree),
                   mtry = as.integer(mtry),
                   selprob = as.double(mtry.select.prob),
+                  obsgini = as.double(matrix(0, nrow(x), ncol(x))),
                   obsnodes = obs.nodes,
                   tracknodes = as.integer(track.nodes),
                   subsetVar = subsetVar, 
@@ -380,6 +381,7 @@ mylevels <- function(x) if (is.factor(x)) levels(x) else 0
                                                     dimnames = list(x.row.names, x.row.names)) else NULL,
                   ntree = ntree,
                   mtry = mtry,
+                  obsgini = matrix(rfout$obsgini, ncol=p) / ntree,
                   forest = if (!keep.forest) NULL else {
                     list(ndbigtree = rfout$ndbigtree,
                          nodestatus = matrix(rfout$nodestatus,
