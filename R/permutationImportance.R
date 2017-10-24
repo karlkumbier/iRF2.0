@@ -1,4 +1,25 @@
-permImportance <- function(rfobj, x, y, int, n.perms=3, varnames.group=NULL) {
+permImprovement <- function(rfobj, x, y, int, n.perms=3, varnames.group=NULL,
+                            n.cores=1) {
+  int.subsets <- intsSubsets(int)
+  perm.importance <- permImportance(rfobj, x, y, int.subsets, n.perms, 
+                                    varnames.group, n.cores)
+  int.improvement <- sapply(int, intImprovement, importance=perm.importance)
+
+
+}
+
+intImprovement <- function(importance, int) {
+  int.subs <- intSubsets(int)
+  int.subs <- int.subs[int.subs != int]
+  int.importance <- importance[int]
+  sub.importance <- max(importance[int.subs])
+  improvement <- int.importance / sub.importance
+  improvement <-  unname(improvement)
+  return(improvement)
+}
+
+permImportance <- function(rfobj, x, y, int, n.perms=3, varnames.group=NULL,
+                           n.cores=1) {
   # Evaluate the importance of an interaction by permuting all pother features
   # args:
   #   rfobj: fitted random forest
@@ -17,11 +38,11 @@ permImportance <- function(rfobj, x, y, int, n.perms=3, varnames.group=NULL) {
   
   preds <- predictInts(rfobj, x, int, n.perms, varnames.group, collapse=TRUE, 
                        n.cores=n.cores)
-  interact.score <- sapply(preds, predAccuracy, y=y)
+  interact.score <- apply(preds, MAR=2, predAccuracy, y=y)
   
   
-  interact.scores <- sapply(int, predInt)
-  return(interact.scores)
+  #interact.scores <- sapply(int, predInt)
+  return(interact.score)
 }
 
 predictInts <- function(rfobj, x, int, n.perms=3, varnames.group=NULL, 
@@ -121,3 +142,16 @@ permute <- function(x) {
   x <- x[sample(length(x))]
   return(x)
 }
+
+intsSubsets <- function(ints) return(unique(unlist(lapply(ints, intSubsets))))
+
+intSubsets <- function(int) {
+  # Generates all lower-order subsets of a given interaction
+  vv <- strsplit(int, '_')[[1]]
+  int.orders <- 1:length(vv)
+  ints <- lapply(int.orders, combn, x=vv, simplify=FALSE)
+  if (length(int.orders) > 1) ints <- unlist(ints, recursive=FALSE)
+  ints <- sapply(ints, paste, collapse='_')
+  return(ints)
+}
+
