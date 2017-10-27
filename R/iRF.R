@@ -8,7 +8,6 @@ iRF <- function(x, y,
                 keep.impvar.quantile=NULL, 
                 interactions.return=NULL, 
                 wt.pred.accuracy=FALSE, 
-                cutoff.unimp.feature=0,  
                 rit.param=list(depth=5, ntree=500, nchild=2, class.id=1, 
                                class.cut=NULL, class.qt=0.5), 
                 varnames.grp=NULL, 
@@ -121,13 +120,9 @@ iRF <- function(x, y,
       }
       
       # run generalized RIT on rf.b to learn interactions
-      ints <- generalizedRIT(rf=rf.b, 
-                             x=x[sample.id,], y=y[sample.id],
+      ints <- generalizedRIT(rf=rf.b, x=x[sample.id,], y=y[sample.id],
                              wt.pred.accuracy=wt.pred.accuracy,
-                             class.irf=class.irf,
-                             importance.feature=importance.feature,
                              varnames.grp=varnames.grp,
-                             cutoff.unimp.feature=cutoff.unimp.feature,
                              rit.param=rit.param,
                              n.core=n.core)
       
@@ -164,14 +159,21 @@ iRF <- function(x, y,
   return(out)
 }
 
-generalizedRIT <- function(rf, x, y, wt.pred.accuracy, class.irf, 
-                           importance.feature, varnames.grp,
-                           cutoff.unimp.feature, rit.param, n.core) {
+generalizedRIT <- function(rf, x, y, 
+                           wt.pred.accuracy=FALSE, 
+                           varnames.grp=NULL,
+                           rit.param=list(depth=5, ntree=500, nchild=2, 
+                                          class.id=1, 
+                                          class.cut=NULL, class.qt=0.5), 
+                           local=FALSE, 
+                           n.core=1) {
   
-  # Extract decision paths from rf as sparse binary matrix to be passed to RIT
+  class.irf <- is.factor(y)
+
+  # Extract decision paths and tree metadata from random forest
   rforest <- readForest(rf, x=x, y=y, 
                         return.node.feature=TRUE,
-                        return.node.obs=TRUE,
+                        return.node.obs=local,
                         wt.pred.accuracy=wt.pred.accuracy, 
                         n.core=n.core)                                                        
   
@@ -179,72 +181,105 @@ generalizedRIT <- function(rf, x, y, wt.pred.accuracy, class.irf,
   select.leaf.id <- rep(TRUE, nrow(rforest$tree.info))
   
   if (class.irf) {
+    # classification: subset leaf nodes by class
     class.id <- rit.param$class.id
     select.leaf.id <- rforest$tree.info$prediction == as.numeric(class.id) + 1
   } else if (!is.null(rit.param$class.cut)) {
-    select.leaf.id <- rep(TRUE, nrow(rforest$tree.info))
+    # regression with cutoff: sample all leaf nodes that exceed cutoff
     select.leaf.id <- rforest$tree.info$prediction > rit.param$class.cut
-    
-    if (sum(select.leaf.id) < 2) {
-      warning('fewer than 2 leaf nodes with prediction > class.cut, using median')
-      select.leaf.id <- rforest$tree.info$prediction > median(y)
-    }
-    
   } else if (!is.null(rit.param$class.qt)) {
-    select.leaf.id <- rforest$tree.info$prediction > 
-      quantile(y, rit.param$class.qt)
+    # regression with quantile cutoff: determine cutoff from quantile and 
+    # sample leaf nodes
+    qt.cut <- quantile(y, rit.param$class.qt)
+    select.leaf.id <- rforest$tree.info$prediction > qt.cut
   }       
   
   rforest <- subsetReadForest(rforest, select.leaf.id)
-  nf <- cbind(rforest$node.feature, rforest$node.obs)
-  
+  nf <- rforest$node.feature
+
+  # Set weights for leaf node sampling using either size or size and accuracy
   if (wt.pred.accuracy) {
     wt <- rforest$tree.info$size.node * rforest$tree.info$dec.purity
   } else {
     wt <- rforest$tree.info$size.node
   }         
   
-  rm(rforest)
-  
-  if (sum(select.leaf.id) < 2){
+  if (sum(select.leaf.id) < 2) {
     return(character(0))
   } else {  
     
     # group features if specified
     if (!is.null(varnames.grp)) nf <- groupFeature(nf, grp=varnames.grp)
+    p <- ncol(nf)
     
-    # drop feature if cutoff.unimp.feature is specified
-    if (cutoff.unimp.feature > 0){
-      rfimp <- rf$importance[,importance.feature]
-      drop.id <- which(rfimp < quantile(rfimp, prob=cutoff.unimp.feature))
-      nf[,drop.id] <- FALSE 
-    }                     
+    # add observation data for each node
+    if (local) nf <- cbind(nf, rforest$node.obs)
+    rm(rforest)
+    
+    # Question: what is the average size of node for class 1 vs class 0 observations?
+    nf <- nf[wt != 0,]
+    wt <- wt[wt != 0]
     
     interactions <- RIT(nf, weights=wt, depth=rit.param$depth,
                         n_trees=rit.param$ntree, branch=rit.param$nchild,
-                        n_cores=n.core)                                                 
-    interactions$Interaction <- gsub(' ', '_', interactions$Interaction)
+                        n_cores=n.core) 
+    
+    # Group interactions and rename by variable name
+    if (!is.null(varnames.grp))
+      varnames.new <- unique(varnames.grp)
+    else if (!is.null(colnames(x)))
+      varnames.new <- colnames(x)
+    else
+      varnames.new <- 1:ncol(x)
+    
+    if (local) {
+      interactions <- groupLocalInteracts(interactions$Interaction, n, p)
+      names(interactions) <- nameInts(names(interactions), varnames.new)
+    } else {
+      interactions <- gsub(' ', '_', interactions$Interaction)
+      interactions <- nameInts(interactions, varnames.new)
+    }
+    
     return(interactions)
   }                   
 }
 
-groupInteracts <- function(rit.ints, n, p) {
+nameInts <- function(int, varnames) {
   
-  ints.split <- strsplit(rit.ints$Interaction, ' ')
-  ints.feat <- sapply(ints.split, function(z) 
-    paste(z[as.numeric(z) <= p], collapse='_'))
+  ints.split <- strsplit(int, '_')
+  varnames.unq <- unique(varnames)
+  ints.name <- lapply(ints.split, function(i) varnames.unq[as.numeric(i)])
+  ints.name <- sapply(ints.name, paste, collapse='_')
+  return(ints.name)
+}
+
+
+groupLocalInteracts <- function(interactions, n, p) {
+  # Aggregate local interactions
   
-  ints.obs <- sapply(ints.split, function(z) paste(z[z > p], collapse='_'))
+  ints.split <- strsplit(interactions, ' ')
+  ints.split <- sapply(ints.split, as.numeric)
+  
+  # split interactions into feature and observation
+  ints.feat <- sapply(ints.split, function(z) paste(z[z <= p], collapse='_'))
+  ints.obs <- lapply(ints.split, function(z) z[z > p])
+  
+  # remove interactions between only observations
   id.rm <- ints.feat == ''
   ints.obs <- ints.obs[!id.rm]
   ints.feat <- ints.feat[!id.rm]
   
-  combineObs <- function(z) as.numeric(unique(unlist(strsplit(z, '_'))))
-  agg <- lapply(unique(ints.feat), function(i) combineObs(ints.obs[ints.feat == i]))
+  # aggreate observations by interaction
+  agg <- lapply(unique(ints.feat), function(i) 
+    unique(unlist(ints.obs[ints.feat == i])))
   id.rm <- sapply(agg, function(z) length(z) == 0)
   agg <- agg[!id.rm]
   names(agg) <- unique(ints.feat)[!id.rm]
+  agg <- lapply(agg, '-', p)
+  
+  return(agg)
 }
+
 
 subsetReadForest <- function(rforest, subset.idcs) {
   

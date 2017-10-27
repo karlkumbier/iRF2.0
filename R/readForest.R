@@ -11,16 +11,17 @@ readForest <- function(rfobj, x, y=NULL,
     stop('y required to evaluate prediction accuracy')
   
   ntree <- rfobj$ntree
+  n <- nrow(x)
   p <- ncol(x)
   out <- list()
   
   # Determine leaf nodes for observations in x
-  if (is.null(rfobj$obs.nodes)) {
+  #if (is.null(rfobj$obs.nodes)) {
     prf <- predict(rfobj, newdata=x, nodes=TRUE)
     nodes <- attr(prf, 'nodes')
-  } else {
-    nodes <- rfobj$obs.nodes
-  }
+  #} else {
+  #  nodes <- rfobj$obs.nodes
+  #}
   
   # read leaf node data from each tree in the forest 
   rd.forest <- mclapply(1:ntree, readTree, rfobj=rfobj, x=x, y=y,
@@ -56,6 +57,7 @@ readTree <- function(rfobj, k, x, y, nodes,
   
   n <- nrow(x) 
   p <- ncol(x)
+  if (is.factor(y)) y <- as.numeric(y) - 1
   ntree <- rfobj$ntree
 
   # Read tree metadata from forest
@@ -113,8 +115,8 @@ readTree <- function(rfobj, k, x, y, nodes,
   
   node.obs <- NULL
   if (return.node.obs) {
-    id <- match(nodes[,k], sort(unique(nodes[,k])))
-    node.obs <- cbind(id, 1:500)
+    id <- match(which.leaf, sort(unique(which.leaf)))
+    node.obs <- cbind(id, 1:n)
     node.obs <- node.obs[order(node.obs[,1]),] #TODO: do we need to order?
   }
   

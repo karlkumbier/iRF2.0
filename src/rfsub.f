@@ -57,7 +57,7 @@ c     main program.
       integer tmpcheck, subsetvar(mcard)
       double precision selprobloc(mred)
       double precision selprob(nsample, mdim)
-      double precision obsgini(nsample, mdim)
+c      double precision obsgini(nsample, mdim)
 
       double precision tclasspop(nclass), classpop(nclass, nrnodes),
      1     tclasscat(nclass, 53), win(nsample), wr(nclass),
@@ -146,13 +146,13 @@ c     If the node is terminal, move on.  Otherwise, split.
 c     find class populations in both nodes
          do n = ndstart, ndendl
             nc = ncase(n)
-            obsgini(nc, msplit) = obsgini(nc, msplit) + decsplit
+c            obsgini(nc, msplit) = obsgini(nc, msplit) + decsplit
             j=cl(nc)
             classpop(j,ncur+1) = classpop(j,ncur+1) + win(nc)
          end do
          do n = ndendl+1, ndend
             nc = ncase(n)
-            obsgini(nc, msplit) = obsgini(nc, msplit) + decsplit
+c            obsgini(nc, msplit) = obsgini(nc, msplit) + decsplit
             j = cl(nc)
             classpop(j,ncur+2) = classpop(j,ncur+2) + win(nc)
          end do
