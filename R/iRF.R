@@ -169,7 +169,10 @@ generalizedRIT <- function(rf, x, y, wt.pred.accuracy, class.irf,
                            cutoff.unimp.feature, rit.param, n.core) {
   
   # Extract decision paths from rf as sparse binary matrix to be passed to RIT
-  rforest <- readForest(rf, x=x, y=y, wt.pred.accuracy=wt.pred.accuracy, 
+  rforest <- readForest(rf, x=x, y=y, 
+                        return.node.feature=TRUE,
+                        return.node.obs=TRUE,
+                        wt.pred.accuracy=wt.pred.accuracy, 
                         n.core=n.core)                                                        
   
   # Select class specific leaf nodes
@@ -193,7 +196,7 @@ generalizedRIT <- function(rf, x, y, wt.pred.accuracy, class.irf,
   }       
   
   rforest <- subsetReadForest(rforest, select.leaf.id)
-  nf <- rforest$node.feature
+  nf <- cbind(rforest$node.feature, rforest$node.obs)
   
   if (wt.pred.accuracy) {
     wt <- rforest$tree.info$size.node * rforest$tree.info$dec.purity
@@ -225,14 +228,35 @@ generalizedRIT <- function(rf, x, y, wt.pred.accuracy, class.irf,
   }                   
 }
 
+groupInteracts <- function(rit.ints, n, p) {
+  
+  ints.split <- strsplit(rit.ints$Interaction, ' ')
+  ints.feat <- sapply(ints.split, function(z) 
+    paste(z[as.numeric(z) <= p], collapse='_'))
+  
+  ints.obs <- sapply(ints.split, function(z) paste(z[z > p], collapse='_'))
+  id.rm <- ints.feat == ''
+  ints.obs <- ints.obs[!id.rm]
+  ints.feat <- ints.feat[!id.rm]
+  
+  combineObs <- function(z) as.numeric(unique(unlist(strsplit(z, '_'))))
+  agg <- lapply(unique(ints.feat), function(i) combineObs(ints.obs[ints.feat == i]))
+  id.rm <- sapply(agg, function(z) length(z) == 0)
+  agg <- agg[!id.rm]
+  names(agg) <- unique(ints.feat)[!id.rm]
+}
+
 subsetReadForest <- function(rforest, subset.idcs) {
   
   # Subset nodes from readforest output 
   if (!is.null(rforest$node.feature)) 
     rforest$node.feature <- rforest$node.feature[subset.idcs,]
   
-  if(!is.null(rforest$tree.info))
+  if (!is.null(rforest$tree.info))
     rforest$tree.info <- rforest$tree.info[subset.idcs,]
+  
+  if (!is.null(rforest$node.obs))
+    rforest$node.obs <- rforest$node.obs[subset.idcs,]
   
   return(rforest)
 }

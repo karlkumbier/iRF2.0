@@ -1,5 +1,6 @@
-readForest <- function(rfobj, x, y=NULL,
-                       return.node.feature=TRUE,
+readForest <- function(rfobj, x, y=NULL, 
+                       return.node.feature=TRUE, 
+                       return.node.obs=FALSE,
                        wt.pred.accuracy=FALSE,
                        obs.weights=NULL,
                        n.core=1){
@@ -25,26 +26,39 @@ readForest <- function(rfobj, x, y=NULL,
   rd.forest <- mclapply(1:ntree, readTree, rfobj=rfobj, x=x, y=y,
                         nodes=nodes,
                         return.node.feature=return.node.feature,
+                        return.node.obs=return.node.obs,
                         wt.pred.accuracy=wt.pred.accuracy,
                         obs.weights=obs.weights,
                         mc.cores=n.core)
   
  
   out$tree.info <- rbindlist(lapply(rd.forest, function(tt) tt$tree.info))
+  
   # aggregate sparse feature matrix across forest
   nf <- lapply(rd.forest, function(tt) tt$node.feature)
   nf <- aggregateNodeFeature(nf)
+  
+  # aggregate sparse observation matrix across forest
+  nobs <- lapply(rd.forest, function(tt) tt$node.obs)
+  nobs <- aggregateNodeFeature(nobs)
+  
   out$node.feature <- sparseMatrix(i=nf[,1], j=nf[,2], dims=c(max(nf[,1]), p))
+  out$node.obs <- sparseMatrix(i=nobs[,1], j=nobs[,2], dims=c(max(nf[,1]), n))
   return(out)
   
 }
 
-readTree <- function(rfobj, k, x, y, nodes, return.node.feature, 
-                     wt.pred.accuracy, obs.weights=NULL) {
+readTree <- function(rfobj, k, x, y, nodes, 
+                     return.node.feature=TRUE,
+                     return.node.obs=FALSE,
+                     wt.pred.accuracy=FALSE, 
+                     obs.weights=NULL) {
+  
   n <- nrow(x) 
   p <- ncol(x)
   ntree <- rfobj$ntree
 
+  # Read tree metadata from forest
   tree.info <- as.data.frame(getTree(rfobj, k))
   tree.info$node.idx <- 1:nrow(tree.info)
   parents <- getParent(tree.info)
@@ -83,24 +97,31 @@ readTree <- function(rfobj, k, x, y, nodes, return.node.feature,
   
   
   # Extract decision paths from leaf nodes as binary sparse matrix
+  node.feature <- NULL
   if (return.node.feature) {
-    row.offset <- 0
     var.nodes <- as.integer(rfobj$forest$bestvar[,k])
-    total.rows <- n
     sparse.idcs <- nodeVars(var.nodes,
                             as.integer(length(select.node)),
                             as.integer(p),
                             as.integer(parents),
                             as.integer(select.node),
                             as.integer(rep.node),
-                            as.integer(row.offset),
-                            matrix(0L, nrow=(total.rows * p), ncol=2))
+                            0L,
+                            matrix(0L, nrow=(n * p), ncol=2))
     node.feature <- sparse.idcs[!sparse.idcs[,1] == 0,]
+  }
+  
+  node.obs <- NULL
+  if (return.node.obs) {
+    id <- match(nodes[,k], sort(unique(nodes[,k])))
+    node.obs <- cbind(id, 1:500)
+    node.obs <- node.obs[order(node.obs[,1]),] #TODO: do we need to order?
   }
   
   out <- list()
   out$tree.info <- tree.info
   out$node.feature <- node.feature
+  out$node.obs <- node.obs
   return(out)
 }
 
@@ -114,33 +135,6 @@ getParent <- function(tree.info) {
   return(parent)
 }
 
-
-passData <- function(rfobj, x, tt, k) {
-  # Pass data through rf object
-  leaf.id <- tt$status == -1
-  n <- nrow(x)
-  n.node <- rfobj$forest$ndbigtree[k]
-  node.composition <- matrix(FALSE, nrow=n.node, ncol=n)
-  node.composition[1,] <- TRUE
-  
-  
-  for (i in which(!leaf.id)){   
-    # determine children and split point for current node
-    d.left <- tt$"left daughter"[i]
-    d.right <- tt$"right daughter"[i]
-    split.var <- tt$"split var"[i]
-    split.pt <- tt$"split point"[i]
-    
-    parent.id <- node.composition[i,]
-    d.left.id <- (x[,split.var] <= split.pt) & parent.id
-    d.right.id <- (x[,split.var] > split.pt) & parent.id
-    
-    node.composition[d.left,] <- d.left.id
-    node.composition[d.right,] <- d.right.id
-  }
-  
-  return(node.composition)
-}
 
 aggregateNodeFeature <- function(nf) {
   # aggregate list of node feature data returned from each tree
