@@ -163,7 +163,7 @@ generalizedRIT <- function(rf, x, y,
                            wt.pred.accuracy=FALSE, 
                            varnames.grp=NULL,
                            rit.param=list(depth=5, ntree=500, nchild=2, 
-                                          class.id=1, 
+                                          class.id=1, min.nd=10,
                                           class.cut=NULL, class.qt=0.5), 
                            local=FALSE, 
                            n.core=1) {
@@ -214,11 +214,14 @@ generalizedRIT <- function(rf, x, y,
     
     # add observation data for each node
     if (local) nf <- cbind(nf, rforest$node.obs)
-    rm(rforest)
+    #rm(rforest)
     
-    # Question: what is the average size of node for class 1 vs class 0 observations?
-    nf <- nf[wt != 0,]
-    wt <- wt[wt != 0]
+    # sample one leaf node per tree ...
+    
+    id <- rforest$tree.info$size.node > rit.param$min.nd
+    nf <- nf[id,]
+    rforest$tree.info <- rforest$tree.info[id,]
+    wt <- wt[id]
     
     interactions <- RIT(nf, weights=wt, depth=rit.param$depth,
                         n_trees=rit.param$ntree, branch=rit.param$nchild,

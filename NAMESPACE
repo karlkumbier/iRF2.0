@@ -22,7 +22,8 @@ export(combine, getTree, grow, importance, margin, MDSplot, na.roughfix,
        partialPlot, randomForest, rfImpute, treesize, tuneRF, varImpPlot, 
        varUsed, rfNews, outlier, classCenter, rfcv, readForest, iRF, 
        partialPlot2var, RIT, conditionalPred, permImportance,
-       predictInts, intsSubsets, generalizedRIT)
+       predictInts, intsSubsets, generalizedRIT, groupFeature, subsetReadForest,
+       nameInts, groupLocalInteracts)
 
 
 S3method(print, randomForest)

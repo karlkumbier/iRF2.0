@@ -40,11 +40,12 @@ readForest <- function(rfobj, x, y=NULL,
   nf <- aggregateNodeFeature(nf)
   
   # aggregate sparse observation matrix across forest
-  nobs <- lapply(rd.forest, function(tt) tt$node.obs)
-  nobs <- aggregateNodeFeature(nobs)
+  if (return.node.obs) nobs <- lapply(rd.forest, function(tt) tt$node.obs)
+  if (return.node.obs) nobs <- aggregateNodeFeature(nobs)
   
   out$node.feature <- sparseMatrix(i=nf[,1], j=nf[,2], dims=c(max(nf[,1]), p))
-  out$node.obs <- sparseMatrix(i=nobs[,1], j=nobs[,2], dims=c(max(nf[,1]), n))
+  if (return.node.obs)
+    out$node.obs <- sparseMatrix(i=nobs[,1], j=nobs[,2], dims=c(max(nf[,1]), n))
   return(out)
   
 }
