@@ -58,11 +58,12 @@ c     main program.
       double precision selprobloc(mred)
       double precision selprob(nsample, mdim)
       double precision obsgini(nsample, mdim)
-
+      double precision locimp
       double precision tclasspop(nclass), classpop(nclass, nrnodes),
      1     tclasscat(nclass, 53), win(nsample), wr(nclass),
      1     wl(nclass), tgini(mdim), xrand
       integer msplit, ntie
+      double precision sloc
 
       tmpcheck = -73
       msplit = 0
@@ -71,8 +72,6 @@ c     main program.
       call zerv(nodestart,nrnodes)
       call zerv(nodepop,nrnodes)
       call zermr(classpop,nclass,nrnodes)
-c     currently doing this for single tree
-c      obsgini(:,:) = 0
 
 c     initialize matrices for tracking observations and variables 
 
@@ -144,20 +143,26 @@ c     If the node is terminal, move on.  Otherwise, split.
          nodestart(ncur+2) = ndendl + 1
 
 c     find class populations in both nodes
+
          do n = ndstart, ndendl
             nc = ncase(n)
-            obsgini(nc, msplit) = obsgini(nc, msplit) + decsplit
+
+            locimp = decsplit / nodepop(kbuild)
+            obsgini(nc, msplit) = obsgini(nc, msplit) + locimp 
             j=cl(nc)
             classpop(j,ncur+1) = classpop(j,ncur+1) + win(nc)
          end do
          do n = ndendl+1, ndend
             nc = ncase(n)
-            obsgini(nc, msplit) = obsgini(nc, msplit) + decsplit
+
+            locimp = decsplit / nodepop(kbuild)
+            obsgini(nc, msplit) = obsgini(nc, msplit) + locimp
             j = cl(nc)
             classpop(j,ncur+2) = classpop(j,ncur+2) + win(nc)
          end do
-c         call intpr("nL", 2, nodepop(ncur+1), 1)
-c         call intpr("nR", 2, nodepop(ncur+2), 1)
+
+c        call intpr("nL", 2, nodepop(ncur+1), 1)
+c        call intpr("nR", 2, nodepop(ncur+2), 1)
 c     check on nodestatus
          nodestatus(ncur+1) = 2
          nodestatus(ncur+2) = 2
