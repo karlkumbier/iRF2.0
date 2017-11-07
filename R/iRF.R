@@ -4,18 +4,18 @@ iRF <- function(x, y,
                 n.iter=5, 
                 ntree=500, 
                 n.core=1, 
-                mtry.select.prob=rep(1/ncol(x), ncol(x)), 
-                keep.impvar.quantile=NULL, 
+                mtry.select.prob=matrix(1, nrow=nrow(x), ncol=ncol(x)),
                 interactions.return=NULL, 
                 wt.pred.accuracy=FALSE, 
                 rit.param=list(depth=5, ntree=500, nchild=2, class.id=1, 
-                               class.cut=NULL, class.qt=0.5), 
+                               min.nd=1, class.cut=NULL, class.qt=0.5), 
                 varnames.grp=NULL, 
                 n.bootstrap=20,
                 bootstrap.forest=TRUE,
                 select.iter=FALSE,
                 verbose=TRUE,
                 keep.subset.var=NULL,
+                local=FALSE,
                 ...) {
   
   
@@ -39,10 +39,12 @@ iRF <- function(x, y,
   
   rf.list <- list()
   if (!is.null(interactions.return) | select.iter) {
-    interact.list <- list()
+    #interact.list <- list()
     stability.score <- list()
   }
   
+  if (local) local.list <- list()
+
   # Set number of trees to grow in each core
   a <- floor(ntree / n.core) 
   b <- ntree %% n.core
@@ -59,13 +61,17 @@ iRF <- function(x, y,
                                               ntree=ntree.id[i], 
                                               mtry.select.prob=mtry.select.prob, 
                                               keep.forest=TRUE,
-                                              track.nodes=TRUE, 
                                               ...)
                                }
     
     ## update feature selection probabilities
-    mtry.select.prob <- rf.list[[iter]]$importance[,importance.feature]
-    
+    if (local){
+      mtry.select.prob <- rf.list[[iter]]$obsgini
+    } else {
+      mtry.select.prob <- matrix(colSums(rf.list[[iter]]$obsgini),
+                                 nrow=nrow(x), ncol=ncol(x), byrow=TRUE)
+    }
+
     if (!is.null(xtest) & class.irf & verbose){
       auroc <- auc(roc(rf.list[[iter]]$test$votes[,2], ytest))
       print(paste('AUROC: ', round(auroc, 2)))
@@ -102,8 +108,14 @@ iRF <- function(x, y,
       if (bootstrap.forest) { 
         
         # use feature weights from current iteraction of full data RF
-        mtry.select.prob <- rf.list[[iter]]$importance[,importance.feature]
-        
+        if (local) {
+          mtry.select.prob <- rf.list[[iter]]$obsgini[sample.id,]
+        } else {
+          mtry.select.prob <- matrix(colSums(rf.list[[iter]]$obsgini[sample.id,]), 
+                                   nrow=nrow(x), ncol=ncol(x), byrow=TRUE)
+        }
+       
+
         # fit random forest on bootstrap sample
         rf.b <- foreach(i=1:length(ntree.id), .combine=combine, 
                         .multicombine=TRUE, .packages='iRF') %dopar% {
@@ -112,8 +124,7 @@ iRF <- function(x, y,
                                        ntree=ntree.id[i], 
                                        mtry.select.prob=mtry.select.prob, 
                                        keep.forest=TRUE, 
-                                       track.nodes=TRUE)#, 
-                          #...)
+                          ...)
                         }
       } else {
         rf.b <- rf.list[[iter]]
@@ -124,36 +135,37 @@ iRF <- function(x, y,
                              wt.pred.accuracy=wt.pred.accuracy,
                              varnames.grp=varnames.grp,
                              rit.param=rit.param,
+                             local=local,
                              n.core=n.core)
-      
+      print('backsampling')
+      if (local) ints <- lapply(ints, function(z) unique(sample.id[z]))
       interact.list.b[[i.b]] <- ints
       rm(rf.b)       
     }
     
     # calculate stability scores of interactions
-    if (!is.null(varnames.grp))
-      varnames.new <- unique(varnames.grp)
-    else if (!is.null(colnames(x)))
-      varnames.new <- colnames(x)
-    else
-      varnames.new <- 1:ncol(x)
-    
-    interact.list[[iter]] <- interact.list.b 
-    summary.interact <- summarizeInteract(interact.list[[iter]], 
-                                          varnames=varnames.new)
-    stability.score[[iter]] <- summary.interact
+    stability.score[[iter]] <- summarizeInteract(interact.list.b, local=local)
+    if (local) {
+      print('grouping')
+      xx <- unlist(interact.list.b, recursive=FALSE)
+      local.list[[iter]] <- lapply(unique(names(xx)), function(i)
+        unique(unlist(xx[names(xx) == i])))      
+      names(local.list[[iter]]) <- unique(names(xx))
+    }
   } # end for (iter in ... )
   
   
   out <- list()
   out$rf.list <- rf.list
   if (!is.null(interactions.return)) out$interaction <- stability.score
-  
+  if (local) out$local <- local.list
+
   if (select.iter) {
     out$rf.list <- out$rf.list[[interactions.return]]
     out$interaction <- out$interaction[[interactions.return]]
     out$opt.k <- interactions.return
     out$weights <- rf.list[[interactions.return]]$importance[,importance.feature]
+    if (local) out$local <- local.list[[interactions.return]]
   }
   
   return(out)
@@ -214,11 +226,8 @@ generalizedRIT <- function(rf, x, y,
     
     # add observation data for each node
     if (local) nf <- cbind(nf, rforest$node.obs)
-    #rm(rforest)
-    
-    # sample one leaf node per tree ...
-    
-    id <- rforest$tree.info$size.node > rit.param$min.nd
+      
+    id <- rforest$tree.info$size.node >= rit.param$min.nd
     nf <- nf[id,]
     rforest$tree.info <- rforest$tree.info[id,]
     wt <- wt[id]
@@ -316,24 +325,19 @@ groupFeature <- function(node.feature, grp){
 
 
 
-summarizeInteract <- function(store.out, varnames=NULL){
+summarizeInteract <- function(store.out, local=FALSE){
   # Aggregate interactions across bootstrap samples
+  print('summarizing')
+  if (local) store.out <- lapply(store.out, names)
+
   n.bootstrap <- length(store.out)
-  store <- do.call(rbind, store.out)
+  store <- unlist(store.out)
   
   if (length(store) >= 1){
-    int.tbl <- sort(table(store$Interaction), decreasing = TRUE)
+    int.tbl <- sort(c(table(store)), decreasing=TRUE)
     int.tbl <- int.tbl / n.bootstrap
   } else {
     return(list(interaction=numeric(0), prevalence=numeric(0)))
-  }
-  
-  if (!is.null(varnames)) {
-    names.int <- strsplit(names(int.tbl), split='_')
-    names.int <- sapply(names.int, function(n) 
-      paste(varnames[as.numeric(n)], collapse='_'))
-    names(int.tbl) <- names.int
-    
   }
   
   out <- int.tbl
