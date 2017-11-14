@@ -16,12 +16,8 @@ readForest <- function(rfobj, x, y=NULL,
   out <- list()
   
   # Determine leaf nodes for observations in x
-  #if (is.null(rfobj$obs.nodes)) {
-    prf <- predict(rfobj, newdata=x, nodes=TRUE)
-    nodes <- attr(prf, 'nodes')
-  #} else {
-  #  nodes <- rfobj$obs.nodes
-  #}
+  prf <- predict(rfobj, newdata=x, nodes=TRUE)
+  nodes <- attr(prf, 'nodes')
   
   # read leaf node data from each tree in the forest 
   rd.forest <- mclapply(1:ntree, readTree, rfobj=rfobj, x=x, y=y,

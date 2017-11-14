@@ -39,7 +39,6 @@ iRF <- function(x, y,
   
   rf.list <- list()
   if (!is.null(interactions.return) | select.iter) {
-    #interact.list <- list()
     stability.score <- list()
   }
   
@@ -135,7 +134,7 @@ iRF <- function(x, y,
                              wt.pred.accuracy=wt.pred.accuracy,
                              varnames.grp=varnames.grp,
                              rit.param=rit.param,
-                             local=local,
+                             local=FALSE, # NOT USING LOCAL RIT
                              n.core=n.core)
       print('backsampling')
       if (local) ints <- lapply(ints, function(z) unique(sample.id[z]))
@@ -145,7 +144,7 @@ iRF <- function(x, y,
     
     # calculate stability scores of interactions
     stability.score[[iter]] <- summarizeInteract(interact.list.b, local=local)
-    if (local) {
+    if (FALSE) { # NOT USING LOCAL RIT
       print('grouping')
       xx <- unlist(interact.list.b, recursive=FALSE)
       local.list[[iter]] <- lapply(unique(names(xx)), function(i)
@@ -158,14 +157,14 @@ iRF <- function(x, y,
   out <- list()
   out$rf.list <- rf.list
   if (!is.null(interactions.return)) out$interaction <- stability.score
-  if (local) out$local <- local.list
+  #if (local) out$local <- local.list NOT USING LCOAL RIT
 
   if (select.iter) {
     out$rf.list <- out$rf.list[[interactions.return]]
     out$interaction <- out$interaction[[interactions.return]]
     out$opt.k <- interactions.return
     out$weights <- rf.list[[interactions.return]]$importance[,importance.feature]
-    if (local) out$local <- local.list[[interactions.return]]
+    #if (local) out$local <- local.list[[interactions.return]]
   }
   
   return(out)
