@@ -17,11 +17,6 @@ mylevels <- function(x) if (is.factor(x)) levels(x) else 0
            keep.forest=!is.null(y) && is.null(xtest), corr.bias=FALSE,
            keep.inbag=FALSE, track.nodes=FALSE,...) {
     
-    #if (length(mtry.select.prob)!=ncol(x))
-    #  stop('length of mtry.select.prob != ncol(x)')
-    
-    #mtry <- mtry + length(keep.subset.var)
-    #if (mtry > ncol(x))
     #  stop("mtry + length(keep.subset.var) exceeds total number of features")
     if (is.null(keep.subset.var)) {
       subsetVar <- as.integer(0)
@@ -434,6 +429,7 @@ mylevels <- function(x) if (is.factor(x)) levels(x) else 0
                   as.integer(ntree),
                   as.integer(mtry),
                   selprob = as.double(mtry.select.prob),
+                  obsgini = as.double(array(0, dim(x))),
                   obsnodes = obs.nodes,
                   trackodes = as.integer(track.nodes),
                   subsetVar = subsetVar,
@@ -527,6 +523,7 @@ mylevels <- function(x) if (is.factor(x)) levels(x) else 0
                   y = y + ymean,
                   feature.nodes = rfout$featurenodes,
                   obs.nodes = if (!track.nodes) NULL else rfout$obsnodes,
+                  obsgini = matrix(rfout$obsgini, ncol=p) / ntree,
                   test = if(testdat) {
                     list(predicted = structure(rfout$ytestpred + ymean,
                                                names=xts.row.names),
