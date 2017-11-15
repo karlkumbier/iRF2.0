@@ -8,7 +8,8 @@ iRF <- function(x, y,
                 interactions.return=NULL, 
                 wt.pred.accuracy=FALSE, 
                 rit.param=list(depth=5, ntree=500, nchild=2, class.id=1, 
-                               min.nd=1, class.cut=NULL, class.qt=0.5), 
+                               min.nd=1, class.cut=NULL, class.qt=0.5,
+                               local=FALSE), 
                 varnames.grp=NULL, 
                 n.bootstrap=20,
                 bootstrap.forest=TRUE,
@@ -16,6 +17,7 @@ iRF <- function(x, y,
                 verbose=TRUE,
                 keep.subset.var=NULL,
                 local=FALSE,
+                get.prevalence=FALSE,
                 ...) {
   
   
@@ -34,15 +36,13 @@ iRF <- function(x, y,
   n <- nrow(x)
   p <- ncol(x)
   class.irf <- is.factor(y)
-  importance.feature <- ifelse(class.irf, 'MeanDecreaseGini', 'IncNodePurity')
+  importance <- ifelse(class.irf, 'MeanDecreaseGini', 'IncNodePurity')
   registerDoMC(n.core)  
   
   rf.list <- list()
-  if (!is.null(interactions.return) | select.iter) {
-    stability.score <- list()
-  }
-  
-  if (local) local.list <- list()
+  if (!is.null(interactions.return) | select.iter) stability.score <- list()
+  if (rit.param$local) local.list <- list()
+  if (get.prevalence) prev.list <- list()
 
   # Set number of trees to grow in each core
   a <- floor(ntree / n.core) 
@@ -63,12 +63,12 @@ iRF <- function(x, y,
                                               ...)
                                }
     
-    ## update feature selection probabilities
+    # Update feature selection probabilities
     if (local){
       mtry.select.prob <- rf.list[[iter]]$obsgini
     } else {
-      mtry.select.prob <- matrix(colSums(rf.list[[iter]]$obsgini),
-                                 nrow=nrow(x), ncol=ncol(x), byrow=TRUE)
+      mtry.select.prob <- matrix(rf.list[[iter]]$importance,
+                                 nrow=n, ncol=p, byrow=TRUE)
     }
 
     if (!is.null(xtest) & class.irf & verbose){
@@ -90,7 +90,8 @@ iRF <- function(x, y,
     # Find interactions across bootstrap replicates
     if (verbose) cat('finding interactions ... ')
     interact.list.b <- list()      
-    
+    if (get.prevalence) prev.list.b <- list()
+
     for (i.b in 1:n.bootstrap) { 
       
       if (class.irf) {
@@ -106,7 +107,7 @@ iRF <- function(x, y,
       
       if (bootstrap.forest) { 
         
-        # use feature weights from current iteraction of full data RF
+        # Use feature weights from current iteraction of full data RF
         if (local) {
           mtry.select.prob <- rf.list[[iter]]$obsgini[sample.id,]
         } else {
@@ -115,7 +116,7 @@ iRF <- function(x, y,
         }
        
 
-        # fit random forest on bootstrap sample
+        # Fit random forest on bootstrap sample
         rf.b <- foreach(i=1:length(ntree.id), .combine=combine, 
                         .multicombine=TRUE, .packages='iRF') %dopar% {
                           randomForest(x[sample.id,], y[sample.id], 
@@ -129,22 +130,27 @@ iRF <- function(x, y,
         rf.b <- rf.list[[iter]]
       }
       
-      # run generalized RIT on rf.b to learn interactions
+      # Run generalized RIT on rf.b to learn interactions
       ints <- generalizedRIT(rf=rf.b, x=x[sample.id,], y=y[sample.id],
                              wt.pred.accuracy=wt.pred.accuracy,
                              varnames.grp=varnames.grp,
                              rit.param=rit.param,
-                             local=FALSE, # NOT USING LOCAL RIT
+                             get.prevalence=get.prevalence,
                              n.core=n.core)
-      #print('backsampling')
-      #if (local) ints <- lapply(ints, function(z) unique(sample.id[z]))
-      interact.list.b[[i.b]] <- ints
+      
+      # TODO: check reindexing
+      if (rit.param$local) ints <- lapply(ints, function(z) unique(sample.id[z]))
+      interact.list.b[[i.b]] <- ints$interactions
+      if (get.prevalence) prev.list.b[[i.b]] <- ints$prevalence
+
       rm(rf.b)       
     }
     
-    # calculate stability scores of interactions
-    stability.score[[iter]] <- summarizeInteract(interact.list.b, local=FALSE) #NOT USING LOCAL
-    if (FALSE) { # NOT USING LOCAL RIT
+    # Calculate stability scores of interactions
+    stability.score[[iter]] <- summarizeInteract(interact.list.b, local=rit.param$local)
+    if (get.prevalence) prev.list[[iter]] <- summarizePrevalence(prev.list.b, interact.list.b)
+
+    if (rit.param$local) {
       print('grouping')
       xx <- unlist(interact.list.b, recursive=FALSE)
       local.list[[iter]] <- lapply(unique(names(xx)), function(i)
@@ -157,14 +163,16 @@ iRF <- function(x, y,
   out <- list()
   out$rf.list <- rf.list
   if (!is.null(interactions.return)) out$interaction <- stability.score
-  #if (local) out$local <- local.list NOT USING LCOAL RIT
+  if (get.prevalence) out$prevalence <- prev.list
+  if (rit.param$local) out$local <- local.list
 
   if (select.iter) {
     out$rf.list <- out$rf.list[[interactions.return]]
     out$interaction <- out$interaction[[interactions.return]]
     out$opt.k <- interactions.return
-    out$weights <- rf.list[[interactions.return]]$importance[,importance.feature]
-    #if (local) out$local <- local.list[[interactions.return]]
+    out$weights <- rf.list[[interactions.return]]$importance[,importance]
+    if (get.prevalence) out$prevalence <- out$prevalence[[interactions.return]]
+    if (rit.param$local) out$local <- local.list[[interactions.return]]
   }
   
   return(out)
@@ -176,7 +184,7 @@ generalizedRIT <- function(rf, x, y,
                            rit.param=list(depth=5, ntree=500, nchild=2, 
                                           class.id=1, min.nd=10,
                                           class.cut=NULL, class.qt=0.5), 
-                           local=FALSE, 
+                           get.prevalence=FALSE,
                            n.core=1) {
   
   class.irf <- is.factor(y)
@@ -184,7 +192,7 @@ generalizedRIT <- function(rf, x, y,
   # Extract decision paths and tree metadata from random forest
   rforest <- readForest(rf, x=x, y=y, 
                         return.node.feature=TRUE,
-                        return.node.obs=local,
+                        return.node.obs=rit.param$local,
                         wt.pred.accuracy=wt.pred.accuracy, 
                         n.core=n.core)                                                        
   
@@ -224,12 +232,12 @@ generalizedRIT <- function(rf, x, y,
     p <- ncol(nf)
     
     # add observation data for each node
-    if (local) nf <- cbind(nf, rforest$node.obs)
+    if (rit.param$local) nf <- cbind(nf, rforest$node.obs)
       
-    #id <- rforest$tree.info$size.node >= rit.param$min.nd
-    #nf <- nf[id,]
-    #rforest$tree.info <- rforest$tree.info[id,]
-    #wt <- wt[id]
+    id <- rforest$tree.info$size.node >= rit.param$min.nd
+    nf <- nf[id,]
+    rforest$tree.info <- rforest$tree.info[id,]
+    wt <- wt[id]
     
     interactions <- RIT(nf, weights=wt, depth=rit.param$depth,
                         n_trees=rit.param$ntree, branch=rit.param$nchild,
@@ -243,25 +251,58 @@ generalizedRIT <- function(rf, x, y,
     else
       varnames.new <- 1:ncol(x)
     
-    if (local) {
+    if (rit.param$local) {
       interactions <- groupLocalInteracts(interactions$Interaction, n, p)
+      if (get.prevalence) prev <- sapply(interactions, prevalence, nf=nf)
       names(interactions) <- nameInts(names(interactions), varnames.new)
+      if (get.prevalence) names(prev) <- interactions
     } else {
       interactions <- gsub(' ', '_', interactions$Interaction)
+      if (get.prevalence) prev <- sapply(interactions, prevalence, nf=nf)
       interactions <- nameInts(interactions, varnames.new)
+      if (get.prevalence) names(prev) <- interactions
     }
     
-    return(interactions)
+    out <- list()
+    out$interactions <- interactions
+    out$prevalence <- prev
+    return(out)
   }                   
 }
 
 nameInts <- function(int, varnames) {
-  
   ints.split <- strsplit(int, '_')
   varnames.unq <- unique(varnames)
   ints.name <- lapply(ints.split, function(i) varnames.unq[as.numeric(i)])
   ints.name <- sapply(ints.name, paste, collapse='_')
   return(ints.name)
+}
+
+summarizePrevalence <- function(prev, int) {
+  # summarize interaction prevalence across bootstrap samples
+  prev <- unlist(prev)
+  nn <- names(prev)
+  prev.summary <- by(prev, nn, prevalenceSummary)
+  prev.summary <- do.call(rbind, c(prev.summary))
+  return(prev.summary)
+}
+
+prevalenceSummary <- function(x) {
+  # determine the min, mean, and maximum prevalence across 
+  # bootstrap samples
+  x.min <- min(x)
+  x.mean <- mean(x)
+  x.max <- max(x)
+  x.n <- length(x)
+  return(c(min=x.min, mean=x.mean, max=x.max, n=x.n))
+}
+
+
+prevalence <- function(int, nf) {
+  # calculate the decision path prevalence of a single interaction
+  int <- as.numeric(strsplit(int, '_')[[1]])
+  prev <- apply(nf[,int], MAR=1, function(z) all(z == 1))
+  return(mean(prev))
 }
 
 
@@ -292,8 +333,7 @@ groupLocalInteracts <- function(interactions, n, p) {
 }
 
 
-subsetReadForest <- function(rforest, subset.idcs) {
-  
+subsetReadForest <- function(rforest, subset.idcs) { 
   # Subset nodes from readforest output 
   if (!is.null(rforest$node.feature)) 
     rforest$node.feature <- rforest$node.feature[subset.idcs,]
@@ -326,7 +366,6 @@ groupFeature <- function(node.feature, grp){
 
 summarizeInteract <- function(store.out, local=FALSE){
   # Aggregate interactions across bootstrap samples
-  print('summarizing')
   if (local) store.out <- lapply(store.out, names)
 
   n.bootstrap <- length(store.out)
