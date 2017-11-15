@@ -226,10 +226,10 @@ generalizedRIT <- function(rf, x, y,
     # add observation data for each node
     if (local) nf <- cbind(nf, rforest$node.obs)
       
-    id <- rforest$tree.info$size.node >= rit.param$min.nd
-    nf <- nf[id,]
-    rforest$tree.info <- rforest$tree.info[id,]
-    wt <- wt[id]
+    #id <- rforest$tree.info$size.node >= rit.param$min.nd
+    #nf <- nf[id,]
+    #rforest$tree.info <- rforest$tree.info[id,]
+    #wt <- wt[id]
     
     interactions <- RIT(nf, weights=wt, depth=rit.param$depth,
                         n_trees=rit.param$ntree, branch=rit.param$nchild,
