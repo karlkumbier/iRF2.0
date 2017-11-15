@@ -136,14 +136,14 @@ iRF <- function(x, y,
                              rit.param=rit.param,
                              local=FALSE, # NOT USING LOCAL RIT
                              n.core=n.core)
-      print('backsampling')
-      if (local) ints <- lapply(ints, function(z) unique(sample.id[z]))
+      #print('backsampling')
+      #if (local) ints <- lapply(ints, function(z) unique(sample.id[z]))
       interact.list.b[[i.b]] <- ints
       rm(rf.b)       
     }
     
     # calculate stability scores of interactions
-    stability.score[[iter]] <- summarizeInteract(interact.list.b, local=local)
+    stability.score[[iter]] <- summarizeInteract(interact.list.b, local=FALSE) #NOT USING LOCAL
     if (FALSE) { # NOT USING LOCAL RIT
       print('grouping')
       xx <- unlist(interact.list.b, recursive=FALSE)
