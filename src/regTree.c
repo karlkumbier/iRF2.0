@@ -29,7 +29,7 @@ void regTree(double *x, double *y, int mdim, int nsample, int *lDaughter,
     int *rDaughter,
     double *upper, double *avnode, int *nodestatus, int nrnodes,
     int *treeSize, int nthsize, int mtry, 
-    double *selprob,
+    double *selprobfull,
     double *obsgini,
     int *featuremat,
     int *obsmat,
@@ -37,12 +37,13 @@ void regTree(double *x, double *y, int mdim, int nsample, int *lDaughter,
     int *subsetvar, int mcard,
     int *mbest, int *cat,
     double *tgini, int *varUsed) {
+  
   int i, j, k, m, ncur, *jdex, *nodestart, *nodepop;
   int ndstart, ndend, ndendl, nodecnt, jstat, msplit;
   double d, ss, av, decsplit, ubest, sumnode;
-  double locimp, *selproblocal;
+  double *selprob;
 
-  selproblocal = (double *) Calloc(mdim, double);
+  selprob = (double *) Calloc(mdim, double);
   nodestart = (int *) Calloc(nrnodes, int);
   nodepop   = (int *) Calloc(nrnodes, int);
 
@@ -54,7 +55,6 @@ void regTree(double *x, double *y, int mdim, int nsample, int *lDaughter,
   zeroDouble(avnode, nrnodes);
   zeroInt(obsmat, nrnodes * nsample);
   zeroInt(featuremat, nrnodes * mdim);
-  zeroDouble(selproblocal, mdim);
 
   jdex = (int *) Calloc(nsample, int);
   for (i = 1; i <= nsample; ++i) jdex[i-1] = i;
@@ -93,10 +93,10 @@ void regTree(double *x, double *y, int mdim, int nsample, int *lDaughter,
     decsplit = 0.0;
 
     /* update local selection probabilities */
-    zeroDouble(selproblocal, mdim);
-    for (i = (ndstart - 1); i < ndend; ++i) {
+    zeroDouble(selprob, mdim);
+    for (i = ndstart; i < ndend; ++i) {
       for (j = 0; j < mdim; ++j) {
-        selproblocal[j] = selprob[j * nsample + inbagidcs[jdex[i] - 1]];
+        selprob[j] = selprobfull[j * nsample + inbagidcs[jdex[i] - 1]];
       }
     }
 
@@ -109,9 +109,7 @@ void regTree(double *x, double *y, int mdim, int nsample, int *lDaughter,
 
     findBestSplit(x, jdex, y, mdim, nsample, ndstart, ndend, &msplit,
         &decsplit, &ubest, &ndendl, &jstat, mtry, 
-        selproblocal, subsetvar, mcard,
-        sumnode,
-        nodecnt, cat);
+        selprob, subsetvar, mcard, sumnode, nodecnt, cat);
 #ifdef RF_DEBUG
     Rprintf(" after findBestSplit: ndstart=%d, ndend=%d, jstat=%d, decsplit=%f, msplit=%d\n",
         ndstart, ndend, jstat, decsplit, msplit);
@@ -158,7 +156,7 @@ void regTree(double *x, double *y, int mdim, int nsample, int *lDaughter,
     ss = 0.0;
     for (j = ndstart; j <= ndendl; ++j) {
       obsmat[(ncur + 1) * nsample + inbagidcs[jdex[j] - 1]] = 1;
-      obsgini[nsample * (msplit - 1) + inbagidcs[jdex[j] - 1]] += decsplit / nodepop[k]; 
+      obsgini[nsample * (msplit - 1) + inbagidcs[jdex[j] - 1]] += decsplit / nodepop[k];
       d = y[jdex[j]-1];
       m = j - ndstart;
       ss += m * (av - d) * (av - d) / (m + 1);
