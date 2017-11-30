@@ -117,8 +117,7 @@ iRF <- function(x, y,
       }
       
       # Run generalized RIT on rf.b to learn interactions
-      ints <- generalizedRIT(rf=rf.b, x=x[-unique(sample.id),], 
-                             y=y[-unique(sample.id)],
+      ints <- generalizedRIT(rf=rf.b, x=x, y=y,
                              wt.pred.accuracy=wt.pred.accuracy,
                              varnames.grp=varnames.grp,
                              rit.param=rit.param,
