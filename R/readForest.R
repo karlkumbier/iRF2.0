@@ -2,7 +2,7 @@ readForest <- function(rfobj, x, y=NULL,
                        return.node.feature=TRUE, 
                        return.node.obs=FALSE,
                        wt.pred.accuracy=FALSE,
-                       varnames.grp=1:ncol(x),
+                       varnames.grp=NULL,
                        obs.weights=NULL,
                        n.core=1){
   
@@ -10,6 +10,7 @@ readForest <- function(rfobj, x, y=NULL,
     stop('No Forest component in the randomForest object')
   if (wt.pred.accuracy & is.null(y))
     stop('y required to evaluate prediction accuracy')
+  if (is.null(varnames.grp)) varnames.grp <- 1:ncol(x)
   
   ntree <- rfobj$ntree
   n <- nrow(x)
@@ -105,8 +106,7 @@ readTree <- function(rfobj, k, x, y, nodes,
     tree.info$dec.purity[leaf.idx] <- pmax((sd(y) - leaf.sd) / sd(y), 0)
   }
   
-  tree.info <- tree.info[leaf.idx,]
-  rep.node[leaf.idx] <- 1
+  tree.info <- tree.info[select.node,]
  
   node.obs <- NULL
   if (return.node.obs) {
