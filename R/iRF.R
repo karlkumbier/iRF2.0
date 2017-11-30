@@ -132,7 +132,8 @@ iRF <- function(x, y,
     
     # Calculate stability scores of interactions
     stability.score[[iter]] <- summarizeInteract(interact.list.b)
-    if (get.prevalence) prev.list[[iter]] <- summarizePrevalence(prev.list.b, interact.list.b)
+    if (get.prevalence) 
+      prev.list[[iter]] <- summarizePrevalence(prev.list.b, interact.list.b, n.bootstrap)
 
   } # end for (iter in ... )
   
@@ -251,7 +252,7 @@ nameInts <- function(int, varnames) {
   return(ints.name)
 }
 
-summarizePrevalence <- function(prev, int) {
+summarizePrevalence <- function(prev, int, n.bootstrap) {
   # summarize interaction prevalence across bootstrap samples
   prev <- unlist(prev)
   nn <- names(prev)
@@ -259,7 +260,8 @@ summarizePrevalence <- function(prev, int) {
   prev.summary <- do.call(rbind, c(prev.summary))
   prev.summary <- data.frame(prev.summary)
   prev.summary$int <- rownames(prev.summary)
-  prev.summary <- arrange(prev.summary, desc(n), desc(mean))
+  prev.summary <- arrange(prev.summary, desc(prop), desc(mean))
+  prev.summary$prop <- prev.summary$prop / n.bootstrap
   return(prev.summary)
 }
 
@@ -270,7 +272,7 @@ prevalenceSummary <- function(x) {
   x.mean <- mean(x)
   x.max <- max(x)
   x.n <- length(x)
-  return(c(min=x.min, mean=x.mean, max=x.max, n=x.n))
+  return(c(min=x.min, mean=x.mean, max=x.max, prop=x.n))
 }
 
 
