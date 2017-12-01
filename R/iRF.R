@@ -11,11 +11,11 @@ iRF <- function(x, y,
                                min.nd=1, class.cut=NULL, class.qt=0.5), 
                 varnames.grp=NULL, 
                 n.bootstrap=20,
-                bootstrap.forest=TRUE,
                 select.iter=FALSE,
                 verbose=TRUE,
                 keep.subset.var=NULL,
                 get.prevalence=FALSE,
+                take.diff=FALSE,
                 ...) {
   
   
@@ -35,7 +35,7 @@ iRF <- function(x, y,
   p <- ncol(x)
   class.irf <- is.factor(y)
   importance <- ifelse(class.irf, 'MeanDecreaseGini', 'IncNodePurity')
-  registerDoMC(n.core)  
+   
   
   rf.list <- list()
   if (!is.null(interactions.return) | select.iter) stability.score <- list()
@@ -46,6 +46,7 @@ iRF <- function(x, y,
   b <- ntree %% n.core
   ntree.id <- c(rep(a + 1, b), rep(a, n.core - b))
   
+  registerDoMC(n.core)
   for (iter in 1:n.iter) {
     
     # Grow Random Forest on full data
@@ -63,7 +64,7 @@ iRF <- function(x, y,
     # Update feature selection probabilities
     mtry.select.prob <- rf.list[[iter]]$importance
 
-    if (!is.null(xtest) & class.irf & verbose){
+    if (!is.null(xtest) & class.irf & verbose) {
       auroc <- auc(roc(rf.list[[iter]]$test$votes[,2], ytest))
       print(paste('AUROC: ', round(auroc, 2)))
     } else if (!is.null(xtest) & verbose) {
@@ -81,6 +82,7 @@ iRF <- function(x, y,
     
     # Find interactions across bootstrap replicates
     if (verbose) cat('finding interactions ... ')
+    
     interact.list.b <- list()      
     if (get.prevalence) prev.list.b <- list()
 
@@ -97,31 +99,27 @@ iRF <- function(x, y,
         sample.id <- sample(n, replace=TRUE)
       }
       
-      if (bootstrap.forest) { 
-        
-        # Use feature weights from current iteraction of full data RF
-        mtry.select.prob <- rf.list[[iter]]$importance
-
-        # Fit random forest on bootstrap sample
-        rf.b <- foreach(i=1:length(ntree.id), .combine=combine, 
-                        .multicombine=TRUE, .packages='iRF') %dopar% {
-                          randomForest(x[sample.id,], y[sample.id], 
-                                       xtest, ytest, 
-                                       ntree=ntree.id[i], 
-                                       mtry.select.prob=mtry.select.prob, 
-                                       keep.forest=TRUE, 
-                          ...)
-                        }
-      } else {
-        rf.b <- rf.list[[iter]]
-      }
+      # Use feature weights from current iteraction of full data RF
+      mtry.select.prob <- rf.list[[iter]]$importance
+      
+      # Fit random forest on bootstrap sample
+      rf.b <- foreach(i=1:length(ntree.id), .combine=combine, 
+                      .multicombine=TRUE, .packages='iRF') %dopar% {
+                        randomForest(x[sample.id,], y[sample.id], 
+                                     xtest, ytest, 
+                                     ntree=ntree.id[i], 
+                                     mtry.select.prob=mtry.select.prob, 
+                                     keep.forest=TRUE, 
+                                     ...)
+                      }
       
       # Run generalized RIT on rf.b to learn interactions
-      ints <- generalizedRIT(rf=rf.b, x=x, y=y,
+      ints <- generalizedRIT(rf=rf.b, x=x[sample.id,], y=y[sample.id],
                              wt.pred.accuracy=wt.pred.accuracy,
                              varnames.grp=varnames.grp,
                              rit.param=rit.param,
                              get.prevalence=get.prevalence,
+                             take.diff=take.diff,
                              n.core=n.core)
       
       interact.list.b[[i.b]] <- ints$interactions
@@ -160,6 +158,7 @@ generalizedRIT <- function(rf, x, y,
                                           class.id=1, min.nd=1,
                                           class.cut=NULL, class.qt=0.5), 
                            get.prevalence=FALSE,
+                           take.diff=take.diff,
                            n.core=1) {
   
   class.irf <- is.factor(y)
@@ -189,7 +188,27 @@ generalizedRIT <- function(rf, x, y,
   }       
  
   rforest <- subsetReadForest(rforest, select.leaf.id)
+  if (sum(select.leaf.id) < 2) {
+    return(character(0))
+  } else {
+    out <- runRIT(subsetReadForest(rforest, select.leaf.id),
+                  varnames.grp, wt.pred.accuracy, rit.param,
+                  get.prevalence)
+    if (take.diff) { 
+      ints.diff <- runRIT(subsetReadForest(rforest, !select.leaf.id),
+                            varnames.grp, wt.pred.accuracy, rit.param,
+                            get.prevalence)
+      id.rm <- out$interactions %in% ints.diff$interactions
+      out$interactions <- out$interactions[!id.rm]
+      out$prevalence <- out$prevalence[!id.rm]
+    }
+  }
+  return(out)
+}
 
+runRIT <- function(rforest, varnames.grp, wt.pred.accuracy, 
+                   rit.param, get.prevalence) {
+  
   # Set weights for leaf node sampling using either size or size and accuracy
   if (wt.pred.accuracy) {
     wt <- rforest$tree.info$size.node * rforest$tree.info$dec.purity
@@ -197,48 +216,44 @@ generalizedRIT <- function(rf, x, y,
     wt <- rforest$tree.info$size.node
   }         
   
-  if (sum(select.leaf.id) < 2) {
-    return(character(0))
-  } else {  
-    
-    # group features if specified
-    #if (!is.null(varnames.grp)) 
-    #  rforest$node.feature <- groupFeature(rforest$node.feature, grp=varnames.grp)
-    
-    # add observation data for each node
-    id <- rforest$tree.info$size.node >= rit.param$min.nd
-    rforest$node.feature <- rforest$node.feature[id,]
-    rforest$tree.info <- rforest$tree.info[id,]
-    wt <- wt[id]
-    
-    interactions <- RIT(rforest$node.feature, weights=wt, depth=rit.param$depth,
-                        n_trees=rit.param$ntree, branch=rit.param$nchild,
-                        n_cores=n.core) 
-    
-    # Group interactions and rename by variable name
-    if (!is.null(varnames.grp))
-      varnames.new <- unique(varnames.grp)
-    else if (!is.null(colnames(x)))
-      varnames.new <- colnames(x)
-    else
-      varnames.new <- 1:ncol(x)
-
-    interactions <- gsub(' ', '_', interactions$Interaction)
-    if (get.prevalence) 
-      prev <- sapply(interactions, prevalence, nf=rforest$node.feature, wt=wt)
-    interactions <- nameInts(interactions, varnames.new)
-    
-    if (get.prevalence) 
-      names(prev) <- interactions
-    
-    out <- list()
-    out$interactions <- interactions
-    if (get.prevalence) out$prevalence <- prev
-    return(out)
-  }                   
+  # group features if specified
+  if (!is.null(varnames.grp)) 
+    rforest$node.feature <- groupFeature(rforest$node.feature, grp=varnames.grp)
+  
+  # remove nodes below specified size threshold
+  id.rm <- rforest$tree.info$size.node >= rit.param$min.nd
+  rforest$node.feature <- rforest$node.feature[!id.rm,]
+  rforest$tree.info <- rforest$tree.info[!id.rm,]
+  wt <- wt[!id.rm]
+  
+  interactions <- RIT(rforest$node.feature, weights=wt, depth=rit.param$depth,
+                      n_trees=rit.param$ntree, branch=rit.param$nchild,
+                      n_cores=n.core) 
+  
+  # Group interactions and rename by variable name
+  if (!is.null(varnames.grp))
+    varnames.new <- unique(varnames.grp)
+  else if (!is.null(colnames(x)))
+    varnames.new <- colnames(x)
+  else
+    varnames.new <- 1:ncol(x)
+  
+  interactions <- gsub(' ', '_', interactions$Interaction)
+  if (get.prevalence) 
+    prev <- sapply(interactions, prevalence, nf=rforest$node.feature, wt=wt)
+  
+  interactions <- nameInts(interactions, varnames.new)
+  if (get.prevalence) 
+    names(prev) <- interactions
+  
+  out <- list()
+  out$interactions <- interactions
+  if (get.prevalence) out$prevalence <- prev
+  return(out)
 }
 
 nameInts <- function(int, varnames) {
+  # Convert interactions indicated by indices to interactions indicated by name
   ints.split <- strsplit(int, '_')
   varnames.unq <- unique(varnames)
   p <- length(varnames.unq)
@@ -246,13 +261,9 @@ nameInts <- function(int, varnames) {
   ints.split <- lapply(ints.split, as.numeric)
   ints.signs <- lapply(ints.split, function(z) ifelse(z > p, '+', '-'))
   ints.split <- lapply(ints.split, '%%', p)
-  ints.split <- lapply(ints.split, function(z) {
-                         z[z == 0] <- p
-                         return(z)
-                        })
 
   ints.name <- mapply(function(i, s) paste(varnames.unq[i], s, sep=''),
-    ints.split, ints.signs, SIMPLIFY=FALSE)
+                      ints.split, ints.signs, SIMPLIFY=FALSE)
   ints.name <- sapply(ints.name, paste, collapse='_')
   return(ints.name)
 }
@@ -290,33 +301,6 @@ prevalence <- function(int, nf, wt=rep(1, ncol(nf))) {
 }
 
 
-groupLocalInteracts <- function(interactions, n, p) {
-  # Aggregate local interactions
-  
-  ints.split <- strsplit(interactions, ' ')
-  ints.split <- sapply(ints.split, as.numeric)
-  
-  # split interactions into feature and observation
-  ints.feat <- sapply(ints.split, function(z) paste(z[z <= p], collapse='_'))
-  ints.obs <- lapply(ints.split, function(z) z[z > p])
-  
-  # remove interactions between only observations
-  id.rm <- ints.feat == ''
-  ints.obs <- ints.obs[!id.rm]
-  ints.feat <- ints.feat[!id.rm]
-  
-  # aggreate observations by interaction
-  agg <- lapply(unique(ints.feat), function(i) 
-    unique(unlist(ints.obs[ints.feat == i])))
-  id.rm <- sapply(agg, function(z) length(z) == 0)
-  agg <- agg[!id.rm]
-  names(agg) <- unique(ints.feat)[!id.rm]
-  agg <- lapply(agg, '-', p)
-  
-  return(agg)
-}
-
-
 subsetReadForest <- function(rforest, subset.idcs) { 
   # Subset nodes from readforest output 
   if (!is.null(rforest$node.feature)) 
@@ -332,7 +316,7 @@ subsetReadForest <- function(rforest, subset.idcs) {
 }
 
 groupFeature <- function(node.feature, grp){
-  # Group feature level data in node.feature 
+  # Group replicated features in node.feature 
   sparse.mat <- is(node.feature, 'Matrix')
   
   grp.names <- unique(grp)
@@ -340,7 +324,6 @@ groupFeature <- function(node.feature, grp){
   node.feature.new <- sapply(grp.names, makeGroup, x=node.feature)
   
   if (sparse.mat) node.feature.new <- Matrix(node.feature.new, sparse=TRUE)
-  
   colnames(node.feature.new) <- grp.names
   
   return(node.feature.new)
