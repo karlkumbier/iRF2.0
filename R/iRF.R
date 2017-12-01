@@ -202,7 +202,8 @@ generalizedRIT <- function(rf, x, y,
   } else {  
     
     # group features if specified
-    if (!is.null(varnames.grp)) nf <- groupFeature(nf, grp=varnames.grp)
+    #if (!is.null(varnames.grp)) 
+    #  rforest$node.feature <- groupFeature(rforest$node.feature, grp=varnames.grp)
     
     # add observation data for each node
     id <- rforest$tree.info$size.node >= rit.param$min.nd
@@ -221,12 +222,12 @@ generalizedRIT <- function(rf, x, y,
       varnames.new <- colnames(x)
     else
       varnames.new <- 1:ncol(x)
-    
+
     interactions <- gsub(' ', '_', interactions$Interaction)
     if (get.prevalence) 
       prev <- sapply(interactions, prevalence, nf=rforest$node.feature, wt=wt)
-    
     interactions <- nameInts(interactions, varnames.new)
+    
     if (get.prevalence) 
       names(prev) <- interactions
     
@@ -245,6 +246,10 @@ nameInts <- function(int, varnames) {
   ints.split <- lapply(ints.split, as.numeric)
   ints.signs <- lapply(ints.split, function(z) ifelse(z > p, '+', '-'))
   ints.split <- lapply(ints.split, '%%', p)
+  ints.split <- lapply(ints.split, function(z) {
+                         z[z == 0] <- p
+                         return(z)
+                        })
 
   ints.name <- mapply(function(i, s) paste(varnames.unq[i], s, sep=''),
     ints.split, ints.signs, SIMPLIFY=FALSE)
