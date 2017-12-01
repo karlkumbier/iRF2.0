@@ -63,12 +63,7 @@ readTree <- function(rfobj, k, x, y, nodes,
   tree.info <- as.data.frame(getTree(rfobj, k))
   n.node <- nrow(tree.info)
   tree.info$node.idx <- 1:nrow(tree.info)
-  parents <- getParent(tree.info)
-  tree.info$parent <- as.integer(parents) %% n.node
-  parent.splits <- parentSplit(tree.info, parents)
-  tree.info$parent.var <- parent.splits[,1]
-  tree.info$parent.split <- parent.splits[,2]
-  tree.info$direction <- ifelse(parents > n.node, 1, 0)
+  tree.info$parent <- getParent(tree.info) %% n.node
   tree.info$tree <- as.integer(k)
   tree.info$size.node <- 0L
   
@@ -78,10 +73,9 @@ readTree <- function(rfobj, k, x, y, nodes,
   which.leaf <- nodes[,k]
 
   if (return.node.feature) {
-    ancestors <- lapply(which(select.node), getAncestorPath, tree.info=tree.info)
-    node.feature <- lapply(ancestors, path2Idx, varnames.grp=varnames.grp)
+    node.feature <- ancestorPath(tree.info, p, varnames.grp=varnames.grp)
     n.path <- sapply(node.feature, length)
-    leaf.id <- rep(1:length(ancestors), times=n.path)
+    leaf.id <- rep(1:length(node.feature), times=n.path)
     node.feature <- cbind(leaf.id, unlist(node.feature))
   }
 
@@ -96,9 +90,6 @@ readTree <- function(rfobj, k, x, y, nodes,
   
   # if specified, calculate purity of each node
   if (wt.pred.accuracy) leaf.sd <- c(by(y, which.leaf, sdNode))
-
-  tree.info <- select(tree.info, prediction, node.idx, 
-                      parent, tree, size.node, status)
   tree.info$size.node[leaf.idx] <- leaf.counts
   
   if (wt.pred.accuracy) {
@@ -146,39 +137,36 @@ getParent <- function(tree.info) {
   return(parent)
 }
 
-parentSplit <- function(tree.info, parents) {
-  # Get parent split variable and point
-  parent.idcs <- parents %% nrow(tree.info)
-  parent.var <- c(0, tree.info[parent.idcs, 'split var'])
-  parent.split <- c(0, tree.info[parent.idcs, 'split point'])
-  return(cbind(parent.var, parent.split))
+
+ancestorPath <- function(tree.info, p, varnames.grp) {
+  
+  paths <- getAncestorPath(tree.info, p, varnames.grp)
+  paths <- lapply(as.character(which(tree.info$status == -1)), 
+                  function(z) which(paths[,z] == 1))
+  return(paths)
 }
 
-getAncestorPath <- function(tree.info, node.idx, path=NULL, i=1) {
-  # Traverse tree to generate ancestor info for each leaf
-  if (is.null(path)) path <- matrix(0, nrow=node.idx, ncol=2)
-  cur.node <- tree.info[node.idx, c('parent.var', 'direction')]
-  path[i,] <- as.matrix(cur.node)
-  parent.idx <- tree.info$parent[node.idx]
-  if (parent.idx > 0) {
-    return(getAncestorPath(tree.info, node.idx=parent.idx, path=path, i=(i+1)))
+getAncestorPath <- function(tree.info, p,  varnames.grp, node.idx=1, cur.path=NULL) {
+  
+  if (is.null(cur.path)) cur.path <- rep(0L, 2 * p)
+  node.var <- tree.info$`split var`[node.idx]
+  node.var.reps <- which(varnames.grp == varnames.grp[node.var])
+  
+  left.set <- cur.path
+  if (all(cur.path[node.var + p] == 0)) left.set[node.var] <- 1L
+  left.child <- tree.info$`left daughter`[node.idx]
+  
+  right.set <- cur.path
+  if (all(cur.path[node.var] == 0)) right.set[node.var + p] <- 1L
+  right.child <- tree.info$`right daughter`[node.idx]
+  
+  if (tree.info$status[node.idx] == -1) {
+    out <- as.matrix(cur.path)
+    colnames(out) <- node.idx
+    return(out)
   } else {
-    return(path[1:(i - 1),])
+    return(cbind(getAncestorPath(tree.info, p, varnames.grp, left.child, left.set),
+                 getAncestorPath(tree.info, p, varnames.grp, right.child, right.set)))
   }
 }
 
-path2Idx <- function(path, varnames.grp) {
-  # represent each path as a length 2 * p sparse binary vector indicating 
-  # splitting feature and direction
-  p <-  length(varnames.grp) # we are not grouping features here
-  if (is.null(dim(path))) path <- matrix(path, nrow=1)
-  path.vars <- path[,1]
-
-  # Paths are ordered from leaf to root. Remove all but last 
-  # occurance of duplicate
-  dup <- rev(duplicated(rev(varnames.grp[path.vars])))
-  path.vars <- path.vars[!dup]
-  path.adj <- (path[!dup, 2] * p)
-  path.vars <- path.adj + path.vars
-  return(path.vars)
-}
