@@ -139,25 +139,28 @@ getParent <- function(tree.info) {
 
 
 ancestorPath <- function(tree.info, p, varnames.grp) {
-  
+ 
+  # recursively extract path info for all nodes 
   paths <- getAncestorPath(tree.info, p, varnames.grp)
+
+  # subset to only leaf nodes
   paths <- lapply(as.character(which(tree.info$status == -1)), 
                   function(z) which(paths[,z] == 1))
   return(paths)
 }
 
-getAncestorPath <- function(tree.info, p,  varnames.grp, node.idx=1, cur.path=NULL) {
-  
+getAncestorPath <- function(tree.info, p, varnames.grp, node.idx=1, cur.path=NULL) {
+  # TODO: we should be aggregating grouped features here
   if (is.null(cur.path)) cur.path <- rep(0L, 2 * p)
   node.var <- tree.info$`split var`[node.idx]
   node.var.reps <- which(varnames.grp == varnames.grp[node.var])
   
   left.set <- cur.path
-  if (all(cur.path[node.var + p] == 0)) left.set[node.var] <- 1L
+  if (all(cur.path[node.var.reps + p] == 0)) left.set[node.var] <- 1L
   left.child <- tree.info$`left daughter`[node.idx]
   
   right.set <- cur.path
-  if (all(cur.path[node.var] == 0)) right.set[node.var + p] <- 1L
+  if (all(cur.path[node.var.reps] == 0)) right.set[node.var + p] <- 1L
   right.child <- tree.info$`right daughter`[node.idx]
   
   if (tree.info$status[node.idx] == -1) {
