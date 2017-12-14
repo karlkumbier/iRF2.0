@@ -80,7 +80,7 @@ readTree <- function(rfobj, k, x, y, nodes,
   which.leaf <- nodes[,k]
 
   if (return.node.feature) {
-    node.feature <- ancestorPath(tree.info, p, varnames.grp=varnames.grp)
+    node.feature <- ancestorPath(tree.info, varnames.grp=varnames.grp)
     n.path <- sapply(node.feature, nrow)
     leaf.id <- rep(1:length(node.feature), times=n.path)
     node.feature <- cbind(leaf.id, do.call(rbind, node.feature))
@@ -145,10 +145,10 @@ getParent <- function(tree.info) {
 }
 
 
-ancestorPath <- function(tree.info, p, varnames.grp) {
+ancestorPath <- function(tree.info, varnames.grp) {
  
   # recursively extract path info for all nodes 
-  paths <- getAncestorPath(tree.info, p, varnames.grp)
+  paths <- getAncestorPath(tree.info, varnames.grp)
 
   # subset to only leaf nodes
   paths <- lapply(as.character(which(tree.info$status == -1)), 
