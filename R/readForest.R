@@ -12,10 +12,10 @@ readForest <- function(rfobj, x, y=NULL,
   if (wt.pred.accuracy & is.null(y))
     stop('y required to evaluate prediction accuracy')
   if (is.null(varnames.grp)) varnames.grp <- 1:ncol(x)
-  
+ 
   ntree <- rfobj$ntree
   n <- nrow(x)
-  p <- ncol(x)
+  p <- length(unique(varnames.grp))
   out <- list()
   
   # Determine leaf nodes for observations in x
@@ -62,7 +62,6 @@ readTree <- function(rfobj, k, x, y, nodes,
                      wt.pred.accuracy=FALSE, 
                      obs.weights=NULL) {
   n <- nrow(x) 
-  p <- ncol(x)
   if (is.factor(y)) y <- as.numeric(y) - 1
   ntree <- rfobj$ntree
 
@@ -161,9 +160,9 @@ ancestorPath <- function(tree.info, varnames.grp) {
 
 getAncestorPath <- function(tree.info, varnames.grp, 
                             varnames.unq=unique(varnames.grp), 
-                            nd.idx=1, p=length(varnames.unq),
+                            node.idx=1, p=length(varnames.unq),
                             cur.path=NULL, depth=1L) {
-  
+ 
   if (is.null(cur.path)) cur.path <- rep(0L, 2 * p)
   id <- tree.info$`split var`[node.idx] 
   node.var <- which(varnames.grp[id] == varnames.unq)
