@@ -15,7 +15,8 @@ iRF <- function(x, y,
                 verbose=TRUE,
                 keep.subset.var=NULL,
                 get.prevalence=FALSE,
-                int.dir=TRUE,
+                int.direction=TRUE,
+                bootstrap.path=NULL,
                 ...) {
   
   
@@ -77,7 +78,7 @@ iRF <- function(x, y,
   # Select iteration for which to return interactions based on minimizing 
   # prediction error on OOB samples
   if (select.iter) {
-    interactions.return <- selectIter(rf.list, y=y)
+    interactions.return <- max(selectIter(rf.list, y=y), 2)
     if (verbose) print(paste('selected iter:', interactions.return))
   }
   
@@ -94,7 +95,6 @@ iRF <- function(x, y,
     }
 
     for (i.b in 1:n.bootstrap) { 
-      
       if (class.irf) {
         # Take bootstrap sample that maintains class balance in full data
         n.class <- table(y)
@@ -122,6 +122,13 @@ iRF <- function(x, y,
                                      keep.forest=TRUE, 
                                      ...)
                       }
+
+      # Write out bootstrap RFs for later processing
+      if (!is.null(bootstrap.path)) {
+        dir.create(bootstrap.path, showWarnings=FALSE)
+        out.file <- paste0('bs_iter', iter, '_b', i.b, '.Rdata')
+        save(file=paste0(bootstrap.path, out.file), rf.b)
+      }
       
       # Run generalized RIT on rf.b to learn interactions
       ints <- generalizedRIT(rf=rf.b, x=x, y=y,
@@ -129,7 +136,7 @@ iRF <- function(x, y,
                              varnames.grp=varnames.grp,
                              rit.param=rit.param,
                              get.prevalence=get.prevalence,
-                             int.dir=int.dir,
+                             int.direction=int.direction,
                              n.core=n.core)
       
       interact.list.b1[[i.b]] <- ints$i1$interactions
@@ -161,7 +168,10 @@ iRF <- function(x, y,
     out$rf.list <- out$rf.list[[interactions.return]]
     out$interaction <- out$interaction[[interactions.return]]
     out$opt.k <- interactions.return
-    out$weights <- rf.list[[interactions.return]]$importance[,importance]
+    if (interactions.return == 1)
+      out$weights <- rep(1, ncol(x))
+    else
+      out$weights <- rf.list[[interactions.return - 1]]$importance
     if (get.prevalence) out$prevalence <- out$prevalence[[interactions.return]]
   }
   return(out)
@@ -174,7 +184,7 @@ generalizedRIT <- function(rf, x, y,
                                           class.id=1, min.nd=1,
                                           class.cut=NULL, class.qt=0.5), 
                            get.prevalence=FALSE,
-                           int.dir=int.dir,
+                           int.direction=int.direction,
                            n.core=1) {
   
   # Extract decision paths and tree metadata from random forest
@@ -186,7 +196,7 @@ generalizedRIT <- function(rf, x, y,
                         n.core=n.core)
 
   # Collapse node feature matrix if not tracking split directions
-  if (!int.dir) {
+  if (!int.direction) {
     p <- ncol(x)
     rforest$node.feature <- rforest$node.feature[,1:p] + 
       rforest$node.feature[,(p+1):(2*p)]
