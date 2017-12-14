@@ -4,6 +4,7 @@ readForest <- function(rfobj, x, y=NULL,
                        wt.pred.accuracy=FALSE,
                        varnames.grp=NULL,
                        obs.weights=NULL,
+                       get.depth=FALSE,
                        n.core=1){
   
   if (is.null(rfobj$forest))
@@ -41,7 +42,13 @@ readForest <- function(rfobj, x, y=NULL,
   if (return.node.obs) nobs <- lapply(rd.forest, function(tt) tt$node.obs)
   if (return.node.obs) nobs <- aggregateNodeFeature(nobs)
   
-  out$node.feature <- sparseMatrix(i=nf[,1], j=nf[,2], dims=c(max(nf[,1]), 2 * p))
+  if (get.depth) 
+    out$node.feature <- sparseMatrix(i=nf[,1], j=nf[,2], x=nf[,3], 
+                                     dims=c(max(nf[,1]), 2 * p))
+  else
+    out$node.feature <- sparseMatrix(i=nf[,1], j=nf[,2],
+                                     dims=c(max(nf[,1]), 2 * p))
+
   if (return.node.obs)
     out$node.obs <- sparseMatrix(i=nobs[,1], j=nobs[,2], dims=c(max(nf[,1]), n))
   return(out)
@@ -74,9 +81,9 @@ readTree <- function(rfobj, k, x, y, nodes,
 
   if (return.node.feature) {
     node.feature <- ancestorPath(tree.info, p, varnames.grp=varnames.grp)
-    n.path <- sapply(node.feature, length)
+    n.path <- sapply(node.feature, nrow)
     leaf.id <- rep(1:length(node.feature), times=n.path)
-    node.feature <- cbind(leaf.id, unlist(node.feature))
+    node.feature <- cbind(leaf.id, do.call(rbind, node.feature))
   }
 
   # if specified, set node counts based on observation weights
@@ -145,22 +152,30 @@ ancestorPath <- function(tree.info, p, varnames.grp) {
 
   # subset to only leaf nodes
   paths <- lapply(as.character(which(tree.info$status == -1)), 
-                  function(z) which(paths[,z] == 1))
+                    function(z) {
+                      idcs <- which(paths[,z] != 0)
+                      return(cbind(id=idcs, depth=paths[idcs, z]))
+                    })
+  #TODO: cbind within ^ to get depth and variable info
   return(paths)
 }
 
-getAncestorPath <- function(tree.info, p, varnames.grp, node.idx=1, cur.path=NULL) {
+getAncestorPath <- function(tree.info, p, varnames.grp, node.idx=1, 
+                            cur.path=NULL, depth=1L) {
   # TODO: we should be aggregating grouped features here
   if (is.null(cur.path)) cur.path <- rep(0L, 2 * p)
   node.var <- tree.info$`split var`[node.idx]
   node.var.reps <- which(varnames.grp == varnames.grp[node.var])
   
+  # Generate vector indicating depth at which variable is first selected on
+  # decision paths. Note: replicated features on decision paths will
+  # intentionally result in skipped values of depth.
   left.set <- cur.path
-  if (all(cur.path[node.var.reps + p] == 0)) left.set[node.var] <- 1L
+  if (all(cur.path[node.var.reps + p] == 0)) left.set[node.var] <- depth
   left.child <- tree.info$`left daughter`[node.idx]
   
   right.set <- cur.path
-  if (all(cur.path[node.var.reps] == 0)) right.set[node.var + p] <- 1L
+  if (all(cur.path[node.var.reps] == 0)) right.set[node.var + p] <- depth
   right.child <- tree.info$`right daughter`[node.idx]
   
   if (tree.info$status[node.idx] == -1) {
@@ -168,8 +183,8 @@ getAncestorPath <- function(tree.info, p, varnames.grp, node.idx=1, cur.path=NUL
     colnames(out) <- node.idx
     return(out)
   } else {
-    return(cbind(getAncestorPath(tree.info, p, varnames.grp, left.child, left.set),
-                 getAncestorPath(tree.info, p, varnames.grp, right.child, right.set)))
+    return(cbind(getAncestorPath(tree.info, p, varnames.grp, left.child, left.set, depth+1),
+                 getAncestorPath(tree.info, p, varnames.grp, right.child, right.set, depth+1)))
   }
 }
 
