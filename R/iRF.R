@@ -7,8 +7,9 @@ iRF <- function(x, y,
                 mtry.select.prob=rep(1, ncol(x)),
                 interactions.return=NULL, 
                 wt.pred.accuracy=FALSE, 
-                rit.param=list(depth=5, ntree=500, nchild=2, class.id=1, 
-                               min.nd=1, class.cut=NULL, class.qt=0.5), 
+                rit.param=list(depth=5, ntree=500, 
+                               nchild=2, class.id=1, 
+                               min.nd=1, class.cut=median(y)), 
                 varnames.grp=NULL, 
                 n.bootstrap=20,
                 select.iter=FALSE,
@@ -139,11 +140,11 @@ iRF <- function(x, y,
                              int.direction=int.direction,
                              n.core=n.core)
       
-      interact.list.b1[[i.b]] <- ints$i1$interactions
-      interact.list.b0[[i.b]] <- ints$i0$interactions
+      interact.list.b1[[i.b]] <- ints$i1$int
+      interact.list.b0[[i.b]] <- ints$i0$int
       if (get.prevalence) {
-        prev.list.b1[[i.b]] <- ints$i1$prevalence
-        prev.list.b0[[i.b]] <- ints$i0$prevalence
+        prev.list.b1[[i.b]] <- ints$i1$prev
+        prev.list.b0[[i.b]] <- ints$i0$prev
       }
 
       rm(rf.b)       
@@ -180,13 +181,22 @@ iRF <- function(x, y,
 generalizedRIT <- function(rf, x, y, 
                            wt.pred.accuracy=FALSE, 
                            varnames.grp=NULL,
-                           rit.param=list(depth=5, ntree=500, nchild=2, 
-                                          class.id=1, min.nd=1,
-                                          class.cut=NULL, class.qt=0.5), 
+                           rit.param=list(depth=5, ntree=500, 
+                                          nchild=2, class.id=1, 
+                                          min.nd=1, class.cut=median(y)), 
                            get.prevalence=FALSE,
-                           int.direction=int.direction,
+                           int.direction=FALSE,
                            n.core=1) {
   
+  out <- list()
+  p <- ncol(x)
+  if (is.null(varnames.grp) & is.null(colnames(x)))
+    varnames.grp <- 1:ncol(x)
+  else if (is.null(varnames.group))
+    varnames.grp <- colnameS(x)
+  
+  varnames.unq <- unique(varnames.grp)
+
   # Extract decision paths and tree metadata from random forest
   class.irf <- is.factor(y)
   rforest <- readForest(rf, x=x, y=y, 
@@ -197,46 +207,49 @@ generalizedRIT <- function(rf, x, y,
 
   # Collapse node feature matrix if not tracking split directions
   if (!int.direction) {
-    p <- ncol(x)
     rforest$node.feature <- rforest$node.feature[,1:p] + 
-      rforest$node.feature[,(p+1):(2*p)]
+      rforest$node.feature[,(p + 1):(2 * p)]
   }  
   
   # Select class specific leaf nodes
-  select.leaf.id <- rep(TRUE, nrow(rforest$tree.info))
-  
-  if (class.irf) {
-    # classification: subset leaf nodes by class
-    class.id <- rit.param$class.id
-    select.leaf.id <- rforest$tree.info$prediction == as.numeric(class.id) + 1
-  } else if (!is.null(rit.param$class.cut)) {
-    # regression with cutoff: sample all leaf nodes that exceed cutoff
-    select.leaf.id <- rforest$tree.info$prediction > rit.param$class.cut
-  } else if (!is.null(rit.param$class.qt)) {
-    # regression with quantile cutoff: determine cutoff from quantile and 
-    # sample leaf nodes
-    qt.cut <- quantile(y, rit.param$class.qt)
-    select.leaf.id <- rforest$tree.info$prediction > qt.cut
-  }       
+  select.id <- rep(TRUE, nrow(rforest$tree.info)) 
+  if (class.irf) 
+    select.id <- rforest$tree.info$prediction == rit.param$class.id + 1
+  else
+    select.id <- rforest$tree.info$prediction > rit.param$class.cut
 
   # Run RIT on selected and non-selected nodes to determine interactions for
   # each group
-  out <- list() 
-  if (sum(select.leaf.id) < 2) {
+  if (sum(select.id) < 2) {
     return(character(0))
   } else {
-    out$i1 <- runRIT(subsetReadForest(rforest, select.leaf.id),
-                     varnames.grp, wt.pred.accuracy, rit.param,
-                     get.prevalence, n.core)
-    out$i0 <- runRIT(subsetReadForest(rforest, !select.leaf.id),
-                     varnames.grp, wt.pred.accuracy, rit.param,
-                     get.prevalence, n.core)
+    out$i1$int <- runRIT(subsetReadForest(rforest, select.id),
+                         wt.pred.accuracy, rit.param, n.core)
+    out$i0$int <- runRIT(subsetReadForest(rforest, !select.id),
+                         wt.pred.accuracy, rit.param, n.core)
+    
+    if (get.prevalence) { 
+      ints <- unique(c(out$i1$int, out$i0$int))
+      nf.agg <- rforest$node.feature[,1:p] + rforest$node.feature[,(p+1):(2*p)]
+      wt <- rforest$tree.info$size.node
+      out$i1$prev <- sapply(ints, prevalence, 
+                            nf.full=rforest$node.feature[select.id,], 
+                            nf.agg=nf.agg[select.id,], wt=wt[select.id])
+      out$i0$prev <- sapply(ints, prevalence,
+                            nf.full=rforest$node.feature[!select.id,],
+                            nf.agg=nf.agg[!select.id,], wt=wt[!select.id])
+      
+      names(out$i1$prev) <- nameInts(names(out$i1$prev), varnames.unq)
+      names(out$i0$prev) <- nameInts(names(out$i0$prev), varnames.unq)
+    }
+
+    out$i1$int <- nameInts(out$i1$int, varnames.unq)
+    out$i0$int <- nameInts(out$i0$int, varnames.unq)
   }
   return(out)
 }
 
-runRIT <- function(rforest, varnames.grp, wt.pred.accuracy, 
-                   rit.param, get.prevalence, n.core) {
+runRIT <- function(rforest, wt.pred.accuracy, rit.param, n.core=1) {
  
   # Set weights for leaf node sampling using either size or size and accuracy
   if (wt.pred.accuracy) 
@@ -244,10 +257,6 @@ runRIT <- function(rforest, varnames.grp, wt.pred.accuracy,
   else 
     wt <- rforest$tree.info$size.node
            
-  # group features if specified
-  if (!is.null(varnames.grp)) 
-    rforest$node.feature <- groupFeature(rforest$node.feature, grp=varnames.grp)
-
   # remove nodes below specified size threshold
   id.rm <- rforest$tree.info$size.node < rit.param$min.nd
   rforest <- subsetReadForest(rforest, !id.rm)
@@ -257,26 +266,9 @@ runRIT <- function(rforest, varnames.grp, wt.pred.accuracy,
                       n_trees=rit.param$ntree, branch=rit.param$nchild,
                       n_cores=n.core) 
   
-  # Group interactions and rename by variable name
-  if (!is.null(varnames.grp))
-    varnames.new <- unique(varnames.grp)
-  else if (!is.null(colnames(x)))
-    varnames.new <- colnames(x)
-  else
-    varnames.new <- 1:ncol(x)
- 
   # Rename interactions using variable names and evaluate prevalence
   interactions <- gsub(' ', '_', interactions$Interaction)
-  if (get.prevalence) 
-    prev <- sapply(interactions, prevalence, nf=rforest$node.feature, wt=wt)
-  interactions <- nameInts(interactions, varnames.new)
-  if (get.prevalence) 
-    names(prev) <- interactions
-  
-  out <- list()
-  out$interactions <- interactions
-  if (get.prevalence) out$prevalence <- prev
-  return(out)
+  return(interactions)
 }
 
 nameInts <- function(int, varnames) {
@@ -323,12 +315,23 @@ prevalenceSummary <- function(x) {
 }
 
 
-prevalence <- function(int, nf, wt=rep(1, ncol(nf))) {
+prevalence <- function(int, nf.full, nf.agg, wt=rep(1, ncol(nf))) {
   # calculate the decision path prevalence of a single interaction
-  int <- as.numeric(strsplit(int, '_')[[1]])
-  int.nd <- apply(nf[,int], MAR=1, function(z) all(z == 1))
-  prev <- sum(wt[int.nd]) / sum(wt)
-  return(prev)
+  p <- ncol(nf.agg)
+
+  int.dir <- as.numeric(strsplit(int, '_')[[1]])
+  int.undir <- int.dir %% p
+  int.undir[int.undir == 0] <- p
+
+  int.undir.nd <- rowSums(nf.agg[,int.undir] != 0) == length(int.undir)
+  int.dir.id <- rowSums(nf.full[int.undir.nd, int.dir] != 0) == length(int.dir)
+
+  int.dir.nd <- rep(FALSE, length(int.undir.nd))
+  int.dir.nd[int.undir.nd][int.dir.id] <- TRUE
+
+  prev.dir <- sum(wt[int.dir.nd]) / sum(wt)
+  prev.undir <- sum(wt[int.undir.nd & !int.dir.nd]) / sum(wt)
+  return(prev.dir - prev.undir)
 }
 
 subsetReadForest <- function(rforest, subset.idcs) { 
