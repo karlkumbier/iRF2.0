@@ -156,26 +156,27 @@ ancestorPath <- function(tree.info, p, varnames.grp) {
                       idcs <- which(paths[,z] != 0)
                       return(cbind(id=idcs, depth=paths[idcs, z]))
                     })
-  #TODO: cbind within ^ to get depth and variable info
   return(paths)
 }
 
-getAncestorPath <- function(tree.info, p, varnames.grp, node.idx=1, 
+getAncestorPath <- function(tree.info, varnames.grp, 
+                            varnames.unq=unique(varnames.grp), 
+                            nd.idx=1, p=length(varnames.unq),
                             cur.path=NULL, depth=1L) {
-  # TODO: we should be aggregating grouped features here
+  
   if (is.null(cur.path)) cur.path <- rep(0L, 2 * p)
-  node.var <- tree.info$`split var`[node.idx]
-  node.var.reps <- which(varnames.grp == varnames.grp[node.var])
+  id <- tree.info$`split var`[node.idx] 
+  node.var <- which(varnames.grp[id] == varnames.unq)
   
   # Generate vector indicating depth at which variable is first selected on
   # decision paths. Note: replicated features on decision paths will
   # intentionally result in skipped values of depth.
   left.set <- cur.path
-  if (all(cur.path[node.var.reps + p] == 0)) left.set[node.var] <- depth
+  if (all(cur.path[node.var + p] == 0)) left.set[node.var] <- depth
   left.child <- tree.info$`left daughter`[node.idx]
   
   right.set <- cur.path
-  if (all(cur.path[node.var.reps] == 0)) right.set[node.var + p] <- depth
+  if (all(cur.path[node.var] == 0)) right.set[node.var + p] <- depth
   right.child <- tree.info$`right daughter`[node.idx]
   
   if (tree.info$status[node.idx] == -1) {
@@ -183,8 +184,10 @@ getAncestorPath <- function(tree.info, p, varnames.grp, node.idx=1,
     colnames(out) <- node.idx
     return(out)
   } else {
-    return(cbind(getAncestorPath(tree.info, p, varnames.grp, left.child, left.set, depth+1),
-                 getAncestorPath(tree.info, p, varnames.grp, right.child, right.set, depth+1)))
+    return(cbind(getAncestorPath(tree.info, varnames.grp, varnames.unq, 
+                                 left.child, p, left.set, depth+1),
+                 getAncestorPath(tree.info, varnames.grp, varnames.unq,
+                                 right.child, p, right.set, depth+1)))
   }
 }
 
