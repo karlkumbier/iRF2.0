@@ -9,7 +9,7 @@ iRF <- function(x, y,
                 wt.pred.accuracy=FALSE, 
                 rit.param=list(depth=5, ntree=500, 
                                nchild=2, class.id=1, 
-                               min.nd=1, class.cut=median(y)), 
+                               min.nd=1, class.cut=NULL), 
                 varnames.grp=NULL, 
                 n.bootstrap=20,
                 select.iter=FALSE,
@@ -36,6 +36,8 @@ iRF <- function(x, y,
   n <- nrow(x)
   p <- ncol(x)
   class.irf <- is.factor(y)
+  if (!class.irf & is.null(rit.param$class.cut)) 
+    rit.param$class.cut <- median(y)
   importance <- ifelse(class.irf, 'MeanDecreaseGini', 'IncNodePurity')
    
   
@@ -154,8 +156,12 @@ iRF <- function(x, y,
     stability.score[[iter]] <- list(i0=summarizeInteract(interact.list.b0),
                                     i1=summarizeInteract(interact.list.b1))
     if (get.prevalence) 
-      prev.list[[iter]] <- list(i0=summarizePrevalence(prev.list.b0, interact.list.b0, n.bootstrap),
-                                i1=summarizePrevalence(prev.list.b1, interact.list.b1, n.bootstrap))
+      prev.list[[iter]] <- list(i0=summarizePrevalence(prev.list.b0, 
+                                                       interact.list.b0, 
+                                                       n.bootstrap),
+                                i1=summarizePrevalence(prev.list.b1, 
+                                                       interact.list.b1, 
+                                                       n.bootstrap))
 
   } # end for (iter in ... )
   
@@ -183,7 +189,7 @@ generalizedRIT <- function(rf, x, y,
                            varnames.grp=NULL,
                            rit.param=list(depth=5, ntree=500, 
                                           nchild=2, class.id=1, 
-                                          min.nd=1, class.cut=median(y)), 
+                                          min.nd=1, class.cut=NULL), 
                            get.prevalence=FALSE,
                            int.direction=FALSE,
                            n.core=1) {
@@ -191,9 +197,9 @@ generalizedRIT <- function(rf, x, y,
   out <- list()
   p <- ncol(x)
   if (is.null(varnames.grp) & is.null(colnames(x)))
-    varnames.grp <- 1:ncol(x)
+    varnames.grp <- as.character(1:ncol(x))
   else if (is.null(varnames.group))
-    varnames.grp <- colnameS(x)
+    varnames.grp <- colnames(x)
   
   varnames.unq <- unique(varnames.grp)
 
@@ -231,6 +237,7 @@ generalizedRIT <- function(rf, x, y,
     if (get.prevalence) { 
       ints <- unique(c(out$i1$int, out$i0$int))
       nf.agg <- rforest$node.feature[,1:p] + rforest$node.feature[,(p+1):(2*p)]
+
       wt <- rforest$tree.info$size.node
       out$i1$prev <- sapply(ints, prevalence, 
                             nf.full=rforest$node.feature[select.id,], 
@@ -317,14 +324,15 @@ prevalenceSummary <- function(x) {
 
 prevalence <- function(int, nf.full, nf.agg, wt=rep(1, ncol(nf))) {
   # calculate the decision path prevalence of a single interaction
+  tryCatch({
   p <- ncol(nf.agg)
 
   int.dir <- as.numeric(strsplit(int, '_')[[1]])
   int.undir <- int.dir %% p
   int.undir[int.undir == 0] <- p
 
-  int.undir.nd <- rowSums(nf.agg[,int.undir] != 0) == length(int.undir)
-  int.dir.id <- rowSums(nf.full[int.undir.nd, int.dir] != 0) == length(int.dir)
+  int.undir.nd <- apply(nf.agg[,int.undir], MAR=1, function(z) all(z != 0))
+  int.dir.id <- apply(nf.full[int.undir.nd, int.dir], MAR=1, function(z) all(z != 0))
 
   int.dir.nd <- rep(FALSE, length(int.undir.nd))
   int.dir.nd[int.undir.nd][int.dir.id] <- TRUE
@@ -332,6 +340,8 @@ prevalence <- function(int, nf.full, nf.agg, wt=rep(1, ncol(nf))) {
   prev.dir <- sum(wt[int.dir.nd]) / sum(wt)
   prev.undir <- sum(wt[int.undir.nd & !int.dir.nd]) / sum(wt)
   return(prev.dir - prev.undir)
+  }, error=function(e) print(e) 
+  )
 }
 
 subsetReadForest <- function(rforest, subset.idcs) { 
