@@ -166,16 +166,18 @@ getAncestorPath <- function(tree.info, varnames.grp,
   if (is.null(cur.path)) cur.path <- rep(0L, 2 * p)
   id <- tree.info$`split var`[node.idx] 
   node.var <- which(varnames.grp[id] == varnames.unq)
-  
+  dd <- depth
+
   # Generate vector indicating depth at which variable is first selected on
-  # decision paths. Note: replicated features on decision paths will
-  # intentionally result in skipped values of depth.
+  # decision paths. 
   left.set <- cur.path
-  if (all(cur.path[node.var + p] == 0)) left.set[node.var] <- depth
-  left.child <- tree.info$`left daughter`[node.idx]
-  
   right.set <- cur.path
-  if (all(cur.path[node.var] == 0)) right.set[node.var + p] <- depth
+  if (all(cur.path[c(node.var, node.var + p)] == 0)) {
+    left.set[node.var] <- depth
+    right.set[node.var + p] <- depth
+    dd <- depth + 1
+  }
+  left.child <- tree.info$`left daughter`[node.idx]
   right.child <- tree.info$`right daughter`[node.idx]
   
   if (tree.info$status[node.idx] == -1) {
@@ -184,9 +186,9 @@ getAncestorPath <- function(tree.info, varnames.grp,
     return(out)
   } else {
     return(cbind(getAncestorPath(tree.info, varnames.grp, varnames.unq, 
-                                 left.child, p, left.set, depth+1),
+                                 left.child, p, left.set, dd),
                  getAncestorPath(tree.info, varnames.grp, varnames.unq,
-                                 right.child, p, right.set, depth+1)))
+                                 right.child, p, right.set, dd)))
   }
 }
 
