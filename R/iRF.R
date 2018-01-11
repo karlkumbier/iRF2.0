@@ -148,7 +148,7 @@ iRF <- function(x, y,
     if (iter %in% interactions.return){
       if (verbose){cat('finding interactions ... ')}
 
-      #interact.list.b <- list()
+      interact.list.b <- list()
       #interact.list[[iter]] <- lapply(1:n.bootstrap, function(i.b) {
       #for (i.b in 1:n.bootstrap) {
       gatheredRITs <- pbdLapply(1:n.bootstrap, function(i.b) {
