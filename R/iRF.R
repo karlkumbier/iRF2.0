@@ -243,7 +243,7 @@ iRF <- function(x, y,
       })
       if (verbose){cat('gathering interactions ... ')}
       interact.list[[iter]] <- unlist(allgather(gatheredRITs),recursive = FALSE)
-
+      interact.list.b <- interact.list[[iter]]
       # 2.2: calculate stability scores of interactions
       if (!is.null(varnames.grp))
         varnames.new <- unique(varnames.grp)
