@@ -20,6 +20,7 @@ iRF <- function(x, y,
                 verbose=TRUE,
                 keep.subset.var=NULL,
                 obs.weights=NULL,
+                samplesize=nrow(x),
                ...) {
 
 
@@ -89,6 +90,7 @@ iRF <- function(x, y,
                                               mtry.select.prob=weight.mat[,iter],
                                               keep.forest=TRUE,
                                               track.nodes=trackforinteractions,
+                                              sampsize=samplesize,
                                               ...)},
                                               mc.cores = n.cpupercore
                                             )
