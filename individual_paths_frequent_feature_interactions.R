@@ -19,7 +19,13 @@ individual.paths.frequent.feature.interactions <- function(irf.output,
   ind <- length(irf.output$rf.list)
   rf.last <- readForest(irf.output$rf.list[[ind]], x=data, return.node.obs=TRUE)
   # get the ids of the target sample
-  ids <- apply(rf.last$node.obs[,sample.indexes], FUN = any, MARGIN = 1)
+  if (sum(sample.indexes) == 1) {
+    # when we only need one sample, ids is easy to obtian.
+    ids <- rf.last$node.obs[,sample.indexes]
+  } else {
+    ids <- apply(rf.last$node.obs[,sample.indexes], FUN = any, MARGIN = 1)
+  }
+  
   # get the paths for the specific sample
   paths <- subsetReadForest(rf.last, ids)$node.feature
   # find frequent interactions
