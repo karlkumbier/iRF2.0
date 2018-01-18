@@ -1,4 +1,4 @@
-unit_test_individual_paths_frequent_feature_interactions <- function(p = 50, n = 500){
+unit.test.individual.paths.frequent.feature.interactions <- function(p = 50, n = 500){
   library(iRF)
   set.seed(47)
   thres = 20
@@ -16,12 +16,11 @@ unit_test_individual_paths_frequent_feature_interactions <- function(p = 50, n =
   y <- as.factor(c(y1, y2))
   
   f <- iRF(x=x, y=y, n.iter=3, n.bootstrap=5, 
-           n.core=4, interactions.return=c(1, 3), local=TRUE,
+           n.core=4, interactions.return=c(3), local=TRUE,
            get.prevalence=TRUE)
   out = list()
-  for (i in 1:10){
-    out[[i]] = individual_paths_frequent_feature_interactions(f, x, i)
-  }
+  out[[1]] = individual.paths.frequent.feature.interactions(f, x, 1:10, method = 'RIT')
+  out[[2]] = individual.paths.frequent.feature.interactions(f, x, 501:510, method = 'RIT')
   return(out)
 }
-unit_test_individual_paths_frequent_feature_interactions()
+print(unit.test.individual.paths.frequent.feature.interactions())
