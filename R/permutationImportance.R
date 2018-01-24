@@ -1,26 +1,6 @@
-permImprovement <- function(rfobj, x, y, int, n.perms=3, varnames.group=NULL,
-                            n.cores=1) {
-  int.subsets <- intsSubsets(int)
-  perm.importance <- permImportance(rfobj, x, y, int.subsets, n.perms, 
-                                    varnames.group, n.cores)
-  int.improvement <- sapply(int, intImprovement, importance=perm.importance)
-
-
-}
-
-intImprovement <- function(importance, int) {
-  int.subs <- intSubsets(int)
-  int.subs <- int.subs[int.subs != int]
-  int.importance <- importance[int]
-  sub.importance <- max(importance[int.subs])
-  improvement <- int.importance / sub.importance
-  improvement <-  unname(improvement)
-  return(improvement)
-}
-
-permImportance <- function(rfobj, x, y, int, n.perms=3, varnames.group=NULL,
+permImportance <- function(rfobj, x, y, ints, n.perms=3, varnames.group=NULL,
                            n.cores=1) {
-  # Evaluate the importance of an interaction by permuting all pother features
+  # Evaluate the importance of an interaction by permuting all other features
   # args:
   #   rfobj: fitted random forest
   #   x: raw data matrix
@@ -36,12 +16,9 @@ permImportance <- function(rfobj, x, y, int, n.perms=3, varnames.group=NULL,
   if (is.null(colnames(x)))
     varnames.group <- as.character(1:ncol(x))
   
-  preds <- predictInts(rfobj, x, int, n.perms, varnames.group, collapse=TRUE, 
-                       n.cores=n.cores)
+  preds <- predictInts(rfobj, x, ints, n.perms, varnames.group, 
+                       collapse=TRUE, n.cores=n.cores)
   interact.score <- apply(preds, MAR=2, predAccuracy, y=y)
-  
-  
-  #interact.scores <- sapply(int, predInt)
   return(interact.score)
 }
 
@@ -65,9 +42,11 @@ predictInts <- function(rfobj, x, int, n.perms=3, varnames.group=NULL,
   
   pred.ints <- mclapply(int, predictInt, rfobj=rfobj, x=x, n.perms=n.perms, 
                         varnames.group=varnames.group, mc.cores=n.cores)
-  if (collapse) pred.ints <- sapply(pred.ints, rowMeans)
-  #pred.ints <- do.call(cbind, pred.ints)
-  colnames(pred.ints) <- int
+  
+  if (collapse) {
+    pred.ints <- sapply(pred.ints, rowMeans)
+    colnames(pred.ints) <- int
+  }
   
   return(pred.ints)
 }
@@ -93,17 +72,15 @@ predictInt <- function(rfobj, x, int, n.perms=3, varnames.group=NULL) {
 }
 
 predAccuracy <- function(y.hat, y) {
-  # Evaluate prediction accuracy, scaled to interval [0,1]: AUROC for 
-  # classification and decrease variance for regression.
+  # Evaluate prediction accuracy: AUROC for classification and decrease 
+  # variance for regression.
   # args:
   #   y.hat: predicted response
   #   y: true response
   require(AUC)
   if (is.factor(y)) {
     accuracy <- auc(roc(y.hat, y))
-    accuracy <- 2 * (max(accuracy, 0.5) - 0.5)
   } else {
-    if (any(weight < 0)) stop('negative weights')
     accuracy <- 1 - mean((y - y.hat) ^ 2) / var(y)
     if (accuracy < 0) accuracy <- 0
   }
@@ -123,7 +100,10 @@ fixInteract <- function(x, x.perm, int, x.names=NULL) {
   
   int.split <- unlist(strsplit(int, '_'))
   if (!is.null(x.names)) {
+    stopifnot(length(x.names) == ncol(x))
     int.split <- which(x.names %in% int.split)
+  } else if (!is.null(colnames(x))) {
+    int.split <- which(colnames(x) %in% int.split)
   } else {
     int.split <- as.numeric(int.split)
   }
@@ -134,24 +114,6 @@ fixInteract <- function(x, x.perm, int, x.names=NULL) {
 
 permuteVars <- function(x, vars) {
   # Permutes the columns of x corresponding to vars
-  x[,vars] <- apply(x[,vars], MAR=2, permute)
+  x[,vars] <- apply(x[,vars], MAR=2, sample)
   return(x)
 }
-
-permute <- function(x) {
-  x <- x[sample(length(x))]
-  return(x)
-}
-
-intsSubsets <- function(ints) return(unique(unlist(lapply(ints, intSubsets))))
-
-intSubsets <- function(int) {
-  # Generates all lower-order subsets of a given interaction
-  vv <- strsplit(int, '_')[[1]]
-  int.orders <- 1:length(vv)
-  ints <- lapply(int.orders, combn, x=vv, simplify=FALSE)
-  if (length(int.orders) > 1) ints <- unlist(ints, recursive=FALSE)
-  ints <- sapply(ints, paste, collapse='_')
-  return(ints)
-}
-

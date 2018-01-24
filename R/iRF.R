@@ -5,10 +5,8 @@ iRF <- function(x, y,
                 ntree=500, 
                 n.core=1, 
                 mtry.select.prob=rep(1/ncol(x), ncol(x)), 
-                keep.impvar.quantile=NULL, 
                 interactions.return=NULL, 
                 wt.pred.accuracy=FALSE, 
-                cutoff.unimp.feature=0,  
                 rit.param=list(depth=5, ntree=500, nchild=2, class.id=1, 
                                class.cut=NULL, class.qt=0.5), 
                 varnames.grp=NULL, 
@@ -16,7 +14,6 @@ iRF <- function(x, y,
                 bootstrap.forest=TRUE,
                 select.iter=FALSE,
                 verbose=TRUE,
-                keep.subset.var=NULL,
                 ...) {
   
   
@@ -35,7 +32,7 @@ iRF <- function(x, y,
   n <- nrow(x)
   p <- ncol(x)
   class.irf <- is.factor(y)
-  importance.feature <- ifelse(class.irf, 'MeanDecreaseGini', 'IncNodePurity')
+  imp <- ifelse(class.irf, 'MeanDecreaseGini', 'IncNodePurity')
   registerDoMC(n.core)  
   
   rf.list <- list()
@@ -65,13 +62,15 @@ iRF <- function(x, y,
                                }
     
     ## update feature selection probabilities
-    mtry.select.prob <- rf.list[[iter]]$importance[,importance.feature]
+    mtry.select.prob <- rf.list[[iter]]$importance[,imp]
     
     if (!is.null(xtest) & class.irf & verbose){
-      auroc <- auc(roc(rf.list[[iter]]$test$votes[,2], ytest))
+      ypred <- predict(rf.list[[iter]], newdata=xtest, type='prob')[,2]
+      auroc <- auc(roc(ypred, ytest))
       print(paste('AUROC: ', round(auroc, 2)))
     } else if (!is.null(xtest) & verbose) {
-      pct.var <- 1 - mean((rf.list[[iter]]$test$predicted - ytest) ^ 2) / var(ytest)
+      ypred <- predict(rf.list[[iter]], newdata=xtest)
+      pct.var <- 1 - mean((ypred - ytest) ^ 2) / var(ytest)
       pct.var <- max(pct.var, 0)
       print(paste('% var explained:', pct.var * 100))
     }
@@ -102,8 +101,11 @@ iRF <- function(x, y,
       
       if (bootstrap.forest) { 
         
-        # use feature weights from current iteraction of full data RF
-        mtry.select.prob <- rf.list[[iter]]$importance[,importance.feature]
+        # use feature weights from current iteration of full data RF
+        if (iter == 1)
+          mtry.select.prob <- rep(1, p)
+        else
+          mtry.select.prob <- rf.list[[iter - 1]]$importance[,imp]
         
         # fit random forest on bootstrap sample
         rf.b <- foreach(i=1:length(ntree.id), .combine=combine, 
@@ -125,9 +127,8 @@ iRF <- function(x, y,
                              x=x[sample.id,], y=y[sample.id],
                              wt.pred.accuracy=wt.pred.accuracy,
                              class.irf=class.irf,
-                             importance.feature=importance.feature,
+                             imp=imp,
                              varnames.grp=varnames.grp,
-                             cutoff.unimp.feature=cutoff.unimp.feature,
                              rit.param=rit.param,
                              n.core=n.core)
       
@@ -158,15 +159,14 @@ iRF <- function(x, y,
     out$rf.list <- out$rf.list[[interactions.return]]
     out$interaction <- out$interaction[[interactions.return]]
     out$opt.k <- interactions.return
-    out$weights <- rf.list[[interactions.return]]$importance[,importance.feature]
+    out$weights <- rf.list[[interactions.return]]$importance[,imp]
   }
   
   return(out)
 }
 
 generalizedRIT <- function(rf, x, y, wt.pred.accuracy, class.irf, 
-                           importance.feature, varnames.grp,
-                           cutoff.unimp.feature, rit.param, n.core) {
+                           imp, varnames.grp, rit.param, n.core) {
   
   # Extract decision paths from rf as sparse binary matrix to be passed to RIT
   rforest <- readForest(rf, x=x, y=y, wt.pred.accuracy=wt.pred.accuracy, 
@@ -206,17 +206,9 @@ generalizedRIT <- function(rf, x, y, wt.pred.accuracy, class.irf,
   if (sum(select.leaf.id) < 2){
     return(character(0))
   } else {  
-    
     # group features if specified
     if (!is.null(varnames.grp)) nf <- groupFeature(nf, grp=varnames.grp)
-    
-    # drop feature if cutoff.unimp.feature is specified
-    if (cutoff.unimp.feature > 0){
-      rfimp <- rf$importance[,importance.feature]
-      drop.id <- which(rfimp < quantile(rfimp, prob=cutoff.unimp.feature))
-      nf[,drop.id] <- FALSE 
-    }                     
-    
+   
     interactions <- RIT(nf, weights=wt, depth=rit.param$depth,
                         n_trees=rit.param$ntree, branch=rit.param$nchild,
                         n_cores=n.core)                                                 
@@ -240,13 +232,11 @@ subsetReadForest <- function(rforest, subset.idcs) {
 groupFeature <- function(node.feature, grp){
   # Group feature level data in node.feature 
   sparse.mat <- is(node.feature, 'Matrix')
-  
   grp.names <- unique(grp)
   makeGroup <- function(x, g) apply(as.matrix(x[,grp == g]), MAR=1, max) 
   node.feature.new <- sapply(grp.names, makeGroup, x=node.feature)
   
   if (sparse.mat) node.feature.new <- Matrix(node.feature.new, sparse=TRUE)
-  
   colnames(node.feature.new) <- grp.names
   
   return(node.feature.new)
@@ -285,9 +275,9 @@ sampleClass <- function(y, cl, n) {
 }
 
 selectIter <- function(rf.list, y) {
-  # Evaluate optimal iteration based on ESCV critereon 
-  predicted <- lapply(rf.list, function(z) as.numeric(z$predicted) - is.factor(y))
-  
+  # Evaluate optimal iteration based on prediction accuracy on OOB samples
+  predicted <- lapply(rf.list, function(z) z$predicted)
+  predicted <- lapply(predicted, function(z) as.numeric(z) - is.factor(z))
   if (is.factor(y)) y <- as.numeric(y) - 1
   
   mse <- function(y, py) mean((py - y) ^ 2, na.rm=TRUE)

@@ -1,19 +1,15 @@
-conditionalPred <- function(rfobj, rd.forest, x, y, int, varnames.group=NULL) {
+conditionalPred <- function(rfobj, rd.forest, x, y, ints, 
+                            varnames.group=NULL, n.cores=1) {
   # Evaluate interaction based on prediction accuracy where predictions are 
   # made using only leaf nodes for which the given interaction falls on the 
   # decision path.
-  require(AUC)
-  
+  require(parallel)
   if (is.null(varnames.group) & !is.null(colnames(x)))
     varnames.group <- colnames(x)
   
-  y.hat <- predIntForest(rfobj, rd.forest, x, y, int, varnames.group)
-  if (is.factor(y)) {
-    r <- roc(y.hat, y)
-    accuracy <- auc(r)
-  } else {
-    accuracy <- 1 - mean((y - y.hat) ^ 2) / var(y)
-  }
+  y.hat <- mclapply(ints, predIntForest, rfobj=rfobj, rd.forest=rd.forest, 
+                    x=x, y=y, varnames.group=varnames.group, mc.cores=n.cores)
+  accuracy <- sapply(y.hat, predAccuracy, y=y)
   return(accuracy)
 }
 
@@ -71,19 +67,4 @@ getInteractNodes <- function(nf, x.names, int) {
     is.interact <- apply(nf[,int.split], MAR=1, sum) == length(int.split)
   }
   return(is.interact)
-}
-
-predAccuracy <- function(y.hat, y, weight=weight) {
-  # Evaluate prediction accuracy, scaled to interavl [0,1]
-  require(AUC)
-  if (is.factor(y)) {
-    accuracy <- auc(roc(y.hat, y))
-    accuracy <- 2 * (max(accuracy, 0.5) - 0.5)
-  } else {
-    if (any(weight < 0)) stop('negative weights')
-    weight <- weight / sum(weight)
-    accuracy <- 1 - mean((y * weight - y.hat * weight) ^ 2) / var(y * weight)
-    if (accuracy < 0) accuracy <- 0
-  }
-  return(accuracy)
 }
