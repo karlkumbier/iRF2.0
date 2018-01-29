@@ -195,11 +195,15 @@ generalizedRIT <- function(rf, x, y,
                            n.core=1) {
   
   out <- list()
-  p <- ncol(x)
-  if (is.null(varnames.grp) & is.null(colnames(x)))
+  if (is.null(varnames.grp) & is.null(colnames(x))) {
     varnames.grp <- as.character(1:ncol(x))
-  else if (is.null(varnames.group))
+    p <- ncol(x)
+  } else if (is.null(varnames.grp)) {
     varnames.grp <- colnames(x)
+    p <- ncol(x)
+  } else {
+    p <- length(unique(varnames.grp))
+  }
   
   varnames.unq <- unique(varnames.grp)
 
