@@ -328,24 +328,26 @@ prevalenceSummary <- function(x) {
 
 prevalence <- function(int, nf.full, nf.agg, wt=rep(1, ncol(nf))) {
   # calculate the decision path prevalence of a single interaction
-  tryCatch({
-  p <- ncol(nf.agg)
-
+  #p <- ncol(nf.agg)
+  
   int.dir <- as.numeric(strsplit(int, '_')[[1]])
-  int.undir <- int.dir %% p
-  int.undir[int.undir == 0] <- p
-
-  int.undir.nd <- apply(nf.agg[,int.undir], MAR=1, function(z) all(z != 0))
-  int.dir.id <- apply(nf.full[int.undir.nd, int.dir], MAR=1, function(z) all(z != 0))
-
-  int.dir.nd <- rep(FALSE, length(int.undir.nd))
-  int.dir.nd[int.undir.nd][int.dir.id] <- TRUE
-
-  prev.dir <- sum(wt[int.dir.nd]) / sum(wt)
-  prev.undir <- sum(wt[int.undir.nd & !int.dir.nd]) / sum(wt)
-  return(prev.dir - prev.undir)
-  }, error=function(e) print(e) 
-  )
+  #int.undir <- int.dir %% p
+  #int.undir[int.undir == 0] <- p
+  
+  #int.undir.nd <- apply(nf.agg[,int.undir], MAR=1, function(z) all(z != 0))
+  #if (sum(int.undir.nd) < 2) return(0) # TODO: adjust for this hack
+  #int.dir.id <- apply(nf.full[int.undir.nd, int.dir], MAR=1, function(z) all(z != 0))
+  if (length(int.dir) == 1)
+    int.dir.id <- nf.full[,int.dir] != 0
+  else
+    int.dir.id <- apply(nf.full[, int.dir], MAR=1, function(z) all(z != 0))
+  
+  #int.dir.nd <- rep(FALSE, length(int.undir.nd))
+  #int.dir.nd[int.undir.nd][int.dir.id] <- TRUE
+  
+  prev.dir <- sum(wt[int.dir.id]) / sum(wt)
+  #prev.undir <- sum(wt[int.undir.nd & !int.dir.nd]) / sum(wt)
+  return(prev.dir) #- prev.undir)
 }
 
 subsetReadForest <- function(rforest, subset.idcs) { 
