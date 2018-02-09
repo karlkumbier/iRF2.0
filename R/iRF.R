@@ -129,7 +129,6 @@ iRF <- function(x, y,
       } else {
         rf.b <- rf.list[[iter]]
       }
-      
       # Run generalized RIT on rf.b to learn interactions
       ints <- generalizedRIT(rf=rf.b, x=x[sample.id,], y=y[sample.id],
                              wt.pred.accuracy=wt.pred.accuracy,
@@ -237,8 +236,9 @@ generalizedRIT <- function(rf, x, y,
     id <- rforest$tree.info$size.node >= rit.param$min.nd
     nf <- nf[id,]
     rforest$tree.info <- rforest$tree.info[id,]
-    wt <- wt[id]
     
+    wt <- wt[id]
+    ######HUE
     interactions <- RIT(nf, weights=wt, depth=rit.param$depth,
                         n_trees=rit.param$ntree, branch=rit.param$nchild,
                         n_cores=n.core) 
@@ -265,7 +265,7 @@ generalizedRIT <- function(rf, x, y,
     
     out <- list()
     out$interactions <- interactions
-    out$prevalence <- prev
+    out$prevalence <- NULL#prev
     return(out)
   }                   
 }
