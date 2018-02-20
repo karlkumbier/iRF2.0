@@ -237,10 +237,10 @@ generalizedRIT <- function(rf, x, y,
 
       wt <- rforest$tree.info$size.node
       out$i1$prev <- sapply(ints, prevalence, 
-                            nf.full=rforest$node.feature[select.id,], 
+                            nf=rforest$node.feature[select.id,], 
                             wt=wt[select.id])
       out$i0$prev <- sapply(ints, prevalence,
-                            nf.full=rforest$node.feature[!select.id,],
+                            nf=rforest$node.feature[!select.id,],
                             wt=wt[!select.id])
       
       names(out$i1$prev) <- nameInts(names(out$i1$prev), varnames.unq)
