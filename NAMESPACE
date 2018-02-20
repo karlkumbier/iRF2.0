@@ -18,10 +18,9 @@ importFrom(foreach, foreach, "%dopar%")
 importFrom(parallel, mclapply)
 
 export(combine, getTree, grow, importance, margin, MDSplot, na.roughfix,
-       partialPlot, randomForest, rfImpute, treesize, tuneRF, varImpPlot, 
+       randomForest, rfImpute, treesize, tuneRF, varImpPlot, 
        varUsed, rfNews, outlier, classCenter, rfcv, readForest, iRF, 
-       partialPlot2var, RIT, conditionalPred, permImportance, predictInteract,
-       RIT, prevalence, nameInts, subsetReadForest)
+       RIT, prevalence, nameInts, subsetReadForest, interactPredict)
 
 
 S3method(print, randomForest)
@@ -29,7 +28,6 @@ S3method(predict, randomForest)
 S3method(plot, randomForest)
 S3method(plot, margin)
 S3method(margin, randomForest)
-S3method(partialPlot, randomForest)
 S3method(grow, randomForest)
 S3method(importance, randomForest)
 S3method(outlier, randomForest)
