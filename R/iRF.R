@@ -11,13 +11,11 @@ iRF <- function(x, y,
                                nchild=2, class.id=1, 
                                min.nd=1, class.cut=NULL), 
                 varnames.grp=NULL, 
-                n.bootstrap=20,
+                n.bootstrap=1,
                 select.iter=FALSE,
-                verbose=TRUE,
-                keep.subset.var=NULL,
-                get.prevalence=FALSE,
+                get.prevalence=TRUE,
                 int.direction=TRUE,
-                bootstrap.path=NULL,
+                verbose=TRUE,
                 ...) {
   
   
@@ -136,6 +134,7 @@ iRF <- function(x, y,
         out.file <- NULL
       }
       
+     
       # Run generalized RIT on rf.b to learn interactions
       ints <- generalizedRIT(rf=rf.b, x=x, y=y,
                              wt.pred.accuracy=wt.pred.accuracy,
@@ -159,6 +158,8 @@ iRF <- function(x, y,
     # Calculate stability scores of interactions
     stability.score[[iter]] <- list(i0=summarizeInteract(interact.list.b0),
                                     i1=summarizeInteract(interact.list.b1))
+    
+    
     if (get.prevalence) 
       prev.list[[iter]] <- list(i0=summarizePrevalence(prev.list.b0, 
                                                        interact.list.b0, 
@@ -252,10 +253,12 @@ generalizedRIT <- function(rf=NULL, x=NULL, y=NULL, rforest=NULL,
     if (get.prevalence) { 
       ints <- unique(c(out$i1$int, out$i0$int))
       wt <- rforest$tree.info$size.node
-      out$i1$prev <- sapply(ints, prevalence, wt=wt[select.id],
-                            nf.full=rforest$node.feature[select.id,])
-      out$i0$prev <- sapply(ints, prevalence, wt=wt[!select.id],
-                            nf.full=rforest$node.feature[!select.id,])
+      out$i1$prev <- sapply(ints, prevalence, 
+                            nf=rforest$node.feature[select.id,], 
+                            wt=wt[select.id])
+      out$i0$prev <- sapply(ints, prevalence,
+                            nf=rforest$node.feature[!select.id,],
+                            wt=wt[!select.id])
       
       names(out$i1$prev) <- nameInts(names(out$i1$prev), varnames.unq)
       names(out$i0$prev) <- nameInts(names(out$i0$prev), varnames.unq)
@@ -277,8 +280,14 @@ runRIT <- function(rforest, wt.pred.accuracy, rit.param, n.core=1) {
            
   # remove nodes below specified size threshold
   id.rm <- rforest$tree.info$size.node < rit.param$min.nd
+  if (mean(id.rm) == 1) {
+    warning(paste('No nodes with greater than ', rit.param$min.nd,
+                  'observations. Using all nodes'))
+    id.rm <- rep(FALSE, length(id.rm))
+  }
   rforest <- subsetReadForest(rforest, !id.rm)
   wt <- wt[!id.rm]
+  
 
   interactions <- RIT(rforest$node.feature, weights=wt, depth=rit.param$depth,
                       n_trees=rit.param$ntree, branch=rit.param$nchild,
@@ -334,17 +343,16 @@ prevalenceSummary <- function(x) {
 }
 
 
-prevalence <- function(int, nf.full, wt=rep(1, ncol(nf))) {
+prevalence <- function(int, nf, wt=rep(1, ncol(nf))) {
   # calculate the decision path prevalence of a single interaction
- 
   int.dir <- as.numeric(strsplit(int, '_')[[1]])
   if (length(int.dir) == 1)
-    int.dir.id <- nf.full[,int.dir] != 0
+    int.dir.id <- nf[,int.dir] != 0
   else
-    int.dir.id <- apply(nf.full[, int.dir], MAR=1, function(z) all(z != 0))
-   
+    int.dir.id <- apply(nf[, int.dir], MAR=1, function(z) all(z != 0))
+  
   prev.dir <- sum(wt[int.dir.id]) / sum(wt)
-  return(prev.dir) 
+  return(prev.dir)
 }
 
 subsetReadForest <- function(rforest, subset.idcs) { 
