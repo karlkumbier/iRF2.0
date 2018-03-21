@@ -56,7 +56,7 @@ iRF <- function(x, y,
     # Grow Random Forest on full data
     print(paste('iteration = ', iter))
     rf.list[[iter]] <- foreach(i=1:length(ntree.id), .combine=combine, 
-                               .multicombine=TRUE, .packages='iRF') %dopar% {
+                               .multicombine=TRUE, .packages='iRF') %dorng% {
                                  randomForest(x, y, 
                                               xtest, ytest, 
                                               ntree=ntree.id[i], 
@@ -117,7 +117,7 @@ iRF <- function(x, y,
 
       # Fit random forest on bootstrap sample
       rf.b <- foreach(i=1:length(ntree.id), .combine=combine, 
-                      .multicombine=TRUE, .packages='iRF') %dopar% {
+                      .multicombine=TRUE, .packages='iRF') %dorng% {
                         randomForest(x[sample.id,], y[sample.id], 
                                      xtest, ytest, 
                                      ntree=ntree.id[i], 
@@ -129,8 +129,11 @@ iRF <- function(x, y,
       # Write out bootstrap RFs for later processing
       if (!is.null(bootstrap.path)) {
         dir.create(bootstrap.path, showWarnings=FALSE)
-        out.file <- paste0('bs_iter', iter, '_b', i.b, '.Rdata')
-        save(file=paste0(bootstrap.path, out.file), rf.b)
+        out.file <- paste0(bootstrap.path, 'bs_iter', 
+                           iter, '_b', i.b, '.Rdata')
+        #save(file=paste0(bootstrap.path, out.file), rf.b)
+      } else {
+        out.file <- NULL
       }
       
       # Run generalized RIT on rf.b to learn interactions
@@ -140,6 +143,7 @@ iRF <- function(x, y,
                              rit.param=rit.param,
                              get.prevalence=get.prevalence,
                              int.direction=int.direction,
+                             out.file=out.file,
                              n.core=n.core)
       
       interact.list.b1[[i.b]] <- ints$i1$int
@@ -184,7 +188,7 @@ iRF <- function(x, y,
   return(out)
 }
 
-generalizedRIT <- function(rf, x, y, 
+generalizedRIT <- function(rf=NULL, x=NULL, y=NULL, rforest=NULL, 
                            wt.pred.accuracy=FALSE, 
                            varnames.grp=NULL,
                            rit.param=list(depth=5, ntree=500, 
@@ -192,9 +196,11 @@ generalizedRIT <- function(rf, x, y,
                                           min.nd=1, class.cut=NULL), 
                            get.prevalence=FALSE,
                            int.direction=FALSE,
+                           out.file=NULL,
                            n.core=1) {
   
   out <- list()
+  stopifnot(!is.null(rf) & !is.null(x)| !is.null(rforest))
   if (is.null(varnames.grp) & is.null(colnames(x))) {
     varnames.grp <- as.character(1:ncol(x))
     p <- ncol(x)
@@ -209,11 +215,13 @@ generalizedRIT <- function(rf, x, y,
 
   # Extract decision paths and tree metadata from random forest
   class.irf <- is.factor(y)
-  rforest <- readForest(rf, x=x, y=y, 
-                        return.node.feature=TRUE,
-                        wt.pred.accuracy=wt.pred.accuracy, 
-                        varnames.grp=varnames.grp,
-                        n.core=n.core)
+  if (is.null(rforest)) {
+    rforest <- readForest(rf, x=x, y=y, 
+                          return.node.feature=TRUE,
+                          wt.pred.accuracy=wt.pred.accuracy, 
+                          varnames.grp=varnames.grp,
+                          n.core=n.core)
+  }
 
   # Collapse node feature matrix if not tracking split directions
   if (!int.direction) {
@@ -221,6 +229,9 @@ generalizedRIT <- function(rf, x, y,
       rforest$node.feature[,(p + 1):(2 * p)]
   }  
   
+  if (!is.null(out.file))
+    save(file=out.file, rforest)
+
   # Select class specific leaf nodes
   select.id <- rep(TRUE, nrow(rforest$tree.info)) 
   if (class.irf) 
@@ -240,15 +251,11 @@ generalizedRIT <- function(rf, x, y,
     
     if (get.prevalence) { 
       ints <- unique(c(out$i1$int, out$i0$int))
-      nf.agg <- rforest$node.feature[,1:p] + rforest$node.feature[,(p+1):(2*p)]
-
       wt <- rforest$tree.info$size.node
-      out$i1$prev <- sapply(ints, prevalence, 
-                            nf.full=rforest$node.feature[select.id,], 
-                            nf.agg=nf.agg[select.id,], wt=wt[select.id])
-      out$i0$prev <- sapply(ints, prevalence,
-                            nf.full=rforest$node.feature[!select.id,],
-                            nf.agg=nf.agg[!select.id,], wt=wt[!select.id])
+      out$i1$prev <- sapply(ints, prevalence, wt=wt[select.id],
+                            nf.full=rforest$node.feature[select.id,])
+      out$i0$prev <- sapply(ints, prevalence, wt=wt[!select.id],
+                            nf.full=rforest$node.feature[!select.id,])
       
       names(out$i1$prev) <- nameInts(names(out$i1$prev), varnames.unq)
       names(out$i0$prev) <- nameInts(names(out$i0$prev), varnames.unq)
@@ -282,20 +289,21 @@ runRIT <- function(rforest, wt.pred.accuracy, rit.param, n.core=1) {
   return(interactions)
 }
 
-nameInts <- function(int, varnames) {
+nameInts <- function(int, varnames, directed=TRUE) {
   # Convert interactions indicated by indices to interactions indicated by name
   ints.split <- strsplit(int, '_')
   varnames.unq <- unique(varnames)
   p <- length(varnames.unq)
 
   ints.split <- lapply(ints.split, as.numeric)
-  ints.signs <- lapply(ints.split, function(z) ifelse(z > p, '+', '-'))
-  ints.split <- lapply(ints.split, '%%', p)
-  ints.split <- lapply(ints.split, function(z) {
-                         z[z == 0] <- p
-                         return(z)
-                      })
+  if (directed) {
+    ints.signs <- lapply(ints.split, function(z) ifelse(z > p, '+', '-'))
+  } else {
+    ints.signs <- ''
+  }
 
+  ints.split <- lapply(ints.split, function(z) z %% p + p * (z == p))
+  
   ints.name <- mapply(function(i, s) paste(varnames.unq[i], s, sep=''),
                       ints.split, ints.signs, SIMPLIFY=FALSE)
   ints.name <- sapply(ints.name, paste, collapse='_')
@@ -326,28 +334,17 @@ prevalenceSummary <- function(x) {
 }
 
 
-prevalence <- function(int, nf.full, nf.agg, wt=rep(1, ncol(nf))) {
+prevalence <- function(int, nf.full, wt=rep(1, ncol(nf))) {
   # calculate the decision path prevalence of a single interaction
-  #p <- ncol(nf.agg)
  
   int.dir <- as.numeric(strsplit(int, '_')[[1]])
-  #int.undir <- int.dir %% p
-  #int.undir[int.undir == 0] <- p
-  
-  #int.undir.nd <- apply(nf.agg[,int.undir], MAR=1, function(z) all(z != 0))
-  #if (sum(int.undir.nd) < 2) return(0) # TODO: adjust for this hack
-  #int.dir.id <- apply(nf.full[int.undir.nd, int.dir], MAR=1, function(z) all(z != 0))
   if (length(int.dir) == 1)
     int.dir.id <- nf.full[,int.dir] != 0
   else
     int.dir.id <- apply(nf.full[, int.dir], MAR=1, function(z) all(z != 0))
-  
-  #int.dir.nd <- rep(FALSE, length(int.undir.nd))
-  #int.dir.nd[int.undir.nd][int.dir.id] <- TRUE
-  
+   
   prev.dir <- sum(wt[int.dir.id]) / sum(wt)
-  #prev.undir <- sum(wt[int.undir.nd & !int.dir.nd]) / sum(wt)
-  return(prev.dir) #- prev.undir)
+  return(prev.dir) 
 }
 
 subsetReadForest <- function(rforest, subset.idcs) { 
@@ -411,9 +408,18 @@ selectIter <- function(rf.list, y) {
   predicted <- lapply(rf.list, function(z) 
                       as.numeric(z$predicted) - is.factor(y))
   
-  if (is.factor(y)) y <- as.numeric(y) - 1
+  if (is.factor(y)){
+    y <- as.numeric(y) - 1
+    errFun <- function(y, yhat) {
+     out <- mean(y == 1) * sum(y == 0 & yhat == 1) + 
+       mean(y == 0) * sum(y == 1 & yhat == 0)
+     return(out)
+    }
+  } else {
+    errFun <- function(y, yhat) mean((yhat - y) ^ 2, na.rm=TRUE)
+  }
   
-  mse <- function(y, py) mean((py - y) ^ 2, na.rm=TRUE)
-  error <- sapply(predicted, mse, y=y)
+  error <- sapply(predicted, errFun, y=y)
+  print(error)
   return(which.min(error))
 } 
