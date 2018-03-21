@@ -12,6 +12,7 @@ Imports:
     Rcpp,
     methods,
     doMC,
+    doRNG,
     FSInteract
 Suggests:
     RColorBrewer,
