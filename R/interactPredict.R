@@ -1,6 +1,6 @@
 interactPredict <- function(int, x, rd.forest, min.node=1, 
-                            max.rule=1000, class=1,
-                            varnames.grp=1:ncol(x)) {
+                            qcut=0.5, max.rule=1000, class=1,
+                            hard.region=FALSE, varnames.grp=1:ncol(x)) {
   # Generate prediction from directed interaction based on regions 
   # corresponding to class-C leaf nodes.
   # args:
@@ -13,18 +13,26 @@ interactPredict <- function(int, x, rd.forest, min.node=1,
   #   hard.region: T/F indicating whether regions should be aggregated before 
   #     prediction -- will give 0/1 prediction
   #   varnames.grp: grouped variable names
-  id.cls <- rd.forest$tree.info$prediction == class + 1
-  id.min <- rd.forest$tree.info$size.node >= min.node
-  nf <- rd.forest$node.feature[id.cls & id.min,]
-  tree.info <- rd.forest$tree.info[id.cls & id.min,]
+  tree.info <- rd.forest$tree.info
+  nf <- rd.forest$node.feature
+
+  if (all(tree.info$prediction %in% 1:2)) {
+    id.cls <- tree.info$prediction == class + 1
+  } else {
+    id.cls <- tree.info$prediction > class
+  }
+  id.min <- tree.info$size.node >= min.node
+  nf <- nf[id.cls & id.min,]
+  tree.info <- tree.info[id.cls & id.min,]
   
   p <- length(unique(varnames.grp))
   stopifnot(ncol(x) == p)
   id <- int2Id(int, varnames.grp, directed=TRUE)
   id.raw <- id - (id > p) * p
+  sgn <- intSign(int)
 
   if (length(id.raw) == 1) {
-    id.int <- which(nf[,id] != 0)
+    id.int <- nf[,id] != 0
   } else {
     id.int <- apply(nf[,id], MAR=1, function(z) all(z != 0))
   }
@@ -34,26 +42,21 @@ interactPredict <- function(int, x, rd.forest, min.node=1,
     return(rep(0, nrow(x)))
   }
 
-  id.sel <- sample(which(id.int), min(max.rule, sum(id.int)))
-  nf.sub <- t(nf[id.sel , c(id.raw, id.raw + p)])
+  if (hard.region) {
+    qq <- function(x) quantile(x, probs=qcut)
+    nf.sub <- matrix(nf[id.int, id], nrow=sum(id.int))
+    nf.sub <- apply(nf.sub, MAR=2, qq)
+    nf.sub <- matrix(nf.sub, ncol=1)
+  } else {
+    id.sel <- sample(which(id.int), min(max.rule, sum(id.int)))
+    nf.sub <- t(matrix(nf[id.sel , id], nrow=length(id.sel)))
+  }
+  
+  nf.sub[sgn == -1,] <- nf.sub[sgn == -1,] * -1
   xraw <- as.matrix(x[,id.raw])
-  nf.array <- array(nf.sub, dim=c(nrow(nf.sub)/2, 2, ncol(nf.sub)))
-  print(dim(nf.array))
-  # Bound regions by min/max values of each feature
-  xmin <- apply(xraw, MAR=2, min)
-  xmax <- apply(xraw, MAR=2, max)
-  
-  nf.array[,2,] <- apply(nf.array[,2,], MAR=2, function(z) {
-    z[z == 0] <- xmin[z == 0]
-    return(z)
-  })
-  
-  nf.array[,1,] <- apply(nf.array[,1,], MAR=2, function(z) {
-    z[z == 0] <- xmax[z == 0]
-    return(z)
-  })
+  xraw[,sgn == -1] <- xraw[,sgn == -1] * -1
 
-  node.pred <- apply(xraw, MAR=1, regionPredObs, thresh=nf.array)
+  node.pred <- apply(xraw, MAR=1, regionPredObs, thresh=nf.sub)
   return(node.pred)
 }
 
@@ -64,8 +67,7 @@ regionPredObs <- function(x, thresh) {
   #   x: numeric vector
   #   thresh: matrix of thresholds, rows corresponding to interacting features
   
-  pred <- mean(x >= thresh[,2,] & x <= thresh[,1,])
-  #pred <- mean(colSums(x >= thresh[,2,] & x <= thresh[,1,]) == nrow(thresh))
+  pred <- mean(colSums(x >= thresh) == length(x))
   return(pred)  
 }
 
@@ -74,8 +76,8 @@ int2Id <- function(int, varnames.grp, directed=FALSE, split=FALSE) {
   if (!split) int <- strsplit(int, '_')[[1]]
   if (directed) {
     dir <- grep('\\+$', int)  
-    varnames.grp <- gsub('[\\+\\-]', '', varnames.grp)
-    int <- gsub('[\\+\\-]', '', int)
+    varnames.grp <- gsub('[-\\+]', '', varnames.grp)
+    int <- gsub('[-\\+]', '', int)
   }
   
   varnames.grp <- unique(varnames.grp)
@@ -87,4 +89,13 @@ int2Id <- function(int, varnames.grp, directed=FALSE, split=FALSE) {
   }
   
   return(id)
+}
+
+intSign <- function(int) {
+  # Evaluates the direction of each feature in an interaction
+  int <- unlist(strsplit(int, '_'))
+  dir <- grep('\\+$', int)
+  out <- rep(-1, length(int))
+  out[dir] <- 1
+  return(out)
 }

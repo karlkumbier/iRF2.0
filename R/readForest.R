@@ -6,6 +6,7 @@ readForest <- function(rfobj, x, y=NULL,
                        obs.weights=NULL,
                        get.depth=FALSE,
                        get.split=FALSE,
+                       first.split=TRUE,
                        n.core=1){
   
   if (is.null(rfobj$forest))
@@ -32,6 +33,7 @@ readForest <- function(rfobj, x, y=NULL,
                         wt.pred.accuracy=wt.pred.accuracy,
                         obs.weights=obs.weights,
                         get.split=get.split,
+                        first.split=first.split,
                         mc.cores=n.core)
   
   out$tree.info <- rbindlist(lapply(rd.forest, function(tt) tt$tree.info))
@@ -63,7 +65,8 @@ readTree <- function(rfobj, k, x, y, nodes,
                      return.node.obs=FALSE,
                      wt.pred.accuracy=FALSE, 
                      obs.weights=NULL,
-                     get.split=get.split) {
+                     get.split=FALSE,
+                     first.split=TRUE) {
   
   n <- nrow(x) 
   if (is.factor(y)) y <- as.numeric(y) - 1
@@ -84,7 +87,7 @@ readTree <- function(rfobj, k, x, y, nodes,
 
   if (return.node.feature) {
     node.feature <- ancestorPath(tree.info, varnames.grp=varnames.grp, 
-                                 split.pt=get.split)
+                                 split.pt=get.split, first.split=first.split)
     n.path <- sapply(node.feature, nrow)
     leaf.id <- rep(1:length(node.feature), times=n.path)
     node.feature <- cbind(leaf.id, do.call(rbind, node.feature))
@@ -150,10 +153,12 @@ getParent <- function(tree.info) {
 }
 
 
-ancestorPath <- function(tree.info, varnames.grp, split.pt=FALSE) {
+ancestorPath <- function(tree.info, varnames.grp, split.pt=FALSE, 
+                         first.split=TRUE) {
  
   # recursively extract path info for all nodes 
-  paths <- getAncestorPath(tree.info, varnames.grp, split.pt=split.pt)
+  paths <- getAncestorPath(tree.info, varnames.grp, split.pt=split.pt,
+                           first.split=first.split)
 
   # subset to only leaf nodes
   paths <- lapply(as.character(which(tree.info$status == -1)), 
@@ -167,7 +172,8 @@ ancestorPath <- function(tree.info, varnames.grp, split.pt=FALSE) {
 getAncestorPath <- function(tree.info, varnames.grp, 
                             varnames.unq=unique(varnames.grp), 
                             node.idx=1, p=length(varnames.unq),
-                            cur.path=NULL, depth=1L, split.pt=FALSE) {
+                            cur.path=NULL, depth=1L, split.pt=FALSE,
+                            first.split=TRUE) {
  
   if (is.null(cur.path)) cur.path <- rep(0L, 2 * p)
   id <- tree.info$`split var`[node.idx]
@@ -175,15 +181,23 @@ getAncestorPath <- function(tree.info, varnames.grp,
   node.var <- which(varnames.grp[id] == varnames.unq)
   
   # Generate vector indicating depth at which variable is first selected on
-  # decision paths. Note: replicated features on decision paths will
-  # intentionally result in skipped values of depth.
+  # decision paths.   
   left.set <- cur.path
   att <- ifelse(split.pt, sp, depth)
-  if (all(cur.path[node.var + p] == 0)) left.set[node.var] <- att
+  if (first.split) {
+    if (all(cur.path[node.var + p] == 0)) left.set[node.var] <- att
+  } else {
+    left.set[node.var] <- att
+  }
+
   left.child <- tree.info$`left daughter`[node.idx]
   
   right.set <- cur.path
-  if (all(cur.path[node.var] == 0)) right.set[node.var + p] <- att
+  if (first.split) {
+    if (all(cur.path[node.var] == 0)) right.set[node.var + p] <- att
+  } else {
+    right.set[node.var + p] <- att
+  }
   right.child <- tree.info$`right daughter`[node.idx]
   
   if (tree.info$status[node.idx] == -1) {
@@ -192,9 +206,11 @@ getAncestorPath <- function(tree.info, varnames.grp,
     return(out)
   } else {
     return(cbind(getAncestorPath(tree.info, varnames.grp, varnames.unq, 
-                                 left.child, p, left.set, depth+1, split.pt),
+                                 left.child, p, left.set, depth+1, split.pt,
+                                 first.split),
                  getAncestorPath(tree.info, varnames.grp, varnames.unq,
-                                 right.child, p, right.set, depth+1, split.pt)))
+                                 right.child, p, right.set, depth+1, split.pt,
+                                 first.split)))
   }
 }
 

@@ -16,13 +16,13 @@ permImportance <- function(rfobj, x, y, ints, n.perms=3, varnames.group=NULL,
   if (is.null(colnames(x)))
     varnames.group <- as.character(1:ncol(x))
   
-  preds <- predictInts(rfobj, x, ints, n.perms, varnames.group, 
+  preds <- permPredict(rfobj, x, ints, n.perms, varnames.group, 
                        collapse=TRUE, n.cores=n.cores)
   interact.score <- apply(preds, MAR=2, predAccuracy, y=y)
   return(interact.score)
 }
 
-predictInts <- function(rfobj, x, int, n.perms=3, varnames.group=NULL, 
+permPredict <- function(rfobj, x, int, n.perms=3, varnames.group=NULL, 
                         collapse=TRUE, n.cores=1) {
   # Wrapper function for predictInt, to evaluate predictions over multiple 
   # interactions
@@ -48,7 +48,7 @@ predictInts <- function(rfobj, x, int, n.perms=3, varnames.group=NULL,
     colnames(pred.ints) <- int
   }
   
-  return(pred.ints)
+ return(pred.ints)
 }
 
 predictInt <- function(rfobj, x, int, n.perms=3, varnames.group=NULL) {

@@ -19,12 +19,6 @@ iRF <- function(x, y,
                 ...) {
   
   
-  if (!is.matrix(x) | (!is.null(xtest) & !is.matrix(xtest)))
-    stop('either x or xtest is not a matrix !')
-  
-  if (!is.numeric(x) | (!is.null(xtest) & !is.numeric(xtest)))
-    stop('either x or xtest is not a numeric matrix!')
-  
   if (ncol(x) < 2 & !is.null(interactions.return))
     stop('cannot find interaction - X has less than two columns!')
   
