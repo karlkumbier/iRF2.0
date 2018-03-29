@@ -103,7 +103,7 @@ readTree <- function(rfobj, k, x, y, nodes,
   }
   
   # if specified, calculate purity of each node
-  if (wt.pred.accuracy) leaf.sd <- c(by(y, which.leaf, sdNode))
+  if (wt.pred.accuracy) leaf.sd <- c(by(y, which.leaf, varNode))
   tree.info$size.node[leaf.idx] <- leaf.counts
   
   if (wt.pred.accuracy) {
@@ -122,7 +122,9 @@ readTree <- function(rfobj, k, x, y, nodes,
   tree.info <- tree.info[select.node,]
   
   out <- list()
-  out$tree.info <- tree.info
+  col.remove <- c('left daughter', 'right daughter', 'split var',
+                  'split point', 'status')
+  out$tree.info <- tree.info[,!colnames(tree.info) %in% col.remove]
   out$node.feature <- node.feature
   out$node.obs <- node.obs
   return(out)
@@ -139,9 +141,9 @@ aggregateNodeFeature <- function(nf) {
   return(nf)
 }
 
-sdNode <- function(x) {
-  sd.node <- ifelse(length(x) == 1, 0, sd(x))
-  return(sd.node)
+varNode <- function(x) {
+  var.node <- ifelse(length(x) == 1, 0, var(x))
+  return(var.node)
 }
 
 getParent <- function(tree.info) {

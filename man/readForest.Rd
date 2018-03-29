@@ -1,18 +1,24 @@
 \name{readForest}
 \alias{readForest}
 \title{Pass data through a fitted forest, record node characteristics [works
-  for binary classification with continuous variables]}
+  for continuous variables]}
 \description{
-  Passes a feature matrix (and optionally a label vector) through a fitted random forest
-  object, records size (and Gini impurity) of each node. Optionally,
-  for every node, returns the features used to define the rule and the data
-  points falling in that node. Uses \code{foreach} function to
-  distribute computation across available cores.
+  Passes a feature matrix (and optionally a response vector) through a fitted
+  random forest object, records size of each node. Optionally,for every node,
+  returns the features used to define the rule and the data points falling in
+  that node. Uses \code{foreach} function to distribute computation across
+  available cores.
 }
 \usage{
-  function(rfobj, x, 
-           return.node.feature=TRUE, 
+  function(rfobj, x, y=NULL 
+           return.node.feature=TRUE,
+           return.node.obs=FALSE, 
            wt.pred.accuracy=FALSE,
+           varnames.group=NULL,
+           obs.weights=NULL,
+           get.depth=FALSE,
+           get.split=FALSE,
+           first.split=TRUE,
            n.core=1)
 }
 \arguments{
@@ -21,10 +27,22 @@
   \item{x}{numeric matrix with the same number of predictors used in
     \code{rfobj} fit}
   \item{y}{a numeric vector specifying response values}
-  \item{return.node.feature}{if TRUE, returns a matrix containing features
-    used to define the decision rule associated with a node}
-  \item{wt.pred.accuracy}{Should leaf nodes be sampled proportional to both
-    size and decrease in variabiliy of responses?}
+  \item{return.node.feature}{if TRUE, returns a sparse matrix that encodes the
+    features and inequality directions used to define the decision rule associated 
+    with a node}
+  \item{return.node.obs}{if TRUE, returns a sparse matrix indicating the
+    observations that fall in a leaf node}
+  \item{wt.pred.accuracy}{if true, computes the decrease in variability of
+    responses in each leaf node relative to the full data}
+  \item{varnames.grp}{a vector of length ncol(x) indicating feature groupings}
+  \item{obs.weights}{}
+  \item{get.depth}{if TRUE, entries of \code{node.feature} indicate the depth of
+  the first time a feature is selected}
+  \item{get.split}{if TRUE, entries of \code{node.feature} indicate the
+    threshold associated with a feature split}
+  \item{first.split}{if TRUE, only the threshold associated with the first time
+    a feature is selected will be recorded}
+  \item{n.core}{the number of cores to parallelize over}
 }
 \value{ A list containing the following items:
   \item{tree.info}{a data frame with number of rows equal to total number of
