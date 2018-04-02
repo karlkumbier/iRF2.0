@@ -161,16 +161,22 @@ plotInt2 <- function(rectangles, interact, x, y,
         removed[i] <- TRUE
         next
       }
+
+      # Evaluate distribution of responses in interaction region and its
+      # compliment
+      yr <- mean(y[x1 & x2])
+      yrc <- mean(y[!x1 | !x2])
+      wt <- rectangles$size.node[i]
+
+      grid[idcs.1, idcs.2] <- grid[idcs.1, idcs.2] +  yr * wt
+      grid[!idcs.1, idcs.2] <- grid[!idcs.1, idcs.2] + yrc * wt
+      grid[idcs.1, !idcs.2] <- grid[idcs.1, !idcs.2] + yrc * wt
+      grid[!idcs.1, !idcs.2] <- grid[!idcs.1, !idcs.2] + yrc * wt
       
-      grid[idcs.1, idcs.2] <- grid[idcs.1, idcs.2] +  mean(y[x1 & x2]) * rectangles$size.node[i]
-      grid[!idcs.1, idcs.2] <- grid[!idcs.1, idcs.2] + mean(y[!x1 | !x2]) * rectangles$size.node[i]
-      grid[idcs.1, !idcs.2] <- grid[idcs.1, !idcs.2] + mean(y[!x1 | !x2]) * rectangles$size.node[i]
-      grid[!idcs.1, !idcs.2] <- grid[!idcs.1, !idcs.2] + mean(y[!x1 | !x2]) * rectangles$size.node[i]
-      
-      gg[idcs.1, idcs.2, i] <- ifelse(any(x1 & x2), mean(y[x1 & x2]), 0) * rectangles$size.node[i]
-      gg[!idcs.1, idcs.2, i] <- ifelse(any(!x1 & x2), mean(y[!x1 | !x2]), 0) * rectangles$size.node[i]
-      gg[idcs.1, !idcs.2, i] <- ifelse(any(x1 & !x2), mean(y[!x1 | !x2]), 0) * rectangles$size.node[i]
-      gg[!idcs.1, !idcs.2, i] <- ifelse(any(!x1 & !x2), mean(y[!x1 | !x2]), 0) * rectangles$size.node[i]
+      gg[idcs.1, idcs.2, i] <- ifelse(any(x1 & x2), yr, 0) * wt
+      gg[!idcs.1, idcs.2, i] <- ifelse(any(!x1 & x2), yrc, 0) * wt
+      gg[idcs.1, !idcs.2, i] <- ifelse(any(x1 & !x2), yrc, 0) * wt
+      gg[!idcs.1, !idcs.2, i] <- ifelse(any(!x1 & !x2), yrc, 0) * wt
       
     }
   }
