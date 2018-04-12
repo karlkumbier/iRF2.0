@@ -1,4 +1,4 @@
-interactPredict <- function(int, x, rd.forest, min.node=1, 
+interactPredict <- function(int, x, rd.forest, min.node=1,  
                             qcut=0.5, max.rule=1000, class=1,
                             hard.region=FALSE, varnames.grp=1:ncol(x)) {
   # Generate prediction from directed interaction based on regions 
@@ -38,8 +38,7 @@ interactPredict <- function(int, x, rd.forest, min.node=1,
   }
 
   if (sum(id.int) == 0) {
-    warning('0 paths contain interaction')
-    return(rep(0, nrow(x)))
+    return(0, nrow(x))
   }
 
   if (hard.region) {

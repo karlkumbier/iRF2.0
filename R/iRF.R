@@ -16,6 +16,7 @@ iRF <- function(x, y,
                 get.prevalence=TRUE,
                 int.direction=TRUE,
                 verbose=TRUE,
+                bootstrap.path=NULL,
                 ...) {
   
   
@@ -73,7 +74,7 @@ iRF <- function(x, y,
   # Select iteration for which to return interactions based on minimizing 
   # prediction error on OOB samples
   if (select.iter) {
-    interactions.return <- max(selectIter(rf.list, y=y), 2)
+    interactions.return <- selectIter(rf.list, y=y)
     if (verbose) print(paste('selected iter:', interactions.return))
   }
   
@@ -215,6 +216,7 @@ generalizedRIT <- function(rf=NULL, x=NULL, y=NULL, rforest=NULL,
                           return.node.feature=TRUE,
                           wt.pred.accuracy=wt.pred.accuracy, 
                           varnames.grp=varnames.grp,
+                          get.split=TRUE,
                           n.core=n.core)
   }
 
@@ -247,15 +249,15 @@ generalizedRIT <- function(rf=NULL, x=NULL, y=NULL, rforest=NULL,
     if (get.prevalence) { 
       ints <- unique(c(out$i1$int, out$i0$int))
       wt <- rforest$tree.info$size.node
-      out$i1$prev <- sapply(ints, prevalence, 
-                            nf=rforest$node.feature[select.id,], 
-                            wt=wt[select.id])
-      out$i0$prev <- sapply(ints, prevalence,
-                            nf=rforest$node.feature[!select.id,],
-                            wt=wt[!select.id])
+      out$i1$prev <- unlist(mclapply(ints, prevalence, 
+                              nf=rforest$node.feature[select.id,], 
+                              wt=wt[select.id], mc.cores=n.core))
+      out$i0$prev <- unlist(mclapply(ints, prevalence,
+                              nf=rforest$node.feature[!select.id,],
+                              wt=wt[!select.id], mc.cores=n.core))
       
-      names(out$i1$prev) <- nameInts(names(out$i1$prev), varnames.unq)
-      names(out$i0$prev) <- nameInts(names(out$i0$prev), varnames.unq)
+      names(out$i1$prev) <- nameInts(ints, varnames.unq)
+      names(out$i0$prev) <- nameInts(ints, varnames.unq)
     }
 
     out$i1$int <- nameInts(out$i1$int, varnames.unq)
@@ -288,9 +290,20 @@ runRIT <- function(rforest, wt.pred.accuracy, rit.param, n.core=1) {
                       n_cores=n.core) 
   
   # Rename interactions using variable names and evaluate prevalence
-  interactions <- gsub(' ', '_', interactions$Interaction)
+  interactions <- strsplit(interactions$Interaction, ' ')
+  interactions <- lapply(interactions, intSubsets)
+  interactions <- unique(unlist(interactions))
   return(interactions)
 }
+
+intSubsets <- function(int) {
+  int.order <- length(int)
+  int.subs <- lapply(1:int.order, combn, x=int, simplify=FALSE)
+  int.subs <- unlist(int.subs, recursive=FALSE)
+  int.subs <- sapply(int.subs, function(z) paste(sort(z), collapse='_'))
+  return(int.subs)
+}
+
 
 nameInts <- function(int, varnames, directed=TRUE) {
   # Convert interactions indicated by indices to interactions indicated by name
@@ -306,10 +319,9 @@ nameInts <- function(int, varnames, directed=TRUE) {
   }
 
   ints.split <- lapply(ints.split, function(z) z %% p + p * (z == p))
-  
   ints.name <- mapply(function(i, s) paste(varnames.unq[i], s, sep=''),
                       ints.split, ints.signs, SIMPLIFY=FALSE)
-  ints.name <- sapply(ints.name, paste, collapse='_')
+  ints.name <- sapply(ints.name, function(z) paste(sort(z), collapse='_'))
   return(ints.name)
 }
 
