@@ -83,20 +83,15 @@ iRF <- function(x, y,
     # Find interactions across bootstrap replicates
     if (verbose) cat('finding interactions ... ')
     
-    interact.list.b1 <- list()
-    interact.list.b0 <- list()    
-    if (get.prevalence) {
-      prev.list.b1 <- list()
-      prev.list.b0 <- list()
-    }
+    interact.list <- list()
+    if (get.prevalence) prev.list <- list()
 
     for (i.b in 1:n.bootstrap) { 
       if (class.irf) {
         # Take bootstrap sample that maintains class balance in full data
-        n.class <- table(y)
-        class <- as.factor(names(n.class))
-        sample.id <- mapply(function(cc, nn) sampleClass(y, cc, nn), 
-                            class, n.class)
+        ncl <- table(y)
+        class <- as.factor(names(ncl))
+        sample.id <- mapply(function(cc, n) sampleClass(y, cc, n), class, ncl)
         sample.id <- unlist(sample.id)
       } else {
         sample.id <- sample(n, replace=TRUE)
@@ -140,29 +135,18 @@ iRF <- function(x, y,
                              out.file=out.file,
                              n.core=n.core)
       
-      interact.list.b1[[i.b]] <- ints$i1$int
-      interact.list.b0[[i.b]] <- ints$i0$int
-      if (get.prevalence) {
-        prev.list.b1[[i.b]] <- ints$i1$prev
-        prev.list.b0[[i.b]] <- ints$i0$prev
-      }
+      interact.list[[i.b]] <- ints$int
+      if (get.prevalence) prev.list[[i.b]] <- ints$prev
 
       rm(rf.b)       
     }
     
     # Calculate stability scores of interactions
-    stability.score[[iter]] <- list(i0=summarizeInteract(interact.list.b0),
-                                    i1=summarizeInteract(interact.list.b1))
+    stability.score[[iter]] <- summarizeInteract(interact.list)
     
     
     if (get.prevalence) 
-      prev.list[[iter]] <- list(i0=summarizePrevalence(prev.list.b0, 
-                                                       interact.list.b0, 
-                                                       n.bootstrap),
-                                i1=summarizePrevalence(prev.list.b1, 
-                                                       interact.list.b1, 
-                                                       n.bootstrap))
-
+      prev.list[[iter]] <- summarizePrev(prev.list)
   } # end for (iter in ... )
   
   
@@ -174,11 +158,6 @@ iRF <- function(x, y,
   if (select.iter) {
     out$rf.list <- out$rf.list[[interactions.return]]
     out$interaction <- out$interaction[[interactions.return]]
-    out$opt.k <- interactions.return
-    if (interactions.return == 1)
-      out$weights <- rep(1, ncol(x))
-    else
-      out$weights <- rf.list[[interactions.return - 1]]$importance
     if (get.prevalence) out$prevalence <- out$prevalence[[interactions.return]]
   }
   return(out)
@@ -226,11 +205,9 @@ generalizedRIT <- function(rf=NULL, x=NULL, y=NULL, rforest=NULL,
       rforest$node.feature[,(p + 1):(2 * p)]
   }  
   
-  if (!is.null(out.file))
-    save(file=out.file, rforest)
+  if (!is.null(out.file)) save(file=out.file, rforest)
 
   # Select class specific leaf nodes
-  select.id <- rep(TRUE, nrow(rforest$tree.info)) 
   if (class.irf) 
     select.id <- rforest$tree.info$prediction == rit.param$class.id + 1
   else
@@ -241,27 +218,24 @@ generalizedRIT <- function(rf=NULL, x=NULL, y=NULL, rforest=NULL,
   if (sum(select.id) < 2) {
     return(character(0))
   } else {
-    out$i1$int <- runRIT(subsetReadForest(rforest, select.id),
-                         wt.pred.accuracy, rit.param, n.core)
-    out$i0$int <- runRIT(subsetReadForest(rforest, !select.id),
-                         wt.pred.accuracy, rit.param, n.core)
+    out$int <- runRIT(subsetReadForest(rforest, select.id),
+                      wt.pred.accuracy, rit.param, n.core)
+    int.names <- nameInts(out$int, varnames.unq)
     
     if (get.prevalence) { 
-      ints <- unique(c(out$i1$int, out$i0$int))
       wt <- rforest$tree.info$size.node
-      out$i1$prev <- unlist(mclapply(ints, prevalence, 
-                              nf=rforest$node.feature[select.id,], 
-                              wt=wt[select.id], mc.cores=n.core))
-      out$i0$prev <- unlist(mclapply(ints, prevalence,
-                              nf=rforest$node.feature[!select.id,],
-                              wt=wt[!select.id], mc.cores=n.core))
+      out$prev$i1 <- unlist(mclapply(out$int, prevalence, 
+                            nf=rforest$node.feature[select.id,], 
+                            wt=wt[select.id], mc.cores=n.core))
+      out$prev$i0 <- unlist(mclapply(out$int, prevalence,
+                            nf=rforest$node.feature[!select.id,],
+                            wt=wt[!select.id], mc.cores=n.core))
       
-      names(out$i1$prev) <- nameInts(ints, varnames.unq)
-      names(out$i0$prev) <- nameInts(ints, varnames.unq)
+      names(out$prev$i1) <- int.names
+      names(out$prev$i0) <- int.names 
     }
-
-    out$i1$int <- nameInts(out$i1$int, varnames.unq)
-    out$i0$int <- nameInts(out$i0$int, varnames.unq)
+    
+    out$int <- int.names
   }
   return(out)
 }
@@ -297,6 +271,7 @@ runRIT <- function(rforest, wt.pred.accuracy, rit.param, n.core=1) {
 }
 
 intSubsets <- function(int) {
+  # Generate all lower order subsets of specified interaction
   int.order <- length(int)
   int.subs <- lapply(1:int.order, combn, x=int, simplify=FALSE)
   int.subs <- unlist(int.subs, recursive=FALSE)
@@ -325,40 +300,32 @@ nameInts <- function(int, varnames, directed=TRUE) {
   return(ints.name)
 }
 
-summarizePrevalence <- function(prev, int, n.bootstrap) {
+summarizePrev <- function(prev) {
   # summarize interaction prevalence across bootstrap samples
-  prev <- unlist(prev)
-  nn <- names(prev)
-  prev.summary <- by(prev, nn, prevalenceSummary)
-  prev.summary <- do.call(rbind, c(prev.summary))
-  prev.summary <- data.frame(prev.summary)
-  prev.summary$int <- rownames(prev.summary)
-  prev.summary <- arrange(prev.summary, desc(prop), desc(mean))
-  prev.summary$prop <- prev.summary$prop / n.bootstrap
-  return(prev.summary)
+  n.bs <- length(prev)
+  prev1 <- unlist(lapply(prev, function(z) z$i1))
+  prev0 <- unlist(lapply(prev, function(z) z$i0))
+  
+  prev <- data.frame(int=names(prev1), prev1=prev1, prev0=prev0)
+  prev <- group_by(int) %>%
+    summarize(prev1=mean(prev1), prev0=mean(prev0), n=n()/n.bs) %>%
+    mutate(diff=(prev1-prev0))
+  return(prev)
 }
-
-prevalenceSummary <- function(x) {
-  # determine the min, mean, and maximum prevalence across 
-  # bootstrap samples
-  x.min <- min(x)
-  x.mean <- mean(x)
-  x.max <- max(x)
-  x.n <- length(x)
-  return(c(min=x.min, mean=x.mean, max=x.max, prop=x.n))
-}
-
 
 prevalence <- function(int, nf, wt=rep(1, ncol(nf))) {
   # calculate the decision path prevalence of a single interaction
-  int.dir <- as.numeric(strsplit(int, '_')[[1]])
-  if (length(int.dir) == 1)
-    int.dir.id <- nf[,int.dir] != 0
+  int <- as.numeric(strsplit(int, '_')[[1]])
+  id.rm <- wt == 0
+  wt <- wt[!id.rm]
+
+  if (length(int) == 1)
+    int.id <- nf[!id.rm, int] != 0
   else
-    int.dir.id <- apply(nf[, int.dir], MAR=1, function(z) all(z != 0))
+    int.id <- apply(nf[!id.rm, int], MAR=1, function(z) all(z != 0))
   
-  prev.dir <- sum(wt[int.dir.id]) / sum(wt)
-  return(prev.dir)
+  prev <- sum(wt[int.id]) / sum(wt)
+  return(prev)
 }
 
 subsetReadForest <- function(rforest, subset.idcs) { 
@@ -375,23 +342,6 @@ subsetReadForest <- function(rforest, subset.idcs) {
   return(rforest)
 }
 
-groupFeature <- function(node.feature, grp){
-  # Group replicated features in node.feature 
-  sparse.mat <- is(node.feature, 'Matrix')
- 
-  # If evaluating interaction direction, replicate group names
-  if (ncol(node.feature) == (2 *  length(grp))) 
-    grp <- c(paste0(grp, '-'), paste0(grp, '+'))
-
-  grp.names <- unique(grp)
-  makeGroup <- function(x, g) apply(as.matrix(x[,grp == g]), MAR=1, max) 
-  node.feature.new <- sapply(grp.names, makeGroup, x=node.feature)
-  
-  if (sparse.mat) node.feature.new <- Matrix(node.feature.new, sparse=TRUE)
-  colnames(node.feature.new) <- grp.names
-  
-  return(node.feature.new)
-}
 
 summarizeInteract <- function(store.out, local=FALSE){
   # Aggregate interactions across bootstrap samples
