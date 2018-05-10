@@ -22,7 +22,7 @@ export(combine, getTree, grow, importance, margin, MDSplot, na.roughfix,
        randomForest, rfImpute, treesize, tuneRF, varImpPlot, 
        varUsed, rfNews, outlier, classCenter, rfcv, readForest, iRF, 
        RIT, prevalence, nameInts, subsetReadForest, interactPredict, 
-       generalizedRIT, permPredict, summarizePrev)
+       generalizedRIT, permPredict, summarizePrev, interactPredictFull)
 
 
 S3method(print, randomForest)

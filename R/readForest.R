@@ -103,12 +103,19 @@ readTree <- function(rfobj, k, x, y, nodes,
   }
   
   # if specified, calculate purity of each node
-  if (wt.pred.accuracy) leaf.sd <- c(by(y, which.leaf, varNode))
+  if (wt.pred.accuracy) {
+    leaf.sd <- c(by(y, which.leaf, varNode))
+    leaf.mean <- c(by(y, which.leaf, mean))
+    leaf.mean.c <- mean(y) - (leaf.counts / n) * leaf.mean
+    leaf.mean.c <- (n / (n - leaf.counts)) * leaf.mean.c 
+  }
   tree.info$size.node[leaf.idx] <- leaf.counts
   
   if (wt.pred.accuracy) {
     tree.info$dec.purity <- 0
     tree.info$dec.purity[leaf.idx] <- pmax((sd(y) - leaf.sd) / sd(y), 0)
+    tree.info$mean[leaf.idx] <- leaf.mean
+    tree.info$mean.c[leaf.idx] <- leaf.mean.c
   }
   
 
