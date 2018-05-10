@@ -1,5 +1,6 @@
 interactPredict <- function(int, x, rd.forest, min.node=1,  
                             qcut=0.5, max.rule=1000, class=1,
+                            region.pred=FALSE,
                             hard.region=FALSE, varnames.grp=1:ncol(x)) {
   # Generate prediction from directed interaction based on regions 
   # corresponding to class-C leaf nodes.
@@ -25,6 +26,14 @@ interactPredict <- function(int, x, rd.forest, min.node=1,
   nf <- nf[id.cls & id.min,]
   tree.info <- tree.info[id.cls & id.min,]
   
+  if (region.pred) {
+    y <- tree.info$mean
+    yc <- tree.info$mean.c
+  } else {
+    y <- rep(1, nrow(tree.info))
+    yc <- rep(0, nrow(tree.info))
+  }
+
   p <- length(unique(varnames.grp))
   stopifnot(ncol(x) == p)
   id <- int2Id(int, varnames.grp, directed=TRUE)
@@ -49,25 +58,45 @@ interactPredict <- function(int, x, rd.forest, min.node=1,
   } else {
     id.sel <- sample(which(id.int), min(max.rule, sum(id.int)))
     nf.sub <- t(matrix(nf[id.sel , id], nrow=length(id.sel)))
+    y <- y[id.sel]
+    yc <- yc[id.sel]
   }
   
   nf.sub[sgn == -1,] <- nf.sub[sgn == -1,] * -1
   xraw <- as.matrix(x[,id.raw])
   xraw[,sgn == -1] <- xraw[,sgn == -1] * -1
 
-  node.pred <- apply(xraw, MAR=1, regionPredObs, thresh=nf.sub)
+  node.pred <- apply(xraw, MAR=1, regionPredObs, thresh=nf.sub, y=y, yc=yc)
   return(node.pred)
 }
 
-regionPredObs <- function(x, thresh) {
+interactPredictFull <- function(int, read.forest, nodes, varnames,
+                                class=1) {
+  
+  tree.info <- read.forest$tree.info
+  id.int <- int2Id(int, varnames, directed=TRUE)
+  id <- apply(rf$node.feature[,id.int] != 0, MAR=1, all)
+  ti.sub <- tree.info[id & tree.info$prediction == class + 1,]
+  
+  out <- sapply(1:ncol(nodes), function(i) {
+    id <- filter(ti.sub, tree == i)$node.idx
+    return(nodes[,i] %in% id)
+  })
+  
+  pred <- rowMeans(out)
+  return(pred)
+}
+
+regionPredObs <- function(x, thresh, y, yc) {
   # Generates prediction for single observation based on whether it falls in 
   # regions indicated by thresholds.
   # args:
   #   x: numeric vector
   #   thresh: matrix of thresholds, rows corresponding to interacting features
   
-  pred <- mean(colSums(x >= thresh) == length(x))
-  return(pred)  
+  pred <- colSums(x >= thresh) == length(x)
+  pred <- ifelse(pred, y, yc)
+  return(mean(pred))
 }
 
 int2Id <- function(int, varnames.grp, directed=FALSE, split=FALSE) {
