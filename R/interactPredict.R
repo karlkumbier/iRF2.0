@@ -38,7 +38,7 @@ interactPredict <- function(int, x, rd.forest, min.node=1,
   }
 
   if (sum(id.int) == 0) {
-    return(0, nrow(x))
+    return(rep(0, nrow(x)))
   }
 
   if (hard.region) {

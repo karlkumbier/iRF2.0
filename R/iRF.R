@@ -307,9 +307,10 @@ summarizePrev <- function(prev) {
   prev0 <- unlist(lapply(prev, function(z) z$i0))
   
   prev <- data.frame(int=names(prev1), prev1=prev1, prev0=prev0)
-  prev <- group_by(int) %>%
+  prev <- group_by(prev, int) %>%
     summarize(prev1=mean(prev1), prev0=mean(prev0), n=n()/n.bs) %>%
-    mutate(diff=(prev1-prev0))
+    mutate(diff=(prev1-prev0)) %>%
+    arrange(desc(diff))
   return(prev)
 }
 
