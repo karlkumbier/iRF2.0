@@ -293,7 +293,7 @@ nameInts <- function(int, varnames, directed=TRUE) {
     ints.signs <- ''
   }
 
-  ints.split <- lapply(ints.split, function(z) z %% p + p * (z == p))
+  ints.split <- lapply(ints.split, function(z) z %% p + p * (z == p | z == 2*p))
   ints.name <- mapply(function(i, s) paste(varnames.unq[i], s, sep=''),
                       ints.split, ints.signs, SIMPLIFY=FALSE)
   ints.name <- sapply(ints.name, function(z) paste(sort(z), collapse='_'))
