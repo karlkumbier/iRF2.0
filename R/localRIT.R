@@ -7,12 +7,12 @@ localORIT <- function(idcs, rf, cl=1, min.int=5) {
   id.nd <- apply(as.matrix(rf$node.obs[,idcs]) != 0, MAR=1, all)
   os1 <- rf$node.obs[id.cl & id.nd,]
   ti1 <- rf$tree.info[id.cl & id.nd,]
-  rit <- RIT(os1, weights=ti1$size.node, min_inter_sz=min.int)
-  rit <- unname(gsub(' ', '_', rit$Interaction))
-  id.rm <- sapply(rit, isSubset, y=rit)
-  rit <- rit[!id.rm]
+  
+  rit <- RIT(os1, weights=ti1$size.node, min_inter_sz=min.int, output_list=TRUE)
+  id.rm <- sapply(rit$Interactions, isSubset, y=rit$Interactions)
+  rit <- rit$Interactions[!id.rm]
   prev1 <- sapply(rit, prevalence, nf=os1, wt=ti1$size.node)
-
+  
   if (sum(!id.cl & id.nd) > 0) {
     os0 <- rf$node.obs[!id.cl & id.nd,]
     ti0 <- rf$tree.info[!id.cl & id.nd,]
@@ -36,8 +36,7 @@ localFRIT <-  function(idcs, rf, cl=1, varnames=NULL) {
   id.nd <- apply(as.matrix(rf$node.obs[,idcs]) != 0, MAR=1, all)
   fs1 <- rf$node.feat[id.cl & id.nd,]
   ti1 <- rf$tree.info[id.cl & id.nd,]
-  rit <- RIT(fs1, weights=ti1$size.node)$Interaction
-  rit <- unname(gsub(' ', '_', rit))
+  rit <- RIT(fs1, weights=ti1$size.node, output_list=TRUE)$Interaction
   prev1 <- sapply(rit, prevalence, nf=fs1, wt=ti1$size.node)
 
   if (sum(!id.cl & id.nd) > 0) {
@@ -56,14 +55,11 @@ localFRIT <-  function(idcs, rf, cl=1, varnames=NULL) {
 }
 
 isSubset <- function(x, y) {
-  stopifnot(length(x) == 1)
-  x.sp <- unlist(strsplit(as.character(x), '_'))
-  x.lng <- length(x.sp)
-  y.sp <- strsplit(as.character(y), '_')
-  y.lng <- sapply(y.sp, length)
+  x.lng <- length(x)
+  y.lng <- sapply(y, length)
 
   # only consider larger interactions
-  y.sub <- y.sp[y.lng > x.lng]
-  ss <- any(sapply(y.sub, function(z) all(x.sp %in% z)))
+  y.sub <- y[y.lng > x.lng]
+  ss <- any(sapply(y.sub, function(z) all(x %in% z)))
   return(ss)
 }

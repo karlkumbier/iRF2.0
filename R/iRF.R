@@ -187,7 +187,7 @@ generalizedRIT <- function(rf=NULL, x=NULL, y=NULL, rforest=NULL,
   }
   
   varnames.unq <- unique(varnames.grp)
-
+  
   # Extract decision paths and tree metadata from random forest
   class.irf <- is.factor(y)
   if (is.null(rforest)) {
@@ -213,8 +213,7 @@ generalizedRIT <- function(rf=NULL, x=NULL, y=NULL, rforest=NULL,
   else
     select.id <- rforest$tree.info$prediction > rit.param$class.cut
 
-  # Run RIT on selected and non-selected nodes to determine interactions for
-  # each group
+  # Run RIT on leaf nodes of selected class to find prevalent interactions
   if (sum(select.id) < 2) {
     return(character(0))
   } else {
@@ -240,7 +239,7 @@ generalizedRIT <- function(rf=NULL, x=NULL, y=NULL, rforest=NULL,
   return(out)
 }
 
-runRIT <- function(rforest, wt.pred.accuracy, rit.param, n.core=1) {
+runRIT <- function(rforest, wt.pred.accuracy, rit.param, subs=TRUE, n.core=1) {
  
   # Set weights for leaf node sampling using either size or size and accuracy
   if (wt.pred.accuracy) 
@@ -258,15 +257,17 @@ runRIT <- function(rforest, wt.pred.accuracy, rit.param, n.core=1) {
   rforest <- subsetReadForest(rforest, !id.rm)
   wt <- wt[!id.rm]
   
-
   interactions <- RIT(rforest$node.feature, weights=wt, depth=rit.param$depth,
                       n_trees=rit.param$ntree, branch=rit.param$nchild,
-                      n_cores=n.core) 
+                      output_list=TRUE, n_cores=n.core)$Interaction
   
-  # Rename interactions using variable names and evaluate prevalence
-  interactions <- strsplit(interactions$Interaction, ' ')
-  interactions <- lapply(interactions, intSubsets)
-  interactions <- unique(unlist(interactions))
+  if (subs) {
+    interactions <- lapply(interactions, intSubsets)
+    interactions <- unlist(interactions, recursive=FALSE)
+    id.rm <- duplicated(interactions)
+    interactions <- interactions[!id.rm]
+  }
+  
   return(interactions)
 }
 
@@ -275,27 +276,23 @@ intSubsets <- function(int) {
   int.order <- length(int)
   int.subs <- lapply(1:int.order, combn, x=int, simplify=FALSE)
   int.subs <- unlist(int.subs, recursive=FALSE)
-  int.subs <- sapply(int.subs, function(z) paste(sort(z), collapse='_'))
   return(int.subs)
 }
 
 
-nameInts <- function(int, varnames, directed=TRUE) {
+nameInts <- function(ints, varnames, directed=TRUE) {
   # Convert interactions indicated by indices to interactions indicated by name
-  ints.split <- strsplit(int, '_')
   varnames.unq <- unique(varnames)
   p <- length(varnames.unq)
-
-  ints.split <- lapply(ints.split, as.numeric)
   if (directed) {
-    ints.signs <- lapply(ints.split, function(z) ifelse(z > p, '+', '-'))
+    ints.signs <- lapply(ints, function(z) ifelse(z > p, '+', '-'))
   } else {
     ints.signs <- ''
   }
 
-  ints.split <- lapply(ints.split, function(z) z %% p + p * (z == p | z == 2*p))
+  ints <- lapply(ints, function(z) z %% p + p * (z == p | z == 2 * p))
   ints.name <- mapply(function(i, s) paste(varnames.unq[i], s, sep=''),
-                      ints.split, ints.signs, SIMPLIFY=FALSE)
+                      ints, ints.signs, SIMPLIFY=FALSE)
   ints.name <- sapply(ints.name, function(z) paste(sort(z), collapse='_'))
   return(ints.name)
 }
@@ -316,7 +313,7 @@ summarizePrev <- function(prev) {
 
 prevalence <- function(int, nf, wt=rep(1, ncol(nf))) {
   # calculate the decision path prevalence of a single interaction
-  int <- as.numeric(strsplit(int, '_')[[1]])
+  if (is.character(int)) int <- as.numeric(strsplit(int, '_')[[1]])
   id.rm <- wt == 0
   wt <- wt[!id.rm]
 
