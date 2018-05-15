@@ -11,6 +11,7 @@ localORIT <- function(idcs, rf, cl=1, min.int=5) {
   rit <- RIT(os1, weights=ti1$size.node, min_inter_sz=min.int, output_list=TRUE)
   id.rm <- sapply(rit$Interactions, isSubset, y=rit$Interactions)
   rit <- rit$Interactions[!id.rm]
+  if (length(rit) == 0) return(NULL)
   prev1 <- sapply(rit, prevalence, nf=os1, wt=ti1$size.node)
   
   if (sum(!id.cl & id.nd) > 0) {
@@ -37,6 +38,8 @@ localFRIT <-  function(idcs, rf, cl=1, varnames=NULL) {
   fs1 <- rf$node.feat[id.cl & id.nd,]
   ti1 <- rf$tree.info[id.cl & id.nd,]
   rit <- RIT(fs1, weights=ti1$size.node, output_list=TRUE)$Interaction
+  if (length(rit) == 0) return(NULL)
+  
   prev1 <- sapply(rit, prevalence, nf=fs1, wt=ti1$size.node)
 
   if (sum(!id.cl & id.nd) > 0) {
