@@ -1,14 +1,16 @@
-localORIT <- function(idcs, rf, cl=1) {
+localORIT <- function(idcs, rf, cl=1, min.int=5) {
   # Run observation interacion RIT over
   # class-cl leaf nodes containing 
   # observations indicated by idcs
- 
+  require(data.table)
   id.cl <- rf$tree.info$prediction == cl + 1
   id.nd <- apply(as.matrix(rf$node.obs[,idcs]) != 0, MAR=1, all)
   os1 <- rf$node.obs[id.cl & id.nd,]
   ti1 <- rf$tree.info[id.cl & id.nd,]
-  rit <- RIT(os1, weights=ti1$size.node)$Interaction
-  rit <- unname(gsub(' ', '_', rit))
+  rit <- RIT(os1, weights=ti1$size.node, min_inter_sz=min.int)
+  rit <- unname(gsub(' ', '_', rit$Interaction))
+  id.rm <- sapply(rit, isSubset, y=rit)
+  rit <- rit[!id.rm]
   prev1 <- sapply(rit, prevalence, nf=os1, wt=ti1$size.node)
 
   if (sum(!id.cl & id.nd) > 0) {
@@ -20,7 +22,7 @@ localORIT <- function(idcs, rf, cl=1) {
   }
 
   pd <- prev1 - prev0  
-  d <- data.frame(int=rit, p1=prev1, p0=prev0, d=pd)
+  d <- data.table(int=rit, p1=prev1, p0=prev0, d=pd)
   rownames(d) <- NULL 
   return(d)
 }
@@ -29,6 +31,7 @@ localFRIT <-  function(idcs, rf, cl=1, varnames=NULL) {
   # Run feature interaction RIT over 
   # class-cl leaf nodes containing 
   # observations indicated by idcs
+  require(data.table)
   id.cl <- rf$tree.info$prediction == cl + 1
   id.nd <- apply(as.matrix(rf$node.obs[,idcs]) != 0, MAR=1, all)
   fs1 <- rf$node.feat[id.cl & id.nd,]
@@ -47,8 +50,20 @@ localFRIT <-  function(idcs, rf, cl=1, varnames=NULL) {
   
   if (!is.null(varnames)) rit <- nameInts(rit, varnames)
   pd <- prev1 - prev0
-  d <- data.frame(int=rit, p1=prev1, p0=prev0, d=pd)
+  d <- data.table(int=rit, p1=prev1, p0=prev0, d=pd)
   rownames(d) <- NULL
   return(d)
 }
 
+isSubset <- function(x, y) {
+  stopifnot(length(x) == 1)
+  x.sp <- unlist(strsplit(as.character(x), '_'))
+  x.lng <- length(x.sp)
+  y.sp <- strsplit(as.character(y), '_')
+  y.lng <- sapply(y.sp, length)
+
+  # only consider larger interactions
+  y.sub <- y.sp[y.lng > x.lng]
+  ss <- any(sapply(y.sub, function(z) all(x.sp %in% z)))
+  return(ss)
+}
