@@ -17,7 +17,7 @@ interactPredict <- function(x, int, read.forest, varnames.grp=1:ncol(x),
   int.adj <- isPositive(int)
   int.unsgn <- intUnsign(int) 
   id <- mapply(function(i, a) {
-    int2Id(int=i, varnames=varnames.grp, adj=a)
+    intId(int=i, varnames=varnames.grp, adj=a)
   }, int.unsgn, int.adj, SIMPLIFY=TRUE)
   
   nf <- nf[tree.info$size.node >= min.node,]
@@ -73,7 +73,7 @@ isPositive <- function(x) {
 
 intUnsign <- function(x) gsub('[-\\+]', '', x)
 
-int2Id <- function(int, varnames.grp, adj) { 
+intId <- function(int, varnames.grp, adj) { 
   # Evaluate 1:2p index of interaction term
   int.adj <- which(varnames.grp == int) + adj * length(varnames.grp)
   return(int.adj)
