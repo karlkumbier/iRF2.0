@@ -32,11 +32,15 @@ interactPredict <- function(x, int, read.forest, varnames.grp=1:ncol(x),
   
   # subset node feature matrix to interacting features
   nf <- nf[,id]
-  if (is.null(dim(nf))) nf <- as.matrix(nf, ncol=1)
-  int.nds <- Matrix::rowSums(nf != 0) > 0
-  nf <- nf[int.nds,]
-  
+  if (is.null(dim(nf))) {
+    int.nds <- nf != 0
+    nf <- as.matrix(nf[int.nds], ncol=1)
+  } else {
+    int.nds <- Matrix::rowSums(nf != 0) > 0
+    nf <- nf[int.nds,]
+  }
   tree.info <- tree.info[int.nds,]
+  
   id.pos <- id > p
   id.raw <- id %% p   
   id.raw <- id.raw + p * (id.raw == 0)
