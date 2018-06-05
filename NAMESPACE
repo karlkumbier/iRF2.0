@@ -1,6 +1,6 @@
 useDynLib(iRF)
 importFrom(Rcpp, evalCpp)
-importFrom(Matrix, Matrix, t, sparseMatrix)
+importFrom(Matrix, Matrix, t, sparseMatrix, rowSums, colSums)
 importFrom(methods, is)
 importFrom(AUC, auc, roc)
 importFrom(data.table, data.table, rbindlist)
@@ -23,8 +23,7 @@ export(combine, getTree, grow, importance, margin, MDSplot, na.roughfix,
        randomForest, rfImpute, treesize, tuneRF, varImpPlot, 
        varUsed, rfNews, outlier, classCenter, rfcv, readForest, iRF, 
        RIT, prevalence, nameInts, subsetReadForest, interactPredict, 
-       generalizedRIT, permPredict, summarizePrev, interactPredictFull,
-       localFRIT, localORIT)
+       generalizedRIT, permPredict, summarizePrev, localFRIT, localORIT)
 
 
 S3method(print, randomForest)

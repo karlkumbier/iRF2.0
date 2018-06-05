@@ -1,6 +1,6 @@
 interactPredict <- function(x, int, read.forest, varnames.grp=1:ncol(x), 
                             hard.region=FALSE, qcut=0.5, nrule=1000, 
-                            is.split=FALSE) {
+                            min.node=1, is.split=FALSE) {
   # Generate RF predictions for given interactions, using only information
   # from interacting features.
   
@@ -20,6 +20,8 @@ interactPredict <- function(x, int, read.forest, varnames.grp=1:ncol(x),
     int2Id(int=i, varnames=varnames.grp, adj=a)
   }, int.unsgn, int.adj, SIMPLIFY=TRUE)
   
+  nf <- nf[tree.info$size.node >= min.node,]
+  tree.info <- tree.info[tree.info$size.node >= min.node,]
   
   # if classification, subset to class 1 leaf nodes
   if (all(tree.info$prediction %in% 1:2)) {
