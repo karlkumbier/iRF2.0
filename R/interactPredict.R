@@ -1,7 +1,7 @@
 interactPredict <- function(int, x, rd.forest, min.node=1,  
                             qcut=0.5, max.rule=1000, class=1,
-                            region.pred=FALSE,
-                            hard.region=FALSE, varnames.grp=1:ncol(x)) {
+                            hard.region=FALSE, 
+                            varnames.grp=1:ncol(x)) {
   # Generate prediction from directed interaction based on regions 
   # corresponding to class-C leaf nodes.
   # args:
@@ -14,28 +14,28 @@ interactPredict <- function(int, x, rd.forest, min.node=1,
   #   hard.region: T/F indicating whether regions should be aggregated before 
   #     prediction -- will give 0/1 prediction
   #   varnames.grp: grouped variable names
+  
+  p <- length(unique(varnames.grp))
+  stopifnot(ncol(x) == p)
+ 
   tree.info <- rd.forest$tree.info
   nf <- rd.forest$node.feature
 
+  # Subset to class specific leaf nodes above minimum size
   if (all(tree.info$prediction %in% 1:2)) {
-    id.cls <- tree.info$prediction == class + 1
+    tree.info$prediction <-  tree.info$prediction - 1
+    id.cls <- tree.info$prediction == class
   } else {
     id.cls <- tree.info$prediction > class
   }
+
+  yc <- sum(tree.info$prediction * tree.info$size.node) / 
+    sum(tree.info$size.node)
   id.min <- tree.info$size.node >= min.node
   nf <- nf[id.cls & id.min,]
   tree.info <- tree.info[id.cls & id.min,]
-  
-  if (region.pred) {
-    y <- tree.info$mean
-    yc <- tree.info$mean.c
-  } else {
-    y <- rep(1, nrow(tree.info))
-    yc <- rep(0, nrow(tree.info))
-  }
+  y <- tree.info$prediction
 
-  p <- length(unique(varnames.grp))
-  stopifnot(ncol(x) == p)
   id <- int2Id(int, varnames.grp, directed=TRUE)
   id.raw <- id - (id > p) * p
   sgn <- intSign(int)
@@ -43,11 +43,13 @@ interactPredict <- function(int, x, rd.forest, min.node=1,
   if (length(id.raw) == 1) {
     id.int <- nf[,id] != 0
   } else {
-    id.int <- apply(nf[,id], MAR=1, function(z) all(z != 0))
+    id.int <- Matrix::rowSums(nf[,id] != 0) == length(id)
   }
 
+  # If interaction does not appear on decision paths, 
+  # return null prediction
   if (sum(id.int) == 0) {
-    return(rep(0, nrow(x)))
+    return(rep(yc, nrow(x)))
   }
 
   if (hard.region) {
@@ -56,35 +58,19 @@ interactPredict <- function(int, x, rd.forest, min.node=1,
     nf.sub <- apply(nf.sub, MAR=2, qq)
     nf.sub <- matrix(nf.sub, ncol=1)
   } else {
-    id.sel <- sample(which(id.int), min(max.rule, sum(id.int)))
-    nf.sub <- t(matrix(nf[id.sel , id], nrow=length(id.sel)))
+    nsample <- min(max.rule, sum(id.int))
+    id.sel <- sample(which(id.int), nsample, prob=tree.info$size.node[id.int])
+    nf.sub <- t(nf[id.sel, id]) #t(matrix(nf[id.sel , id], nrow=length(id.sel)))
     y <- y[id.sel]
-    yc <- yc[id.sel]
   }
   
+  # Adjust data/thresholds for interaction sign
   nf.sub[sgn == -1,] <- nf.sub[sgn == -1,] * -1
   xraw <- as.matrix(x[,id.raw])
   xraw[,sgn == -1] <- xraw[,sgn == -1] * -1
 
   node.pred <- apply(xraw, MAR=1, regionPredObs, thresh=nf.sub, y=y, yc=yc)
   return(node.pred)
-}
-
-interactPredictFull <- function(int, read.forest, nodes, varnames,
-                                class=1) {
-  
-  tree.info <- read.forest$tree.info
-  id.int <- int2Id(int, varnames, directed=TRUE)
-  id <- apply(rf$node.feature[,id.int] != 0, MAR=1, all)
-  ti.sub <- tree.info[id & tree.info$prediction == class + 1,]
-  
-  out <- sapply(1:ncol(nodes), function(i) {
-    id <- filter(ti.sub, tree == i)$node.idx
-    return(nodes[,i] %in% id)
-  })
-  
-  pred <- rowMeans(out)
-  return(pred)
 }
 
 regionPredObs <- function(x, thresh, y, yc) {
@@ -94,8 +80,9 @@ regionPredObs <- function(x, thresh, y, yc) {
   #   x: numeric vector
   #   thresh: matrix of thresholds, rows corresponding to interacting features
   
-  pred <- colSums(x >= thresh) == length(x)
+  pred <- Matrix::colSums(x >= thresh) == length(x)
   pred <- ifelse(pred, y, yc)
+  # TODO: weight average by size of node
   return(mean(pred))
 }
 
