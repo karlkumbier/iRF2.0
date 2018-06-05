@@ -14,7 +14,8 @@ iRF <- function(x, y,
                 n.bootstrap=1,
                 select.iter=FALSE,
                 get.prevalence=TRUE,
-                int.direction=TRUE,
+                int.sign=TRUE,
+                int.subs=TRUE,
                 verbose=TRUE,
                 bootstrap.path=NULL,
                 ...) {
@@ -131,7 +132,8 @@ iRF <- function(x, y,
                              varnames.grp=varnames.grp,
                              rit.param=rit.param,
                              get.prevalence=get.prevalence,
-                             int.direction=int.direction,
+                             int.sign=int.sign,
+                             int.subs=int.subs,
                              out.file=out.file,
                              n.core=n.core)
       
@@ -170,7 +172,8 @@ generalizedRIT <- function(rf=NULL, x=NULL, y=NULL, rforest=NULL,
                                           nchild=2, class.id=1, 
                                           min.nd=1, class.cut=NULL), 
                            get.prevalence=FALSE,
-                           int.direction=FALSE,
+                           int.sign=TRUE,
+                           int.subs=TRUE,
                            out.file=NULL,
                            n.core=1) {
   
@@ -200,7 +203,7 @@ generalizedRIT <- function(rf=NULL, x=NULL, y=NULL, rforest=NULL,
   }
 
   # Collapse node feature matrix if not tracking split directions
-  if (!int.direction) {
+  if (!int.sign) {
     rforest$node.feature <- rforest$node.feature[,1:p] + 
       rforest$node.feature[,(p + 1):(2 * p)]
   }  
@@ -218,10 +221,10 @@ generalizedRIT <- function(rf=NULL, x=NULL, y=NULL, rforest=NULL,
     return(character(0))
   } else {
     out$int <- runRIT(subsetReadForest(rforest, select.id),
-                      wt.pred.accuracy, rit.param, n.core)
-    int.names <- nameInts(out$int, varnames.unq)
+                      wt.pred.accuracy, int.subs, rit.param, n.core)
+    int.names <- nameInts(out$int, varnames.unq, signed=int.sign)
     
-    if (get.prevalence) { 
+    if (get.prevalence & !is.null(out$int)) { 
       wt <- rforest$tree.info$size.node
       out$prev$i1 <- unlist(mclapply(out$int, prevalence, 
                             nf=rforest$node.feature[select.id,], 
@@ -239,7 +242,9 @@ generalizedRIT <- function(rf=NULL, x=NULL, y=NULL, rforest=NULL,
   return(out)
 }
 
-runRIT <- function(rforest, wt.pred.accuracy, rit.param, subs=TRUE, n.core=1) {
+runRIT <- function(rforest, wt.pred.accuracy=FALSE,
+                   int.subs=TRUE,
+                   rit.param, n.core=1) {
  
   # Set weights for leaf node sampling using either size or size and accuracy
   if (wt.pred.accuracy) 
@@ -261,7 +266,7 @@ runRIT <- function(rforest, wt.pred.accuracy, rit.param, subs=TRUE, n.core=1) {
                       n_trees=rit.param$ntree, branch=rit.param$nchild,
                       output_list=TRUE, n_cores=n.core)$Interaction
   
-  if (subs) {
+  if (int.subs) {
     interactions <- lapply(interactions, intSubsets)
     interactions <- unlist(interactions, recursive=FALSE)
     id.rm <- duplicated(interactions)
@@ -280,11 +285,11 @@ intSubsets <- function(int) {
 }
 
 
-nameInts <- function(ints, varnames, directed=TRUE) {
+nameInts <- function(ints, varnames, signed=TRUE) {
   # Convert interactions indicated by indices to interactions indicated by name
   varnames.unq <- unique(varnames)
   p <- length(varnames.unq)
-  if (directed) {
+  if (signed) {
     ints.signs <- lapply(ints, function(z) ifelse(z > p, '+', '-'))
   } else {
     ints.signs <- ''
@@ -382,6 +387,7 @@ selectIter <- function(rf.list, y) {
   }
   
   error <- sapply(predicted, errFun, y=y)
-  print(error)
-  return(which.min(error))
+  min.err <- min(error)
+  id.select <- max(which(error == min.err))
+  return(id.select)
 } 

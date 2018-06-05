@@ -1,4 +1,4 @@
-localORIT <- function(idcs, rf, cl=1, min.int=5) {
+localORIT <- function(idcs, rf, cl=1, min.int=5, max.ret=250) {
   # Run observation interacion RIT over
   # class-cl leaf nodes containing 
   # observations indicated by idcs
@@ -9,8 +9,12 @@ localORIT <- function(idcs, rf, cl=1, min.int=5) {
   ti1 <- rf$tree.info[id.cl & id.nd,]
   
   rit <- RIT(os1, weights=ti1$size.node, min_inter_sz=min.int, output_list=TRUE)
-  id.rm <- sapply(rit$Interactions, isSubset, y=rit$Interactions)
-  rit <- rit$Interactions[!id.rm]
+  rit <- rit$Interaction
+  if (length(rit) > max.ret) 
+    rit <- rit[sample(length(rit), max.ret)]
+  id.rm <- sapply(rit, isSubset, y=rit)
+  rit <- rit[!id.rm]
+
   if (length(rit) == 0) return(NULL)
   prev1 <- sapply(rit, prevalence, nf=os1, wt=ti1$size.node)
   
