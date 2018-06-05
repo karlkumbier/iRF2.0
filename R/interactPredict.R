@@ -1,129 +1,78 @@
-interactPredict <- function(int, x, rd.forest, min.node=1,  
-                            qcut=0.5, max.rule=1000, class=1,
-                            region.pred=FALSE,
-                            hard.region=FALSE, varnames.grp=1:ncol(x)) {
-  # Generate prediction from directed interaction based on regions 
-  # corresponding to class-C leaf nodes.
-  # args:
-  #   int: directed interaction, features separated by '_'
-  #   x: data matrix
-  #   rd.forest: readForest output
-  #   min.node: minimum leaf node size to use for prediction
-  #   qcut: quantile to cut at if doing hard prediction
-  #   class: class of interest (indicates what leaf nodes will be used)
-  #   hard.region: T/F indicating whether regions should be aggregated before 
-  #     prediction -- will give 0/1 prediction
-  #   varnames.grp: grouped variable names
-  tree.info <- rd.forest$tree.info
-  nf <- rd.forest$node.feature
-
-  if (all(tree.info$prediction %in% 1:2)) {
-    id.cls <- tree.info$prediction == class + 1
-  } else {
-    id.cls <- tree.info$prediction > class
-  }
-  id.min <- tree.info$size.node >= min.node
-  nf <- nf[id.cls & id.min,]
-  tree.info <- tree.info[id.cls & id.min,]
+interactPredict <- function(x, int, read.forest, varnames.grp=1:ncol(x), 
+                            hard.region=FALSE, qcut=0.5, nrule=1000, 
+                            is.split=FALSE) {
+  # Generate RF predictions for given interactions, using only information
+  # from interacting features.
   
-  if (region.pred) {
-    y <- tree.info$mean
-    yc <- tree.info$mean.c
-  } else {
-    y <- rep(1, nrow(tree.info))
-    yc <- rep(0, nrow(tree.info))
-  }
-
-  p <- length(unique(varnames.grp))
-  stopifnot(ncol(x) == p)
-  id <- int2Id(int, varnames.grp, directed=TRUE)
-  id.raw <- id - (id > p) * p
-  sgn <- intSign(int)
-
-  if (length(id.raw) == 1) {
-    id.int <- nf[,id] != 0
-  } else {
-    id.int <- apply(nf[,id], MAR=1, function(z) all(z != 0))
-  }
-
-  if (sum(id.int) == 0) {
-    return(rep(0, nrow(x)))
-  }
-
-  if (hard.region) {
-    qq <- function(x) quantile(x, probs=qcut)
-    nf.sub <- matrix(nf[id.int, id], nrow=sum(id.int))
-    nf.sub <- apply(nf.sub, MAR=2, qq)
-    nf.sub <- matrix(nf.sub, ncol=1)
-  } else {
-    id.sel <- sample(which(id.int), min(max.rule, sum(id.int)))
-    nf.sub <- t(matrix(nf[id.sel , id], nrow=length(id.sel)))
-    y <- y[id.sel]
-    yc <- yc[id.sel]
-  }
-  
-  nf.sub[sgn == -1,] <- nf.sub[sgn == -1,] * -1
-  xraw <- as.matrix(x[,id.raw])
-  xraw[,sgn == -1] <- xraw[,sgn == -1] * -1
-
-  node.pred <- apply(xraw, MAR=1, regionPredObs, thresh=nf.sub, y=y, yc=yc)
-  return(node.pred)
-}
-
-interactPredictFull <- function(int, read.forest, nodes, varnames,
-                                class=1) {
+  p <- ncol(x)
+  stopifnot(p == length(varnames.grp))
+  stopifnot(p == ncol(read.forest$node.feature) / 2)
   
   tree.info <- read.forest$tree.info
-  id.int <- int2Id(int, varnames, directed=TRUE)
-  id <- apply(rf$node.feature[,id.int] != 0, MAR=1, all)
-  ti.sub <- tree.info[id & tree.info$prediction == class + 1,]
+  nf <- read.forest$node.feature
   
-  out <- sapply(1:ncol(nodes), function(i) {
-    id <- filter(ti.sub, tree == i)$node.idx
-    return(nodes[,i] %in% id)
-  })
+  # Get interaction term indices
+  if (!is.split) int <- strsplit(int, '_')[[1]]
   
-  pred <- rowMeans(out)
-  return(pred)
-}
-
-regionPredObs <- function(x, thresh, y, yc) {
-  # Generates prediction for single observation based on whether it falls in 
-  # regions indicated by thresholds.
-  # args:
-  #   x: numeric vector
-  #   thresh: matrix of thresholds, rows corresponding to interacting features
+  int.adj <- isPositive(int)
+  int.unsgn <- intUnsign(int) 
+  id <- mapply(function(i, a) {
+    int2Id(int=i, varnames=varnames.grp, adj=a)
+  }, int.unsgn, int.adj, SIMPLIFY=TRUE)
   
-  pred <- colSums(x >= thresh) == length(x)
-  pred <- ifelse(pred, y, yc)
-  return(mean(pred))
-}
-
-int2Id <- function(int, varnames.grp, directed=FALSE, split=FALSE) {
-  # Determine integer index of named variable in nf matrix (directed or not)
-  if (!split) int <- strsplit(int, '_')[[1]]
-  if (directed) {
-    dir <- grep('\\+$', int)  
-    varnames.grp <- gsub('[-\\+]', '', varnames.grp)
-    int <- gsub('[-\\+]', '', int)
+  
+  # if classification, subset to class 1 leaf nodes
+  if (all(tree.info$prediction %in% 1:2)) {
+    nf <- nf[tree.info$prediction == 2,]
+    tree.info <- tree.info[tree.info$prediction == 2,]
+    tree.info$prediction <- tree.info$prediction - 1
   }
   
-  varnames.grp <- unique(varnames.grp)
-  id <- sapply(int, function(i) which(varnames.grp == i))
-  if (directed) {
-    adjust <- rep(0, length(int))
-    adjust[dir] <- length(varnames.grp)
-    id <- id + adjust
+  # subset node feature matrix to interacting features
+  int.nds <- Matrix::rowSums(nf[,id] != 0) > 0
+  nf <- nf[int.nds, id]
+  tree.info <- tree.info[int.nds,]
+  id.pos <- id > p
+  id.raw <- id %% p   
+  id.raw <- id.raw + p * (id.raw == 0)
+  if (hard.region) {
+    nf <- matrix(apply(nf, MAR=2, quantile, probs=qcut), nrow=1)
+    y <- 1
+    size <- 1
+  } else {
+    y <- tree.info$prediction
+    size <- tree.info$size.node
   }
   
-  return(id)
+  # evaluate predictions over subsample of active rules
+  nrule <- min(nrule, nrow(nf))
+  ss <- sample(nrow(nf), nrule, prob=size)
+  preds <- matrix(0, nrow=nrow(x), ncol=nrule)
+  for (i in 1:nrule) {
+    s <- ss[i]
+    id.active <- nf[s, ] != 0
+    tlow <- t(x[,id.raw[!id.pos & id.active]]) <= nf[s, !id.pos & id.active]
+    if (is.null(ncol(tlow))) tlow <- matrix(0, nrow=0, ncol=nrow(x))
+    
+    thigh <-  t(x[,id.raw[id.pos & id.active]]) > nf[s, id.pos & id.active]
+    if (is.null(ncol(thigh))) thigh <- matrix(0, nrow=0, ncol=nrow(x))
+    
+    int.active <- (colSums(tlow) + colSums(thigh)) == sum(id.active)
+    preds[,i] <- int.active * size[s] * y[s]
+  }
+  return(rowSums(preds) / sum(size[ss]))
 }
 
-intSign <- function(int) {
-  # Evaluates the direction of each feature in an interaction
-  int <- unlist(strsplit(int, '_'))
-  dir <- grep('\\+$', int)
-  out <- rep(-1, length(int))
-  out[dir] <- 1
+isPositive <- function(x) {
+  out <- rep(FALSE, length(x))
+  out[grep('+', x, fixed=TRUE)] <- TRUE
   return(out)
+}
+
+intUnsign <- function(x) gsub('[-\\+]', '', x)
+
+int2Id <- function(int, varnames.grp, adj) { 
+  # Evaluate 1:2p index of interaction term
+  int.adj <- which(varnames.grp == int) + adj * length(varnames.grp)
+  return(int.adj)
 }
