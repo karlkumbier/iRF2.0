@@ -6,10 +6,10 @@ interactPredict <- function(x, int, read.forest, varnames.grp=1:ncol(x),
   p <- ncol(x)
   stopifnot(p == length(varnames.grp))
   stopifnot(p == ncol(read.forest$node.feature) / 2)
-  
-  tree.info <- read.forest$tree.info[tree.info$size.node >= min.node,]
-  nf <- read.forest$node.feature[tree.info$size.node >= min.node,]
-  
+
+  nf <- read.forest$node.feature[read.forest$tree.info$size >= min.node,]
+  tree.info <- read.forest$tree.info[read.forest$tree.info$size >= min.node,]
+
   # Get feature indices for interaction terms 
   if (!is.split) int <- strsplit(int, '_')[[1]]
   int.adj <- isPositive(int)
@@ -35,7 +35,7 @@ interactPredict <- function(x, int, read.forest, varnames.grp=1:ncol(x),
     nf <- as.matrix(nf[int.nds])
     x <- as.matrix(x)
   } else {
-    int.nds <- Matrix::rowSums(nf != 0) > 0
+    int.nds <- Matrix::rowSums(nf != 0) == length(id)
     nf <- nf[int.nds,]
   }
   tree.info <- tree.info[int.nds,]
