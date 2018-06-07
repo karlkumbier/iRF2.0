@@ -39,7 +39,11 @@ interactPredict <- function(x, int, read.forest, varnames.grp=1:ncol(x),
     nf <- nf[int.nds,]
   }
   tree.info <- tree.info[int.nds,]
-  
+  if (sum(int.nds) == 0) {
+    warning('interaction does not appear on RF paths')
+    return(rep(0, nrow(x)))
+  }
+
   # Set response values for each region proportional to node size
   if (hard.region) {
     nf <- matrix(apply(nf, MAR=2, quantile, probs=qcut), nrow=1)
@@ -49,7 +53,7 @@ interactPredict <- function(x, int, read.forest, varnames.grp=1:ncol(x),
     y <- tree.info$prediction
     size <- tree.info$size.node
   }
-  
+ 
   # evaluate predictions over subsample of active rules
   nrule <- min(nrule, nrow(nf))
   ss <- sample(nrow(nf), nrule, prob=size)
@@ -71,24 +75,28 @@ interactPredict <- function(x, int, read.forest, varnames.grp=1:ncol(x),
 
 interactPredictPermute <- function(x, int, read.forest, varnames.grp=1:ncol(x), 
                                    hard.region=FALSE, qcut=0.5, nrule=1000, 
-                                   min.node=1, is.split=FALSE, nperm=100
-                                   ) {
+                                   min.node=1, is.split=FALSE, nperm=100, 
+                                   ncore=1) {
 
   if (!is.split) int <- strsplit(int, '_')[[1]]
-  int <- intUnsign(int)
-  id.perm <- which(varnames.grp %in% int)
+  int.unsgn <- intUnsign(int)
+  id.perm <- which(varnames.grp %in% int.unsgn)
   out <- list()
   for (i in 1:length(id.perm)) {
-    permPred  <- function(ii) {
+    permPred  <- function(ii, seed) {
+      set.seed(seed)
       xperm <- x
       xperm[,ii] <- sample(xperm[,ii])
       out <- interactPredict(int, x=xperm, varnames.grp=varnames.grp, 
                              read.forest=read.forest, hard.region=hard.region, 
                              qcut=qcut, nrule=nrule, min.node=min.node, 
-                             is.split=is.split)
+                             is.split=TRUE)
     }
     
-    out[[i]] <- replicate(nperm, permPred(id.perm[[i]]))
+    out.tmp <- mclapply(1:nperm, function(j) permPred(id.perm[[i]], seed=j),
+                         mc.cores=ncore)
+    out.tmp <- do.call(cbind, out.tmp)
+    out[[i]] <- out.tmp
   }
   return(out)
 }
