@@ -1,6 +1,6 @@
 interactPredict <- function(x, int, read.forest, varnames.grp=1:ncol(x), 
                             hard.region=FALSE, qcut=0.5, nrule=1000, 
-                            min.node=1, is.split=FALSE) {
+                            min.node=1, mask='low', wt=TRUE, is.split=FALSE) {
   # Generate RF predictions for given interactions, using only information
   # from interacting features.
   p <- ncol(x)
@@ -35,9 +35,17 @@ interactPredict <- function(x, int, read.forest, varnames.grp=1:ncol(x),
     nf <- as.matrix(nf[int.nds])
     x <- as.matrix(x)
   } else {
-    int.nds <- Matrix::rowSums(nf != 0) == length(id)
+    nint <- Matrix::rowSums(nf != 0)
+    if (mask == 'low') {
+      int.nds <- nint == length(id)
+    } else if (mask == 'high') {
+      int.nds <- nint < length(id) & nint > 0
+    } else {
+      int.nds <- nint > 0
+    }
     nf <- nf[int.nds,]
   }
+  
   tree.info <- tree.info[int.nds,]
   if (sum(int.nds) == 0) {
     warning('interaction does not appear on RF paths')
@@ -51,12 +59,14 @@ interactPredict <- function(x, int, read.forest, varnames.grp=1:ncol(x),
     size <- 1
   } else {
     y <- tree.info$prediction
-    size <- tree.info$size.node
+    if (wt) size <- tree.info$size.node
+    else size <- rep(1, nrow(tree.info))
   }
  
   # evaluate predictions over subsample of active rules
   nrule <- min(nrule, nrow(nf))
   ss <- sample(nrow(nf), nrule, prob=size)
+  
   preds <- matrix(0, nrow=nrow(x), ncol=nrule)
   for (i in 1:nrule) {
     s <- ss[i]
