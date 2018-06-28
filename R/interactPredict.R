@@ -1,6 +1,7 @@
 interactPredict <- function(x, int, read.forest, varnames.grp=1:ncol(x), 
                             hard.region=FALSE, qcut=0.5, nrule=1000, 
-                            min.node=1, mask='low', wt=TRUE, is.split=FALSE) {
+                            min.node=1, mask='low', wt=TRUE, is.split=FALSE,
+                            aggregate=TRUE) {
   # Generate RF predictions for given interactions, using only information
   # from interacting features.
   p <- ncol(x)
@@ -27,7 +28,8 @@ interactPredict <- function(x, int, read.forest, varnames.grp=1:ncol(x),
     tree.info$prediction <- tree.info$prediction - 1
   }
   
-  # Subset node feature matrix to and data matrix to interacting features
+  # Subset node feature matrix to and data matrix for paths that include
+  # interaction terms
   nf <- nf[,id]
   x <- x[,id.raw]
   if (is.null(dim(nf))) {
@@ -40,10 +42,11 @@ interactPredict <- function(x, int, read.forest, varnames.grp=1:ncol(x),
       int.nds <- nint == length(id)
     } else if (mask == 'high') {
       int.nds <- nint < length(id) & nint > 0
-    } else {
+    } else if (mask == 'none') {
       int.nds <- nint > 0
     }
     nf <- nf[int.nds,]
+    nint <- nint[int.nds]
   }
   
   tree.info <- tree.info[int.nds,]
@@ -80,7 +83,23 @@ interactPredict <- function(x, int, read.forest, varnames.grp=1:ncol(x),
     int.active <- (colSums(tlow) + colSums(thigh)) == sum(id.active)
     preds[,i] <- int.active * size[s] * y[s]
   }
-  return(rowSums(preds) / sum(size[ss]))
+
+  if (aggregate) {
+    out <- rowSums(preds) / sum(size[ss])
+  } else if (length(id) == 1) {
+    out <- rowSums(preds) / sum(size[ss])
+    out <- cbind(out, out)
+  } else {
+    ilow <- nint[ss] < length(id) 
+    if (any(ilow)) 
+      out.low <- rowSums(as.matrix(preds[,ilow])) / sum(size[ss[ilow]])
+    else
+      out.low <- rep(0, nrow(x))
+    out.high <- rowSums(as.matrix(preds[,!ilow])) / sum(size[ss[!ilow]])
+    out <- cbind(out.low, out.high)
+  }
+
+  return(out)
 }
 
 interactPredictPermute <- function(x, int, read.forest, varnames.grp=1:ncol(x), 
