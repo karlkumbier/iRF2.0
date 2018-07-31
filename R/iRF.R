@@ -37,7 +37,7 @@ iRF <- function(x, y,
   
   rf.list <- list()
   if (!is.null(interactions.return) | select.iter) stability.score <- list()
-  if (get.prevalence) prev.list <- list()
+  if (get.prevalence) prevalence.score <- list()
 
   # Set number of trees to grow in each core
   a <- floor(ntree / n.core) 
@@ -120,7 +120,7 @@ iRF <- function(x, y,
         dir.create(bootstrap.path, showWarnings=FALSE)
         out.file <- paste0(bootstrap.path, 'bs_iter', 
                            iter, '_b', i.b, '.Rdata')
-        #save(file=paste0(bootstrap.path, out.file), rf.b)
+        save(file=paste0(bootstrap.path, out.file), rf.b)
       } else {
         out.file <- NULL
       }
@@ -145,18 +145,17 @@ iRF <- function(x, y,
     
     # Calculate stability scores of interactions
     stability.score[[iter]] <- summarizeInteract(interact.list)
-    
-    
-    if (get.prevalence) 
-      prev.list[[iter]] <- summarizePrev(prev.list)
-  } # end for (iter in ... )
   
+    if (get.prevalence) 
+      prevalence.score[[iter]] <- summarizePrev(prev.list)
+  } # end for (iter in ... )
   
   out <- list()
   out$rf.list <- rf.list
   if (!is.null(interactions.return)) out$interaction <- stability.score
-  if (get.prevalence) out$prevalence <- prev.list
+  if (get.prevalence) out$prevalence <- prevalence.score
 
+  
   if (select.iter) {
     out$rf.list <- out$rf.list[[interactions.return]]
     out$interaction <- out$interaction[[interactions.return]]
