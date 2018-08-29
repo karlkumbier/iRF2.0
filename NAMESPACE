@@ -24,7 +24,7 @@ export(combine, getTree, grow, importance, margin, MDSplot, na.roughfix,
        varUsed, rfNews, outlier, classCenter, rfcv, readForest, iRF, 
        RIT, prevalence, nameInts, subsetReadForest, interactPredict, 
        generalizedRIT, permPredict, summarizePrev, localFRIT, localORIT,
-       interactPredictPermute)
+       interactPredictPermute, intSubsets)
 
 
 S3method(print, randomForest)

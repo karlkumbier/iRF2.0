@@ -6,7 +6,6 @@ iRF <- function(x, y,
                 n.core=1, 
                 mtry.select.prob=rep(1, ncol(x)),
                 interactions.return=NULL, 
-                wt.pred.accuracy=FALSE, 
                 rit.param=list(depth=5, ntree=500, 
                                nchild=2, class.id=1, 
                                min.nd=1, class.cut=NULL), 
@@ -34,10 +33,12 @@ iRF <- function(x, y,
     rit.param$class.cut <- median(y)
   importance <- ifelse(class.irf, 'MeanDecreaseGini', 'IncNodePurity')
    
-  
   rf.list <- list()
-  if (!is.null(interactions.return) | select.iter) stability.score <- list()
-  if (get.prevalence) prev.list <- list()
+  if (!is.null(interactions.return) | select.iter) {
+    stability.score <- list()
+    if (get.prevalence) prevalence.score <- list()
+  }
+
 
   # Set number of trees to grow in each core
   a <- floor(ntree / n.core) 
@@ -120,7 +121,6 @@ iRF <- function(x, y,
         dir.create(bootstrap.path, showWarnings=FALSE)
         out.file <- paste0(bootstrap.path, 'bs_iter', 
                            iter, '_b', i.b, '.Rdata')
-        #save(file=paste0(bootstrap.path, out.file), rf.b)
       } else {
         out.file <- NULL
       }
@@ -128,7 +128,6 @@ iRF <- function(x, y,
      
       # Run generalized RIT on rf.b to learn interactions
       ints <- generalizedRIT(rf=rf.b, x=x, y=y,
-                             wt.pred.accuracy=wt.pred.accuracy,
                              varnames.grp=varnames.grp,
                              rit.param=rit.param,
                              get.prevalence=get.prevalence,
@@ -145,28 +144,26 @@ iRF <- function(x, y,
     
     # Calculate stability scores of interactions
     stability.score[[iter]] <- summarizeInteract(interact.list)
-    
-    
-    if (get.prevalence) 
-      prev.list[[iter]] <- summarizePrev(prev.list)
+    if (get.prevalence)  prevalence.score[[iter]] <- summarizePrev(prev.list)
   } # end for (iter in ... )
   
   
   out <- list()
   out$rf.list <- rf.list
   if (!is.null(interactions.return)) out$interaction <- stability.score
-  if (get.prevalence) out$prevalence <- prev.list
+  if (get.prevalence) out$prevalence <- prevalence.score
 
   if (select.iter) {
     out$rf.list <- out$rf.list[[interactions.return]]
     out$interaction <- out$interaction[[interactions.return]]
     if (get.prevalence) out$prevalence <- out$prevalence[[interactions.return]]
   }
+
   return(out)
 }
 
 generalizedRIT <- function(rf=NULL, x=NULL, y=NULL, rforest=NULL, 
-                           wt.pred.accuracy=FALSE, 
+                           weights=rep(1, nrow(x)),
                            varnames.grp=NULL,
                            rit.param=list(depth=5, ntree=500, 
                                           nchild=2, class.id=1, 
@@ -196,7 +193,7 @@ generalizedRIT <- function(rf=NULL, x=NULL, y=NULL, rforest=NULL,
   if (is.null(rforest)) {
     rforest <- readForest(rf, x=x, y=y, 
                           return.node.feature=TRUE,
-                          wt.pred.accuracy=wt.pred.accuracy, 
+                          return.node.obs=TRUE,
                           varnames.grp=varnames.grp,
                           get.split=TRUE,
                           n.core=n.core)
@@ -220,12 +217,12 @@ generalizedRIT <- function(rf=NULL, x=NULL, y=NULL, rforest=NULL,
   if (sum(select.id) < 2) {
     return(character(0))
   } else {
-    out$int <- runRIT(subsetReadForest(rforest, select.id),
-                      wt.pred.accuracy, int.subs, rit.param, n.core)
+    out$int <- runRIT(subsetReadForest(rforest, select.id), weights,
+                      rit.param, int.subs, n.core)
     int.names <- nameInts(out$int, varnames.unq, signed=int.sign)
     
     if (get.prevalence & !is.null(out$int)) { 
-      wt <- rforest$tree.info$size.node
+      wt <- Matrix::colSums(t(rforest$node.obs) * weights)
       out$prev$i1 <- unlist(mclapply(out$int, prevalence, 
                             nf=rforest$node.feature[select.id,], 
                             wt=wt[select.id], mc.cores=n.core))
@@ -242,15 +239,10 @@ generalizedRIT <- function(rf=NULL, x=NULL, y=NULL, rforest=NULL,
   return(out)
 }
 
-runRIT <- function(rforest, wt.pred.accuracy=FALSE,
-                   int.subs=TRUE,
-                   rit.param, n.core=1) {
+runRIT <- function(rforest, weights, rit.param, int.subs=TRUE, n.core=1) {
  
-  # Set weights for leaf node sampling using either size or size and accuracy
-  if (wt.pred.accuracy) 
-    wt <- rforest$tree.info$size.node * rforest$tree.info$dec.purity
-  else 
-    wt <- rforest$tree.info$size.node
+  # Set weights for leaf node sampling
+  wt <- Matrix::colSums(t(rforest$node.obs) * weights)
            
   # remove nodes below specified size threshold
   id.rm <- rforest$tree.info$size.node < rit.param$min.nd
@@ -305,7 +297,12 @@ nameInts <- function(ints, varnames, signed=TRUE) {
 summarizePrev <- function(prev) {
   # summarize interaction prevalence across bootstrap samples
   n.bs <- length(prev)
-  prev1 <- unlist(lapply(prev, function(z) z$i1))
+  prev0 <- unlist(lapply(prev, function(z) z$i0))
+  
+  prev <- data.frame(int=names(prev1), prev1=prev1, prev0=prev0)
+  prev <- group_by(prev, int) %>%
+    summarize(prev1=mean(prev1), prev0=mean(prev0), n=n()/n.bs) %>%
+    mutate(diff=(prev1-prev0)) %>%
   prev0 <- unlist(lapply(prev, function(z) z$i0))
   
   prev <- data.frame(int=names(prev1), prev1=prev1, prev0=prev0)
