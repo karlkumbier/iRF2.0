@@ -25,7 +25,6 @@ export(combine, getTree, grow, importance, margin, MDSplot, na.roughfix,
        predictInts, intsSubsets, generalizedRIT, groupFeature, subsetReadForest,
        nameInts, groupLocalInteracts)
 
-
 S3method(print, randomForest)
 S3method(predict, randomForest)
 S3method(plot, randomForest)
