@@ -9,12 +9,11 @@ iRF <- function(x, y,
                 rit.param=list(depth=5, ntree=500, 
                                nchild=2, class.id=1, 
                                min.nd=1, class.cut=NULL), 
-                varnames.grp=NULL, 
+                varnames.grp=colnames(x), 
                 n.bootstrap=1,
                 select.iter=FALSE,
                 get.prevalence=TRUE,
                 int.sign=TRUE,
-                int.subs=TRUE,
                 verbose=TRUE,
                 bootstrap.path=NULL,
                 ...) {
@@ -125,20 +124,17 @@ iRF <- function(x, y,
         out.file <- NULL
       }
       
-     
       # Run generalized RIT on rf.b to learn interactions
-      ints <- generalizedRIT(rf=rf.b, x=x, y=y,
+      ints <- generalizedRIT(rf=rf.b, x=x,
                              varnames.grp=varnames.grp,
                              rit.param=rit.param,
                              get.prevalence=get.prevalence,
                              int.sign=int.sign,
-                             int.subs=int.subs,
                              out.file=out.file,
                              n.core=n.core)
       
       interact.list[[i.b]] <- ints$int
       if (get.prevalence) prev.list[[i.b]] <- ints$prev
-
       rm(rf.b)       
     }
     
@@ -163,9 +159,8 @@ iRF <- function(x, y,
 }
 
 
-summarizeInteract <- function(store.out, local=FALSE){
+summarizeInteract <- function(store.out){
   # Aggregate interactions across bootstrap samples
-  if (local) store.out <- lapply(store.out, names)
 
   n.bootstrap <- length(store.out)
   store <- unlist(store.out)
@@ -179,6 +174,21 @@ summarizeInteract <- function(store.out, local=FALSE){
   
   out <- int.tbl
   return(out)
+}
+
+summarizePrev <- function(prev) {
+  # Summarize interaction prevalence across bootstrap samples
+  require(data.table)
+  nbs <- length(prev)
+  prev0 <- unlist(lapply(prev, function(z) z$i0))
+  prev1 <- unlist(lapply(prev, function(z) z$i1))
+
+  prev <- data.table(int=names(prev1), prev1=prev1, prev0=prev0) %>%
+  group_by(int) %>%
+  summarize(prev1=mean(prev1), prev0=mean(prev0), n=n()/nbs) %>%
+  mutate(diff=(prev1-prev0)) %>%
+  arrange(desc(diff))
+  return(prev)
 }
 
 sampleClass <- function(y, cl, n) {

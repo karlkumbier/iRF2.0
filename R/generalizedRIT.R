@@ -9,12 +9,12 @@ generalizedRIT <- function(rf=NULL, x=NULL, rforest=NULL,
                                           class.cut=NULL),
                            get.prevalence=FALSE,
                            int.sign=TRUE,
-                           int.subs=TRUE,
+                           obs.rit=FALSE,
                            out.file=NULL,
                            n.core=1) {
 
   out <- list()
-  if (!is.null(rf) & !is.null(x)| !is.null(rforest))
+  if ((is.null(rf) | is.null(x)) & is.null(rforest))
     stop('Supply random forest or read forest output')
   if (is.null(rit.param$class.cut) & is.null(rit.param$class.id))
     stop('Supply class.id (classification) or class.cut (regression)')
@@ -59,10 +59,30 @@ generalizedRIT <- function(rf=NULL, x=NULL, rforest=NULL,
     out$int <- runRIT(subsetReadForest(rforest, select.id),
                       weights=wt[select.id],
                       rit.param=rit.param,
-                      int.subs=int.subs,
+                      obs.rit=obs.rit,
                       n.core=n.core)
     
     if (is.null(out$int)) return(NULL)
+
+    # If running observation level RIT, split feature and observation
+    # interacitons and group by feature interactions
+    if (obs.rit) {
+      pp <- ncol(rforest$node.feature)
+      out$obs <- lapply(out$int, function(z) pasteInt(z[z > pp] - pp))
+      out$int <- sapply(out$int, function(z) pasteInt(z[z <= pp]))
+
+      # Group observation interactions by feature interacitons
+      dgroup <- data.table(int=out$int, obs=out$obs) %>%
+        group_by(int) %>%
+        summarize(obs=pasteInt(obs)) %>%
+        filter(int != '')
+
+      out$int <- str_split(dgroup$int, '_')
+      out$int <- lapply(out$int, as.numeric)
+      out$obs <- str_split(dgroup$obs, '_')
+      out$obs <- lapply(out$obs, function(z) as.numeric(unique(z)))
+    }
+
     int.names <- nameInts(out$int, varnames.unq, signed=int.sign)
 
     if (get.prevalence) {
@@ -87,9 +107,11 @@ generalizedRIT <- function(rf=NULL, x=NULL, rforest=NULL,
   return(out)
 }
 
-runRIT <- function(rforest, weights, rit.param, int.subs=TRUE, n.core=1) {
+runRIT <- function(rforest, weights, rit.param, 
+                   obs.rit=FALSE, int.subs=TRUE, 
+                   n.core=1) {
 
-  # remove nodes below specified size threshold
+  # Remove nodes below specified size threshold
   id.rm <- rforest$tree.info$size.node < rit.param$min.nd
   if (all(id.rm)) {
     warning(paste('No nodes with greater than ', rit.param$min.nd,
@@ -99,31 +121,26 @@ runRIT <- function(rforest, weights, rit.param, int.subs=TRUE, n.core=1) {
   
   rforest <- subsetReadForest(rforest, !id.rm)
   wt <- weights[!id.rm]
-  interactions <- RIT(rforest$node.feature[wt > 0,],
+  
+  # Input for RIT: observations and features or only features 
+  if (obs.rit) {
+    xrit <- cbind(rforest$node.feature[wt > 0,],
+                  rforest$node.obs[wt > 0,])
+  } else {
+    xrit <- cbind(rforest$node.feature[wt > 0,])
+  }
+
+
+  interactions <- RIT(xrit,
                       weights=wt[wt > 0],
                       depth=rit.param$depth,
                       n_trees=rit.param$ntree,
                       branch=rit.param$nchild,
                       output_list=TRUE,
                       n_cores=n.core)$Interaction
-
-  if (int.subs) {
-    interactions <- lapply(interactions, intSubsets)
-    interactions <- unlist(interactions, recursive=FALSE)
-    interactions <- unique(interactions)
-  }
-
+  
   return(interactions)
 }
-
-intSubsets <- function(int) {
-  # Generate all lower order subsets of specified interaction
-  int.order <- length(int)
-  int.subs <- lapply(1:int.order, combn, x=int, simplify=FALSE)
-  int.subs <- unlist(int.subs, recursive=FALSE)
-  return(int.subs)
-}
-
 
 nameInts <- function(ints, varnames, signed=TRUE) {
   # Convert interactions indicated by indices to interactions indicated by
@@ -145,26 +162,12 @@ nameInts <- function(ints, varnames, signed=TRUE) {
   return(ints.name)
 }
 
-summarizePrev <- function(prev) {
-  # Summarize interaction prevalence across bootstrap samples
-  require(data.table)
-  nbs <- length(prev)
-  prev0 <- unlist(lapply(prev, function(z) z$i0))
-  prev1 <- unlist(lapply(prev, function(z) z$i1))
-
-  prev <- data.table(int=names(prev1), prev1=prev1, prev0=prev0) %>%
-    group_by(int) %>%
-    summarize(prev1=mean(prev1), prev0=mean(prev0), n=n()/nbs) %>%
-    mutate(diff=(prev1-prev0)) %>%
-    arrange(desc(diff))
-  return(prev)
-}
-
 prevalence <- function(int, nf, wt=rep(1, ncol(nf))) {
   # Calculate the decision path prevalence of an interaction
   id.rm <- wt == 0
   wt <- wt[!id.rm]
 
+  int <- as.numeric(int)
   intord <- length(int)
   if (intord == 1)
     int.id <- nf[!id.rm, int] != 0
@@ -189,3 +192,4 @@ subsetReadForest <- function(rforest, subset.idcs) {
   return(rforest)
 }
 
+pasteInt <- function(x) paste(x, collapse='_')
