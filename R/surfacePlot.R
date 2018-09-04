@@ -161,7 +161,7 @@ facetSurface <- function(int, nf, tree.info, varnames.grp, x,
   
   rectangles <- forestHyperrectangle(tree.info=tree.info, nf=nf, 
                                      x=x, y=y, 
-                                     interact=interact.plot, 
+                                     interact=int, 
                                      varnames.grp=varnames.grp, 
                                      min.node.size=min.node)
   
@@ -179,12 +179,13 @@ facetSurface <- function(int, nf, tree.info, varnames.grp, x,
     plotInt2(rectangles, interact=int[1:2], x=x[id.cur,], 
              y=as.factor(y[id.cur]), varnames.grp=varnames.grp, 
              min.node=min.node, grids=grids,
-             xlab=xlab, ylab=ylab, zlab='')
+             xlab=xlab, ylab=ylab, zlab='P(Y=1)')
     
     if (!is.null(plot.dir)) {
       pp <- paste(int.clean[id.facet], collapse='_')
       sub.dir <- paste0(plot.dir, pp, '-', ii, '_n', nn)
       dir.create(sub.dir, recursive=TRUE)
+      rgl.viewpoint(zoom=0.85, theta=0, phi=-75)
       movie3d(spin3d(axis = c(0,0,1), rpm = 10), duration=6,  type="png", 
               dir=sub.dir, convert=FALSE, clean=FALSE)
     }
