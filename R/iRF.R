@@ -125,7 +125,12 @@ iRF <- function(x, y,
       }
       
       # Run generalized RIT on rf.b to learn interactions
-      ints <- generalizedRIT(rf=rf.b, x=x,
+      if (!is.null(xtest)) 
+        xx <- rbind(x, xtest)
+      else
+        xx <- x
+      
+      ints <- generalizedRIT(rf=rf.b, x=xx, ntrain=nrow(x),
                              varnames.grp=varnames.grp,
                              rit.param=rit.param,
                              get.prevalence=get.prevalence,

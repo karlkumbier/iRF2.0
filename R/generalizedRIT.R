@@ -1,5 +1,6 @@
 generalizedRIT <- function(rf=NULL, x=NULL, rforest=NULL,
-                           weights=rep(1, nrow(x)),
+                           ntrain=nrow(x),
+                           weights=rep(1, ntrain),
                            varnames.grp=colnames(x),
                            rit.param=list(depth=5,
                                           ntree=500,
@@ -40,7 +41,8 @@ generalizedRIT <- function(rf=NULL, x=NULL, rforest=NULL,
     rforest$node.feature[,(p + 1):(2 * p)]
   }
 
-  if (!is.null(out.file)) save(file=out.file, rforest)
+  if (!is.null(out.file)) save(file=out.file, rforest, ntrain)
+  rforest$node.obs <- rforest$node.obs[,1:ntrain]
 
   # Select class specific leaf nodes
   rfpred <- rforest$tree.info$prediction
@@ -174,6 +176,7 @@ prevalence <- function(int, nf, wt=rep(1, ncol(nf))) {
   else
     int.id <- Matrix::rowSums(nf[!id.rm, int] != 0) == intord
 
+  if (sum(int.id) == 0) return(0)
   prev <- sum(wt[int.id]) / sum(wt)
   return(prev)
 }
