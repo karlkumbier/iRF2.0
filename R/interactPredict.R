@@ -1,7 +1,7 @@
 interactPredict <- function(x, int, read.forest, varnames.grp=1:ncol(x), 
-                            hard.region=FALSE, qcut=0.5, nrule=1000, 
-                            min.node=1, mask='low', wt=TRUE, is.split=FALSE,
-                            aggregate=TRUE) {
+                            nrule=1000, min.node=1, mask='low', wt=TRUE, 
+                            is.split=FALSE, aggregate=TRUE) {
+
   # Generate RF predictions for given interactions, using only information
   # from interacting features.
   p <- ncol(x)
@@ -11,15 +11,17 @@ interactPredict <- function(x, int, read.forest, varnames.grp=1:ncol(x),
   nf <- read.forest$node.feature[read.forest$tree.info$size >= min.node,]
   tree.info <- read.forest$tree.info[read.forest$tree.info$size >= min.node,]
 
-  # Get feature indices for interaction terms 
+  # Get signed and raw feature indices for interaction terms and determine which
+  # interaction features are positive
   if (!is.split) int <- strsplit(int, '_')[[1]]
   int.adj <- isPositive(int)
   int.unsgn <- intUnsign(int) 
-  id <- mapply(function(i, a) {
+  
+  id.sgn <- mapply(function(i, a) {
     intId(int=i, varnames=varnames.grp, adj=a)
   }, int.unsgn, int.adj, SIMPLIFY=TRUE)
-  id.raw <- id %% p  + p * (id == p | id == 2 * p) 
-  id.pos <- id > p
+  id.raw <- id.sgn %% p  + p * (id.sgn == p | id.sgn == 2 * p) 
+  id.pos <- id.sgn > p
   
   # if classification, subset to class 1 leaf nodes
   if (all(tree.info$prediction %in% 1:2)) {
@@ -28,16 +30,24 @@ interactPredict <- function(x, int, read.forest, varnames.grp=1:ncol(x),
     tree.info$prediction <- tree.info$prediction - 1
   }
   
-  # Subset node feature matrix to and data matrix for paths that include
-  # interaction terms
-  nf <- nf[,id]
+  # Subset node feature matrix to and data matrix based on interacting features
+  nf <- nf[,id.sgn]
   x <- x[,id.raw]
-  if (is.null(dim(nf))) {
+
+  if (length(id.sgn) == 1) {
+    # order = 1 interaction
     int.nds <- nf != 0
     nf <- as.matrix(nf[int.nds])
     x <- as.matrix(x)
   } else {
+    # order > 1 interaction
     nint <- Matrix::rowSums(nf != 0)
+    
+    # determine which nodes contain desired interaction based on indicated
+    # masking: 
+    #   low -- only order = s nodes
+    #   high -- only order < s nodes
+    #   none -- both order = s and order < s nodes
     if (mask == 'low') {
       int.nds <- nint == length(id)
     } else if (mask == 'high') {
@@ -56,15 +66,9 @@ interactPredict <- function(x, int, read.forest, varnames.grp=1:ncol(x),
   }
 
   # Set response values for each region proportional to node size
-  if (hard.region) {
-    nf <- matrix(apply(nf, MAR=2, quantile, probs=qcut), nrow=1)
-    y <- 1
-    size <- 1
-  } else {
-    y <- tree.info$prediction
-    if (wt) size <- tree.info$size.node
-    else size <- rep(1, nrow(tree.info))
-  }
+  y <- tree.info$prediction
+  if (wt) size <- tree.info$size.node
+  else size <- rep(1, nrow(tree.info))
  
   # evaluate predictions over subsample of active rules
   nrule <- min(nrule, nrow(nf))
@@ -86,47 +90,24 @@ interactPredict <- function(x, int, read.forest, varnames.grp=1:ncol(x),
 
   if (aggregate) {
     out <- rowSums(preds) / sum(size[ss])
-  } else if (length(id) == 1) {
+  } else if (length(id.sgn) == 1) {
     out <- rowSums(preds) / sum(size[ss])
     out <- cbind(out, out)
   } else {
-    ilow <- nint[ss] < length(id) 
+    ilow <- nint[ss] < length(id.sgn) 
     if (any(ilow)) 
       out.low <- rowSums(as.matrix(preds[,ilow])) / sum(size[ss[ilow]])
     else
       out.low <- rep(0, nrow(x))
-    out.high <- rowSums(as.matrix(preds[,!ilow])) / sum(size[ss[!ilow]])
+    
+    if (!all(ilow))
+      out.high <- rowSums(as.matrix(preds[,!ilow])) / sum(size[ss[!ilow]])
+    else
+      out.high <- rep(0, nrow(x))
+
     out <- cbind(out.low, out.high)
   }
 
-  return(out)
-}
-
-interactPredictPermute <- function(x, int, read.forest, varnames.grp=1:ncol(x), 
-                                   hard.region=FALSE, qcut=0.5, nrule=1000, 
-                                   min.node=1, is.split=FALSE, nperm=100, 
-                                   ncore=1) {
-
-  if (!is.split) int <- strsplit(int, '_')[[1]]
-  int.unsgn <- intUnsign(int)
-  id.perm <- which(varnames.grp %in% int.unsgn)
-  out <- list()
-  for (i in 1:length(id.perm)) {
-    permPred  <- function(ii, seed) {
-      set.seed(seed)
-      xperm <- x
-      xperm[,ii] <- sample(xperm[,ii])
-      out <- interactPredict(int, x=xperm, varnames.grp=varnames.grp, 
-                             read.forest=read.forest, hard.region=hard.region, 
-                             qcut=qcut, nrule=nrule, min.node=min.node, 
-                             is.split=TRUE)
-    }
-    
-    out.tmp <- mclapply(1:nperm, function(j) permPred(id.perm[[i]], seed=j),
-                         mc.cores=ncore)
-    out.tmp <- do.call(cbind, out.tmp)
-    out[[i]] <- out.tmp
-  }
   return(out)
 }
 
@@ -136,7 +117,8 @@ isPositive <- function(x) {
   return(out)
 }
 
-intUnsign <- function(x) gsub('[-\\+]', '', x)
+intUnsign <- function(x) gsub('(-|\\+)$', '', x)
+
 
 intId <- function(int, varnames.grp, adj) { 
   # Evaluate 1:2p index of interaction term
