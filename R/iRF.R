@@ -38,7 +38,6 @@ iRF <- function(x, y,
     if (get.prevalence) prevalence.score <- list()
   }
 
-
   # Set number of trees to grow in each core
   a <- floor(ntree / n.core) 
   b <- ntree %% n.core
@@ -148,12 +147,12 @@ iRF <- function(x, y,
     if (get.prevalence)  prevalence.score[[iter]] <- summarizePrev(prev.list)
   } # end for (iter in ... )
   
-  
   out <- list()
   out$rf.list <- rf.list
   if (!is.null(interactions.return)) out$interaction <- stability.score
   if (get.prevalence) out$prevalence <- prevalence.score
 
+  
   if (select.iter) {
     out$rf.list <- out$rf.list[[interactions.return]]
     out$interaction <- out$interaction[[interactions.return]]
