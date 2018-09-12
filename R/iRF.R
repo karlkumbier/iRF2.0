@@ -15,6 +15,7 @@ iRF <- function(x, y,
                 get.prevalence=TRUE,
                 int.sign=TRUE,
                 verbose=TRUE,
+                block.bootstrap=NULL,
                 bootstrap.path=NULL,
                 ...) {
   
@@ -87,16 +88,8 @@ iRF <- function(x, y,
     if (get.prevalence) prev.list <- list()
 
     for (i.b in 1:n.bootstrap) { 
-      if (class.irf) {
-        # Take bootstrap sample that maintains class balance in full data
-        ncl <- table(y)
-        class <- as.factor(names(ncl))
-        sample.id <- mapply(function(cc, n) sampleClass(y, cc, n), class, ncl)
-        sample.id <- unlist(sample.id)
-      } else {
-        sample.id <- sample(n, replace=TRUE)
-      }
-      
+
+      sample.id <- bootstrapSample(block.bootstrap, y)
       # Use feature weights from current iteraction of full data RF
       if (iter == 1) 
         mtry.select.prob <- rep(1, ncol(x))
@@ -153,9 +146,10 @@ iRF <- function(x, y,
   if (get.prevalence) out$prevalence <- prevalence.score
 
   
-  if (select.iter) {
+  if (select.iter | length(interactions.return) == 1) {
     out$rf.list <- out$rf.list[[interactions.return]]
     out$interaction <- out$interaction[[interactions.return]]
+    out$selected.iter <- interactions.return
     if (get.prevalence) out$prevalence <- out$prevalence[[interactions.return]]
   }
 
@@ -221,4 +215,31 @@ selectIter <- function(rf.list, y) {
   min.err <- min(error)
   id.select <- max(which(error == min.err))
   return(id.select)
-} 
+}
+
+
+bootstrapSample <- function(block.bootstrap, y) {
+  # Generate outer layer bootstrap samples
+  
+  n <- length(y)
+  if (is.null(block.bootstrap) & is.factor(y)) {
+    # Take bootstrap sample that maintains class balance in full data
+    ncl <- table(y)
+    class <- as.factor(names(ncl))
+    sample.id <- mapply(function(cc, n) sampleClass(y, cc, n), class, ncl)
+    sample.id <- unlist(sample.id)
+  } else if (is.null(block.bootstrap)) {
+    sample.id <- sample(n, replace=TRUE)
+  } else {
+    sample.id <- sample(length(block.bootstrap), replace=TRUE)
+    sample.id <- unlist(block.bootstrap[sample.id])
+  }
+  
+  #if (is.factor(y) & length(unique(y[sample.id])) == 1) {
+  #  warning('ONLY 1 class in block bootstrap sample, resampling...')
+  #  bootstrapSample(block.bootstrap, y)
+  #}
+
+  return(sample.id)
+}
+
