@@ -1,18 +1,13 @@
-readForest <- function(rfobj, x, y=NULL, 
+readForest <- function(rfobj, x, 
                        return.node.feature=TRUE, 
                        return.node.obs=FALSE,
-                       wt.pred.accuracy=FALSE,
                        varnames.grp=NULL,
-                       obs.weights=NULL,
-                       get.depth=FALSE,
                        get.split=FALSE,
                        first.split=TRUE,
                        n.core=1){
   
   if (is.null(rfobj$forest))
     stop('No Forest component in the randomForest object')
-  if (wt.pred.accuracy & is.null(y))
-    stop('y required to evaluate prediction accuracy')
   if (is.null(varnames.grp)) varnames.grp <- 1:ncol(x)
  
   ntree <- rfobj$ntree
@@ -25,51 +20,49 @@ readForest <- function(rfobj, x, y=NULL,
   nodes <- attr(prf, 'nodes')
   
   # read leaf node data from each tree in the forest 
-  rd.forest <- mclapply(1:ntree, readTree, rfobj=rfobj, x=x, y=y,
+  rd.forest <- mclapply(1:ntree, readTree, rfobj=rfobj, x=x,
                         nodes=nodes,
                         varnames.grp=varnames.grp,
                         return.node.feature=return.node.feature,
                         return.node.obs=return.node.obs,
-                        wt.pred.accuracy=wt.pred.accuracy,
-                        obs.weights=obs.weights,
                         get.split=get.split,
                         first.split=first.split,
                         mc.cores=n.core)
   
+  # aggregate node level metadata across forest
   out$tree.info <- rbindlist(lapply(rd.forest, function(tt) tt$tree.info))
   
-  # aggregate sparse feature matrix across forest
+  # aggregate sparse node level feature matrix across forest
   nf <- lapply(rd.forest, function(tt) tt$node.feature)
   nf <- aggregateNodeFeature(nf)
   
-  # aggregate sparse observation matrix across forest
-  if (return.node.obs) nobs <- lapply(rd.forest, function(tt) tt$node.obs)
-  if (return.node.obs) nobs <- aggregateNodeFeature(nobs)
-  
-  if (get.depth | get.split) 
+  if (get.split) 
     out$node.feature <- sparseMatrix(i=nf[,1], j=nf[,2], x=nf[,3], 
                                      dims=c(max(nf[,1]), 2 * p))
   else
     out$node.feature <- sparseMatrix(i=nf[,1], j=nf[,2],
                                      dims=c(max(nf[,1]), 2 * p))
 
-  if (return.node.obs)
+ 
+  # aggregate sparse node level observation matrix across forest
+  if (return.node.obs) {
+    nobs <- lapply(rd.forest, function(tt) tt$node.obs)
+    nobs <- aggregateNodeFeature(nobs)
     out$node.obs <- sparseMatrix(i=nobs[,1], j=nobs[,2], dims=c(max(nf[,1]), n))
+  }
+
   return(out)
   
 }
 
-readTree <- function(rfobj, k, x, y, nodes,
+readTree <- function(rfobj, k, x, nodes,
                      varnames.grp=1:ncol(x), 
                      return.node.feature=TRUE,
                      return.node.obs=FALSE,
-                     wt.pred.accuracy=FALSE, 
-                     obs.weights=NULL,
                      get.split=FALSE,
                      first.split=TRUE) {
   
   n <- nrow(x) 
-  if (is.factor(y)) y <- as.numeric(y) - 1
   ntree <- rfobj$ntree
 
   # Read tree metadata from forest
@@ -94,31 +87,10 @@ readTree <- function(rfobj, k, x, y, nodes,
   }
 
   # if specified, set node counts based on observation weights
-  if (is.null(obs.weights)) {
-    leaf.counts <- table(which.leaf)
-    leaf.idx <- as.integer(names(leaf.counts))
-  } else {
-    leaf.counts <- c(by(obs.weights, which.leaf, sum))
-    leaf.idx <- as.integer(names(leaf.counts))
-  }
-  
-  # if specified, calculate purity of each node
-  if (wt.pred.accuracy) {
-    leaf.sd <- c(by(y, which.leaf, varNode))
-    leaf.mean <- c(by(y, which.leaf, mean))
-    leaf.mean.c <- mean(y) - (leaf.counts / n) * leaf.mean
-    leaf.mean.c <- (n / (n - leaf.counts)) * leaf.mean.c 
-  }
+  leaf.counts <- table(which.leaf)
+  leaf.idx <- as.integer(names(leaf.counts))
   tree.info$size.node[leaf.idx] <- leaf.counts
   
-  if (wt.pred.accuracy) {
-    tree.info$dec.purity <- 0
-    tree.info$dec.purity[leaf.idx] <- pmax((sd(y) - leaf.sd) / sd(y), 0)
-    tree.info$mean[leaf.idx] <- leaf.mean
-    tree.info$mean.c[leaf.idx] <- leaf.mean.c
-  }
-  
-
   node.obs <- NULL
   if (return.node.obs) {
     id <- match(which.leaf, sort(unique(which.leaf)))
