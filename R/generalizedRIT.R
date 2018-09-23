@@ -28,7 +28,8 @@ generalizedRIT <- function(x, rand.forest=NULL, read.forest=NULL,
   if (is.null(rit.param$nchild)) rit.param$nchild <- 2
   if (is.null(rit.param$class.id) & class.irf) rit.param$class.id <- 1
   if (is.null(rit.param$min.nd)) rit.param$min.nd <- 1
-  if (is.null(rit.param$class.cut) & !class.irf) stop('Specifiy class.cut for regression')
+  if (is.null(rit.param$class.cut) & !class.irf) 
+    stop('Specifiy class.cut for regression')
 
   # Set feature names for grouping interactions
   if (is.null(varnames.grp)) varnames.grp <- as.character(1:ncol(x))
