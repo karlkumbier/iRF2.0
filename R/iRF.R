@@ -19,18 +19,24 @@ iRF <- function(x, y,
                 bootstrap.path=NULL,
                 ...) {
   
-  
   if (ncol(x) < 2 & !is.null(interactions.return))
     stop('cannot find interaction - X has less than two columns!')
   
   if (any(interactions.return > n.iter))
     stop('interaction iteration to return greater than n.iter')
+ 
+  # Check all RIT and set to defaul if missing
+  if (is.null(rit.param$depth)) rit.param$depth <- 5
+  if (is.null(rit.param$ntree)) rit.param$ntree <- 500
+  if (is.null(rit.param$nchild)) rit.param$nchild <- 2
+  if (is.null(rit.param$class.id) & is.factor(y)) rit.param$class.id <- 1
+  if (is.null(rit.param$min.nd)) rit.param$min.nd <- 1
+  if (is.null(rit.param$class.cut) & is.numeric(y)) 
+    rit.param$class.cut <- median(y)
   
   n <- nrow(x)
   p <- ncol(x)
   class.irf <- is.factor(y)
-  if (!class.irf & is.null(rit.param$class.cut)) 
-    rit.param$class.cut <- median(y)
   importance <- ifelse(class.irf, 'MeanDecreaseGini', 'IncNodePurity')
    
   rf.list <- list()
@@ -117,12 +123,15 @@ iRF <- function(x, y,
       }
       
       # Run generalized RIT on rf.b to learn interactions
-      if (!is.null(xtest)) 
+      if (!is.null(xtest)) {
         xx <- rbind(x, xtest)
-      else
+        weights <- c(rep(1, nrow(x)), rep(0, nrow(xtest)))
+      } else {
         xx <- x
-      
-      ints <- generalizedRIT(rf=rf.b, x=xx, ntrain=nrow(x),
+      }
+
+      ints <- generalizedRIT(rand.forest=rf.b, x=xx,
+                             weights=weights,
                              varnames.grp=varnames.grp,
                              rit.param=rit.param,
                              get.prevalence=get.prevalence,
@@ -145,8 +154,7 @@ iRF <- function(x, y,
   if (!is.null(interactions.return)) out$interaction <- stability.score
   if (get.prevalence) out$prevalence <- prevalence.score
 
-  
-  if (select.iter | length(interactions.return) == 1) {
+  if (length(interactions.return) == 1) {
     out$rf.list <- out$rf.list[[interactions.return]]
     out$interaction <- out$interaction[[interactions.return]]
     out$selected.iter <- interactions.return
@@ -178,14 +186,14 @@ summarizePrev <- function(prev) {
   # Summarize interaction prevalence across bootstrap samples
   require(data.table)
   nbs <- length(prev)
-  prev0 <- unlist(lapply(prev, function(z) z$i0))
-  prev1 <- unlist(lapply(prev, function(z) z$i1))
-
-  prev <- data.table(int=names(prev1), prev1=prev1, prev0=prev0) %>%
-  group_by(int) %>%
-  summarize(prev1=mean(prev1), prev0=mean(prev0), n=n()/nbs) %>%
-  mutate(diff=(prev1-prev0)) %>%
-  arrange(desc(diff))
+  
+  prev <- rbindlist(prev) %>%
+    group_by(int) %>%
+    summarize(prev1=mean(prev1), prev0=mean(prev0), 
+              pred1=mean(pred1), pred0=mean(pred0),
+              n=n()/nbs) %>%
+    mutate(dprev=(prev1-prev0), dpred=(pred1-pred0)) %>%
+    arrange(desc(dpred))
   return(prev)
 }
 
@@ -235,10 +243,10 @@ bootstrapSample <- function(block.bootstrap, y) {
     sample.id <- unlist(block.bootstrap[sample.id])
   }
   
-  #if (is.factor(y) & length(unique(y[sample.id])) == 1) {
-  #  warning('ONLY 1 class in block bootstrap sample, resampling...')
-  #  bootstrapSample(block.bootstrap, y)
-  #}
+  if (is.factor(y) & length(unique(y[sample.id])) == 1) {
+    warning('ONLY 1 class in block bootstrap sample, resampling...')
+    bootstrapSample(block.bootstrap, y)
+  }
 
   return(sample.id)
 }
