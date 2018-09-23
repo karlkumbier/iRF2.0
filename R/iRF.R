@@ -190,10 +190,10 @@ summarizePrev <- function(prev) {
   prev <- rbindlist(prev) %>%
     group_by(int) %>%
     summarize(prev1=mean(prev1), prev0=mean(prev0), 
-              pred1=mean(pred1), pred0=mean(pred0),
+              cprop1=mean(cprop1), prop1=mean(prop1),
               n=n()/nbs) %>%
-    mutate(dprev=(prev1-prev0), dpred=(pred1-pred0)) %>%
-    arrange(desc(dpred))
+    mutate(diff=(prev1-prev0)) %>%
+    arrange(desc(prop1))
   return(prev)
 }
 

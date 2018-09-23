@@ -191,10 +191,8 @@ prevalence <- function(int, nf, select.id, wt=rep(1, ncol(nf))) {
   
   prev1 <- sint1 / s1
   prev0 <- sint0 / s0
-  pred1 <- sint1 / sint
-  pred0 <- sint0 / sint
-
-  return(data.table(prev1, prev0, pred1, pred0))
+  prop1 <- sint1 / sint
+  return(data.table(prev1, prev0, prop1))
 }
 
 subsetReadForest <- function(read.forest, subset.idcs) {
