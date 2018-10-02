@@ -40,21 +40,25 @@ models that have demonstrated impressive empirical success across a wide variety
 of problems. The predictive accuracy of random forests stems from their ability
 to learn high-order, non-linear interactions in large datasets. Although
 approaches exist for evaluating the importance of individual features in a
-fitted random forest, identifying important interactions that drive predictive
-accuracy remains a challenge. 
+fitted random forest, identifying interactions that drive predictive accuracy
+remains a challenge. This challenge is in large part due to the enourmous number
+of interactions that must be considered (i.e. there are $O(p^s)$ possible
+interactions of size $s$ among $p$ features) and the instability of random
+forest decision paths.
 
 The iterative Random Forest algorithm (iRF), and corresponding `iRF` R package,
-take a step towards addressing this challenge by providing a computationally
-tractable approach to search for important interactions in a fitted random
-forest [@basu2018iterative]. Our algorithm grows a series of feature weighted random forests
-[@amaratunga2008enriched] to perform soft regularization on the model based on
-predictive features. We then search for prevalent interactions in the fitted
-random forest using a generalization of random intersection trees
+take a step towards addressing these issues with a computationally tractable
+approach to search for important interactions in a fitted random forest
+[@basu2018iterative]. Our algorithm grows a series of feature weighted random
+forests [@amaratunga2008enriched] to perform soft regularization on the model
+based on predictive features. We then search for prevalent interactions in the
+fitted random forest using a generalization of random intersection trees
 [@shah2014random].  Finally, we assess the stability of recovered interactions
 by repeating this search across random forests trained on bootstrap samples of
 the data. The `iRF` R package combines these steps into a single workflow. It is
-based on the source codes from the R packages `randomForest` [@liaw2002classification] and
-`FSInteract` [@shah2014random]. A detailed vignette is available on
+based on the source codes from the R packages `randomForest`
+[@liaw2002classification] and `FSInteract` [@shah2014random]. A detailed
+vignette is available on
 [github](https://cdn.rawgit.com/sumbose/iRF/master/vignettes/vignette2.html).
 
 # Acknowledgements
