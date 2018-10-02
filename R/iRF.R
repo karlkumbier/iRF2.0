@@ -128,6 +128,7 @@ iRF <- function(x, y,
         weights <- c(rep(1, nrow(x)), rep(0, nrow(xtest)))
       } else {
         xx <- x
+        weights <- rep(1, nrow(x))
       }
 
       ints <- generalizedRIT(rand.forest=rf.b, x=xx,
@@ -190,8 +191,7 @@ summarizePrev <- function(prev) {
   prev <- rbindlist(prev) %>%
     group_by(int) %>%
     summarize(prev1=mean(prev1), prev0=mean(prev0), 
-              cprop1=mean(cprop1), prop1=mean(prop1),
-              n=n()/nbs) %>%
+              prop1=mean(prop1), n=n()/nbs) %>%
     mutate(diff=(prev1-prev0)) %>%
     arrange(desc(prop1))
   return(prev)

@@ -21,7 +21,9 @@ generalizedRIT <- function(x, rand.forest=NULL, read.forest=NULL,
     class.irf <- rand.forest$type == 'classification'
   else
     class.irf <- all(read.forest$tree.info$prediction %in% 1:2)
-  
+
+  ntrain <- nrow(x)
+
   # Check all RIT and set to defaul if missing
   if (is.null(rit.param$depth)) rit.param$depth <- 5
   if (is.null(rit.param$ntree)) rit.param$ntree <- 500
@@ -182,7 +184,8 @@ prevalence <- function(int, nf, select.id, wt=rep(1, ncol(nf))) {
 
   # Compute conditional probabilities of interaction given class and class given
   # interaction
-  if (sum(int.id) == 0) return(0)
+  if (sum(int.id) == 0) 
+    return(data.table(prev1=0, prev0=0, prop1=0))
   
   sint1 <- sum(wt[int.id & select.id])
   sint0 <- sum(wt[int.id & !select.id])
