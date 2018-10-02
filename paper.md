@@ -5,10 +5,10 @@ tags:
   - Random Forests
   - Interpretable machine learning
 authors:
-  - name: Sumanta Basu\*
-    affiliation: "1, 2" # (Multiple affiliations must be quoted)
-  - name: Karl Kumbier\*
-    affiliation: 3
+  - name: Sumanta Basu
+    affiliation: "\*, 1, 2"
+  - name: Karl Kumbier
+    affiliation: "\*, 3"
   - name: James B. Brown
     affiliation: "3, 4, 5"
   - name: Bin Yu
@@ -28,7 +28,10 @@ affiliations:
  - name: Department of Electrical Engineering and Computer Sciences, University
    of California, Berkeley 
    index: 6
-date: 13 August 2017
+ - name: Denotes equal contribution
+   index: \*
+date: 2 October 2018
+bibliography: paper.bib
 ---
 
 # Summary
