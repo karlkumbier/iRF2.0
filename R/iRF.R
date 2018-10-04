@@ -121,8 +121,8 @@ iRF <- function(x, y,
       } else {
         out.file <- NULL
       }
-      
-      # Run generalized RIT on rf.b to learn interactions
+     
+      # Weight observations for gRTI: train = 1, test = 0  
       if (!is.null(xtest)) {
         xx <- rbind(x, xtest)
         weights <- c(rep(1, nrow(x)), rep(0, nrow(xtest)))
@@ -131,6 +131,7 @@ iRF <- function(x, y,
         weights <- rep(1, nrow(x))
       }
 
+      # Run generalized RIT on rf.b to learn interactions
       ints <- generalizedRIT(rand.forest=rf.b, x=xx,
                              weights=weights,
                              varnames.grp=varnames.grp,
@@ -175,12 +176,11 @@ summarizeInteract <- function(store.out){
   if (length(store) >= 1){
     int.tbl <- sort(c(table(store)), decreasing=TRUE)
     int.tbl <- int.tbl / n.bootstrap
+    out <- int.tbl
+    return(out)
   } else {
-    return(list(interaction=numeric(0), prevalence=numeric(0)))
+    return(c(interaction=numeric(0), prevalence=numeric(0)))
   }
-  
-  out <- int.tbl
-  return(out)
 }
 
 summarizePrev <- function(prev) {
@@ -188,13 +188,18 @@ summarizePrev <- function(prev) {
   require(data.table)
   nbs <- length(prev)
   
-  prev <- rbindlist(prev) %>%
-    group_by(int) %>%
-    summarize(prev1=mean(prev1), prev0=mean(prev0), 
-              prop1=mean(prop1), n=n()/nbs) %>%
-    mutate(diff=(prev1-prev0)) %>%
-    arrange(desc(prop1))
-  return(prev)
+  prev <- rbindlist(prev)
+  if (nrow(prev) > 0) {
+    prev <- group_by(prev, int) %>%
+      summarize(prev1=mean(prev1), prev0=mean(prev0), 
+                prop1=mean(prop1), n=n()/nbs) %>%
+      mutate(diff=(prev1-prev0)) %>%
+      arrange(desc(prop1))
+  } else {
+    prev <- data.table(int=character(0), prev1=numeric(0), prev0=numeric(0),
+                       prop1=numeric(0), n=numeric(0), diff=numeric(0))
+    return(prev)
+  }
 }
 
 sampleClass <- function(y, cl, n) {
