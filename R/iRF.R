@@ -192,7 +192,8 @@ summarizePrev <- function(prev) {
   if (nrow(prev) > 0) {
     prev <- group_by(prev, int) %>%
       summarize(prev1=mean(prev1), prev0=mean(prev0), 
-                prop1=mean(prop1), n=n()/nbs) %>%
+                prop1=mean(prop1), gini=mean(gini),
+                n=n()/nbs) %>%
       mutate(diff=(prev1-prev0)) %>%
       arrange(desc(prop1))
   } else {
