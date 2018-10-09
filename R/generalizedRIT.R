@@ -1,6 +1,6 @@
-generalizedRIT <- function(rf=NULL, x=NULL, rforest=NULL,
-                           ntrain=nrow(x),
-                           weights=rep(1, ntrain),
+generalizedRIT <- function(x, y, rand.forest=NULL, 
+                           read.forest=NULL,
+                           weights=rep(1, nrow(x)),
                            varnames.grp=colnames(x),
                            rit.param=list(depth=5,
                                           ntree=500,
@@ -15,10 +15,24 @@ generalizedRIT <- function(rf=NULL, x=NULL, rforest=NULL,
                            n.core=1) {
 
   out <- list()
-  if ((is.null(rf) | is.null(x)) & is.null(rforest))
+  if (is.null(rand.forest) & is.null(read.forest))
     stop('Supply random forest or read forest output')
-  if (is.null(rit.param$class.cut) & is.null(rit.param$class.id))
-    stop('Supply class.id (classification) or class.cut (regression)')
+
+  if (!is.null(rand.forest)) 
+    class.irf <- rand.forest$type == 'classification'
+  else
+    class.irf <- all(read.forest$tree.info$prediction %in% 1:2)
+
+  ntrain <- nrow(x)
+
+  # Check all RIT and set to defaul if missing
+  if (is.null(rit.param$depth)) rit.param$depth <- 5
+  if (is.null(rit.param$ntree)) rit.param$ntree <- 500
+  if (is.null(rit.param$nchild)) rit.param$nchild <- 2
+  if (is.null(rit.param$class.id) & class.irf) rit.param$class.id <- 1
+  if (is.null(rit.param$min.nd)) rit.param$min.nd <- 1
+  if (is.null(rit.param$class.cut) & !class.irf) 
+    stop('Specifiy class.cut for regression')
 
   # Set feature names for grouping interactions
   if (is.null(varnames.grp)) varnames.grp <- as.character(1:ncol(x))
@@ -26,30 +40,29 @@ generalizedRIT <- function(rf=NULL, x=NULL, rforest=NULL,
   p <- length(varnames.unq)
   
   # Read RF object to extract decision path metadata
-  if (is.null(rforest)) {
-    rforest <- readForest(rf, x=x,
-                          return.node.feature=TRUE,
-                          return.node.obs=TRUE,
-                          varnames.grp=varnames.grp,
-                          get.split=TRUE,
-                          n.core=n.core)
+  if (is.null(read.forest)) {
+    read.forest <- readForest(rand.forest, x=x,
+                              return.node.feature=TRUE,
+                              return.node.obs=TRUE,
+                              varnames.grp=varnames.grp,
+                              get.split=TRUE,
+                              n.core=n.core)
   }
 
   # Collapse node feature matrix for unsigned iRF
   if (!int.sign) {
-    rforest$node.feature <- rforest$node.feature[,1:p] +
-    rforest$node.feature[,(p + 1):(2 * p)]
+    read.forest$node.feature <- read.forest$node.feature[,1:p] +
+      read.forest$node.feature[,(p + 1):(2 * p)]
   }
 
-  if (!is.null(out.file)) save(file=out.file, rforest, ntrain)
-  rforest$node.obs <- rforest$node.obs[,1:ntrain]
+  if (!is.null(out.file)) save(file=out.file, read.forest, ntrain)
 
   # Select class specific leaf nodes
-  rfpred <- rforest$tree.info$prediction
-  if (is.null(rit.param$class.cut))
-    select.id <- rfpred == rit.param$class.id + 1
+  pred <- read.forest$tree.info$prediction
+  if (class.irf)
+    select.id <- pred == rit.param$class.id + 1
   else
-    select.id <- rfpred > rit.param$class.cut
+    select.id <- pred > rit.param$class.cut
 
   # Run RIT on leaf nodes of selected class to find
   # prevalent interactions
@@ -57,9 +70,9 @@ generalizedRIT <- function(rf=NULL, x=NULL, rforest=NULL,
     return(character(0))
   } else {
     
-    wt <- Matrix::colSums(t(rforest$node.obs) * weights)
-    out$int <- runRIT(subsetReadForest(rforest, select.id),
-                      weights=wt[select.id],
+    ndcnt <- Matrix::colSums(t(read.forest$node.obs) * weights)
+    out$int <- runRIT(subsetReadForest(read.forest, select.id),
+                      weights=ndcnt[select.id],
                       rit.param=rit.param,
                       obs.rit=obs.rit,
                       n.core=n.core)
@@ -69,7 +82,7 @@ generalizedRIT <- function(rf=NULL, x=NULL, rforest=NULL,
     # If running observation level RIT, split feature and observation
     # interacitons and group by feature interactions
     if (obs.rit) {
-      pp <- ncol(rforest$node.feature)
+      pp <- ncol(read.forest$node.feature)
       out$obs <- lapply(out$int, function(z) pasteInt(z[z > pp] - pp))
       out$int <- sapply(out$int, function(z) pasteInt(z[z <= pp]))
 
@@ -85,51 +98,60 @@ generalizedRIT <- function(rf=NULL, x=NULL, rforest=NULL,
       out$obs <- lapply(out$obs, function(z) as.numeric(unique(z)))
     }
 
-    int.names <- nameInts(out$int, varnames.unq, signed=int.sign)
 
     if (get.prevalence) {
-      out$prev$i1 <- mclapply(out$int, prevalence,
-                              nf=rforest$node.feature[select.id,],
-                              wt=wt[select.id],
-                              mc.cores=n.core)
-      out$prev$i1 <- unlist(out$prev$i1)
 
-      out$prev$i0 <- mclapply(out$int, prevalence,
-                              nf=rforest$node.feature[!select.id,],
-                              wt=wt[!select.id],
-                              mc.cores=n.core)
-      out$prev$i0 <- unlist(out$prev$i0)
+      # Evaluate class proportion in each leaf node
+      if (is.factor(y)) y <- as.numeric(y) - 1
+      stopifnot(all(weights %in% 0:1)) #only 0-1 weights supported
+      ndcnt <- t(read.forest$node.obs) * weights # leaf node size
+      ndcnt1 <- Matrix::colSums(ndcnt * y) # leaf node class-1 size
+      ndcnt <- Matrix::colSums(ndcnt)
+      yprop <- ndcnt1 / ndcnt # leaf node class-1 proportion
 
-      names(out$prev$i1) <- int.names
-      names(out$prev$i0) <- int.names
+      n <- sum(weights)
+      n.ndcnt <- n - ndcnt # non-node size
+      n.ndcnt1 <- sum(weights * y) - ndcnt1 # non-node class-1 size
+      n.yprop <- n.ndcnt1 / n.ndcnt # non-node proportion
+      gini <- (ndcnt / n) * yprop * (1 - yprop) +
+        (n.ndcnt / n) * n.yprop * (1 - n.yprop)
+      
+      id <- read.forest$tree.info$size.node > min.node
+      out$prev <- mclapply(out$int, prevalence,
+                           nf=read.forest$node.feature[id,],
+                           yprop=yprop[id], gini=gini[id],
+                           select.id=select.id[id], wt=ndcnt[id],
+                           mc.cores=n.core)
+      out$prev <- rbindlist(out$prev) 
     }
-
+     
+    int.names <- nameInts(out$int, varnames.unq, signed=int.sign)
     out$int <- int.names
+    if (get.prevalence) out$prev$int <- int.names
   }
   return(out)
 }
 
-runRIT <- function(rforest, weights, rit.param, 
-                   obs.rit=FALSE, int.subs=TRUE, 
-                   n.core=1) {
+runRIT <- function(read.forest, weights, rit.param, 
+                   obs.rit=FALSE, n.core=1) {
 
   # Remove nodes below specified size threshold
-  id.rm <- rforest$tree.info$size.node < rit.param$min.nd
+  id.rm <- read.forest$tree.info$size.node < rit.param$min.nd
   if (all(id.rm)) {
     warning(paste('No nodes with greater than ', rit.param$min.nd,
                   'observations. Using all nodes.'))
     id.rm <- rep(FALSE, length(id.rm))
   }
   
-  rforest <- subsetReadForest(rforest, !id.rm)
+  read.forest <- subsetReadForest(read.forest, !id.rm)
   wt <- weights[!id.rm]
   
   # Input for RIT: observations and features or only features 
   if (obs.rit) {
-    xrit <- cbind(rforest$node.feature[wt > 0,],
-                  rforest$node.obs[wt > 0,])
+    xrit <- cbind(read.forest$node.feature[wt > 0,],
+                  read.forest$node.obs[wt > 0,])
   } else {
-    xrit <- cbind(rforest$node.feature[wt > 0,])
+    xrit <- cbind(read.forest$node.feature[wt > 0,])
   }
 
 
@@ -164,35 +186,53 @@ nameInts <- function(ints, varnames, signed=TRUE) {
   return(ints.name)
 }
 
-prevalence <- function(int, nf, wt=rep(1, ncol(nf))) {
+prevalence <- function(int, nf, yprop, gini,
+                       select.id, wt=rep(1, ncol(nf))) {
   # Calculate the decision path prevalence of an interaction
+  
   id.rm <- wt == 0
+  select.id <- select.id[!id.rm]
   wt <- wt[!id.rm]
+  nf <- nf[!id.rm,]
+  yprop <- yprop[!id.rm]
 
   int <- as.numeric(int)
   intord <- length(int)
   if (intord == 1)
-    int.id <- nf[!id.rm, int] != 0
+    int.id <- nf[, int] != 0
   else
-    int.id <- Matrix::rowSums(nf[!id.rm, int] != 0) == intord
+    int.id <- Matrix::rowSums(nf[, int] != 0) == intord
 
-  if (sum(int.id) == 0) return(0)
-  prev <- sum(wt[int.id]) / sum(wt)
-  return(prev)
+  # Compute conditional probabilities of interaction given class and class given
+  # interaction
+  if (sum(int.id) == 0) 
+    return(data.table(prev1=0, prev0=0, prop1=0))
+  
+  sint1 <- sum(wt[int.id & select.id])
+  sint0 <- sum(wt[int.id & !select.id])
+  s1 <- sum(wt[select.id])
+  s0 <- sum(wt[!select.id])
+  
+  prev1 <- sint1 / s1
+  prev0 <- sint0 / s0
+  prop1 <- mean(yprop[int.id & select.id])
+  gini <- mean(gini[int.id & select.id])
+
+  return(data.table(prev1, prev0, prop1, gini))
 }
 
-subsetReadForest <- function(rforest, subset.idcs) {
+subsetReadForest <- function(read.forest, subset.idcs) {
   # Subset nodes from readforest output 
-  if (!is.null(rforest$node.feature))
-    rforest$node.feature <- rforest$node.feature[subset.idcs,]
+  if (!is.null(read.forest$node.feature))
+    read.forest$node.feature <- read.forest$node.feature[subset.idcs,]
 
-  if (!is.null(rforest$tree.info))
-    rforest$tree.info <- rforest$tree.info[subset.idcs,]
+  if (!is.null(read.forest$tree.info))
+    read.forest$tree.info <- read.forest$tree.info[subset.idcs,]
 
-  if (!is.null(rforest$node.obs))
-    rforest$node.obs <- rforest$node.obs[subset.idcs,]
+  if (!is.null(read.forest$node.obs))
+    read.forest$node.obs <- read.forest$node.obs[subset.idcs,]
 
-  return(rforest)
+  return(read.forest)
 }
 
 pasteInt <- function(x) paste(x, collapse='_')
