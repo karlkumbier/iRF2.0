@@ -125,14 +125,16 @@ iRF <- function(x, y,
       # Weight observations for gRTI: train = 1, test = 0  
       if (!is.null(xtest)) {
         xx <- rbind(x, xtest)
+        yy <- c(y, ytest)
         weights <- c(rep(1, nrow(x)), rep(0, nrow(xtest)))
       } else {
         xx <- x
+        yy <- y
         weights <- rep(1, nrow(x))
       }
 
       # Run generalized RIT on rf.b to learn interactions
-      ints <- generalizedRIT(rand.forest=rf.b, x=xx,
+      ints <- generalizedRIT(rand.forest=rf.b, x=xx, y=yy,
                              weights=weights,
                              varnames.grp=varnames.grp,
                              rit.param=rit.param,
@@ -192,8 +194,7 @@ summarizePrev <- function(prev) {
   if (nrow(prev) > 0) {
     prev <- group_by(prev, int) %>%
       summarize(prev1=mean(prev1), prev0=mean(prev0), 
-                prop1=mean(prop1), gini=mean(gini),
-                n=n()/nbs) %>%
+                prop1=mean(prop1), n=n()/nbs) %>%
       mutate(diff=(prev1-prev0)) %>%
       arrange(desc(prop1))
   } else {

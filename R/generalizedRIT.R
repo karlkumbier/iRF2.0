@@ -55,6 +55,8 @@ generalizedRIT <- function(x, y, rand.forest=NULL,
       read.forest$node.feature[,(p + 1):(2 * p)]
   }
 
+  yprop <- yProp(read.forest, y, weights)
+  read.forest$tree.info$yprop <- yprop
   if (!is.null(out.file)) save(file=out.file, read.forest, ntrain)
 
   # Select class specific leaf nodes
@@ -100,26 +102,10 @@ generalizedRIT <- function(x, y, rand.forest=NULL,
 
 
     if (get.prevalence) {
-
-      # Evaluate class proportion in each leaf node
-      if (is.factor(y)) y <- as.numeric(y) - 1
-      stopifnot(all(weights %in% 0:1)) #only 0-1 weights supported
-      ndcnt <- t(read.forest$node.obs) * weights # leaf node size
-      ndcnt1 <- Matrix::colSums(ndcnt * y) # leaf node class-1 size
-      ndcnt <- Matrix::colSums(ndcnt)
-      yprop <- ndcnt1 / ndcnt # leaf node class-1 proportion
-
-      n <- sum(weights)
-      n.ndcnt <- n - ndcnt # non-node size
-      n.ndcnt1 <- sum(weights * y) - ndcnt1 # non-node class-1 size
-      n.yprop <- n.ndcnt1 / n.ndcnt # non-node proportion
-      gini <- (ndcnt / n) * yprop * (1 - yprop) +
-        (n.ndcnt / n) * n.yprop * (1 - n.yprop)
-      
-      id <- read.forest$tree.info$size.node > min.node
+      id <- read.forest$tree.info$size.node >= rit.param$min.nd
       out$prev <- mclapply(out$int, prevalence,
                            nf=read.forest$node.feature[id,],
-                           yprop=yprop[id], gini=gini[id],
+                           yprop=read.forest$tree.info$yprop[id], 
                            select.id=select.id[id], wt=ndcnt[id],
                            mc.cores=n.core)
       out$prev <- rbindlist(out$prev) 
@@ -186,8 +172,25 @@ nameInts <- function(ints, varnames, signed=TRUE) {
   return(ints.name)
 }
 
-prevalence <- function(int, nf, yprop, gini,
-                       select.id, wt=rep(1, ncol(nf))) {
+yProp <- function(read.forest, y, weights) {
+  # Evaluate class proportion in each leaf node
+  if (is.factor(y) | !all(y %in% 0:1)) y <- as.numeric(y) - 1
+  stopifnot(all(weights %in% 0:1)) # only 0-1 weights supported
+  if (!all(weights == 1)) weights <- 1 - weights # evaluate on test data
+  
+  ndcnt <- t(read.forest$node.obs) * weights # leaf node size
+  ndcnt1 <- Matrix::colSums(ndcnt * y) # leaf node class-1 size
+  ndcnt <- Matrix::colSums(ndcnt)
+  yprop <- ndcnt1 / ndcnt # leaf node class-1 proportion
+
+  n <- sum(weights)
+  n.ndcnt <- n - ndcnt # non-node size
+  n.ndcnt1 <- sum(weights * y) - ndcnt1 # non-node class-1 size
+  n.yprop <- n.ndcnt1 / n.ndcnt # non-node proportion
+  return(yprop)
+}
+
+prevalence <- function(int, nf, yprop, select.id, wt=rep(1, ncol(nf))) {
   # Calculate the decision path prevalence of an interaction
   
   id.rm <- wt == 0
@@ -215,10 +218,9 @@ prevalence <- function(int, nf, yprop, gini,
   
   prev1 <- sint1 / s1
   prev0 <- sint0 / s0
-  prop1 <- mean(yprop[int.id & select.id])
-  gini <- mean(gini[int.id & select.id])
+  prop1 <- mean(yprop[int.id & select.id], na.rm=TRUE)
 
-  return(data.table(prev1, prev0, prop1, gini))
+  return(data.table(prev1, prev0, prop1))
 }
 
 subsetReadForest <- function(read.forest, subset.idcs) {
