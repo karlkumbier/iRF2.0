@@ -13,9 +13,8 @@ iRF <- function(x, y,
                 n.bootstrap=1,
                 select.iter=FALSE,
                 get.prevalence=TRUE,
-                int.sign=TRUE,
+                signed=TRUE,
                 verbose=TRUE,
-                block.bootstrap=NULL,
                 ...) {
   
   if (ncol(x) < 2 & !is.null(interactions.return))
@@ -32,7 +31,13 @@ iRF <- function(x, y,
   if (is.null(rit.param$min.nd)) rit.param$min.nd <- 1
   if (is.null(rit.param$class.cut) & is.numeric(y)) 
     rit.param$class.cut <- median(y)
-  
+ 
+  # Check training/test attributes
+  if (!is.null(xtest) & ncol(xtest) != ncol(x))
+    stop('training/test data must have same number of features')
+  if (!is.null(xtest) & is.null(ytest))
+    stop('test set responses not indicated')
+
   n <- nrow(x)
   p <- ncol(x)
   class.irf <- is.factor(y)
@@ -67,6 +72,7 @@ iRF <- function(x, y,
     # Update feature selection probabilities
     mtry.select.prob <- rf.list[[iter]]$importance
 
+    # Evaluate test set error if supplied
     if (!is.null(xtest) & class.irf & verbose) {
       auroc <- auc(roc(rf.list[[iter]]$test$votes[,2], ytest))
       print(paste('AUROC: ', round(auroc, 2)))
@@ -76,7 +82,7 @@ iRF <- function(x, y,
       print(paste('% var explained:', pct.var * 100))
     }
   }
-  
+
   # Select iteration for which to return interactions based on minimizing 
   # prediction error on OOB samples
   if (select.iter) {
@@ -84,10 +90,12 @@ iRF <- function(x, y,
     if (verbose) print(paste('selected iter:', interactions.return))
   }
 
-  # Weight observations for gRTI: train = 1, test = 0  
+  # Combine training and test set for RIT, and weight test set to 0. Leaf node
+  # class proportions will be evaluated on test set if supplied
   if (!is.null(xtest)) {
     xx <- rbind(x, xtest)
     yy <- c(y, ytest)
+    if (class.irf) yy <- as.factor(yy - 1)
     weights <- c(rep(1, nrow(x)), rep(0, nrow(xtest)))
   } else {
     xx <- x
@@ -98,12 +106,12 @@ iRF <- function(x, y,
   
   for (iter in interactions.return) {
     # Evaluate interactions in full data random forest
-    ints.full <- generalizedRIT(rand.forest=rf.list[[iter]], x=xx, y=yy,
+    ints.full <- gRIT(rand.forest=rf.list[[iter]], x=xx, y=yy,
                                 weights=weights,
                                 varnames.grp=varnames.grp,
                                 rit.param=rit.param,
                                 get.prevalence=get.prevalence,
-                                signed=int.sign,
+                                signed=signed,
                                 n.core=n.core)
 
     # Find interactions across bootstrap replicates
@@ -114,7 +122,7 @@ iRF <- function(x, y,
 
     for (i.b in 1:n.bootstrap) { 
 
-      sample.id <- bootstrapSample(block.bootstrap, y)
+      sample.id <- bootstrapSample(y)
       # Use feature weights from current iteraction of full data RF
       if (iter == 1) 
         mtry.select.prob <- rep(1, ncol(x))
@@ -133,12 +141,12 @@ iRF <- function(x, y,
                       }
 
       # Run generalized RIT on rf.b to learn interactions
-      ints <- generalizedRIT(rand.forest=rf.b, x=xx, y=yy,
+      ints <- gRIT(rand.forest=rf.b, x=xx, y=yy,
                              weights=weights,
                              varnames.grp=varnames.grp,
                              rit.param=rit.param,
                              get.prevalence=get.prevalence,
-                             signed=int.sign,
+                             signed=signed,
                              ints.full=ints.full$int,
                              n.core=n.core)
       
@@ -154,8 +162,10 @@ iRF <- function(x, y,
   
   out <- list()
   out$rf.list <- rf.list
-  if (!is.null(interactions.return)) out$interaction <- stability.score
-  if (get.prevalence) out$prevalence <- prevalence.score
+  if (!is.null(interactions.return)) {
+    out$interaction <- stability.score
+    if (get.prevalence) out$prevalence <- prevalence.score
+  }
 
   if (length(interactions.return) == 1) {
     out$rf.list <- out$rf.list[[interactions.return]]
@@ -168,19 +178,18 @@ iRF <- function(x, y,
 }
 
 
-summarizeInteract <- function(store.out){
+summarizeInteract <- function(x){
   # Aggregate interactions across bootstrap samples
 
-  n.bootstrap <- length(store.out)
-  store <- unlist(store.out)
+  n.bootstrap <- length(x)
+  x <- unlist(x)
   
-  if (length(store) >= 1){
-    int.tbl <- sort(c(table(store)), decreasing=TRUE)
+  if (length(x) >= 1){
+    int.tbl <- sort(c(table(x)), decreasing=TRUE)
     int.tbl <- int.tbl / n.bootstrap
-    out <- int.tbl
-    return(out)
+    return(int.tbl)
   } else {
-    return(c(interaction=numeric(0), prevalence=numeric(0)))
+    return(c(interaction=numeric(0)))
   }
 }
 
@@ -198,14 +207,16 @@ summarizePrev <- function(prev) {
                 diff=mean(diff),
                 prev1=mean(prev1), 
                 prev0=mean(prev0), 
-                prop1=mean(prop1),
                 prop1.mn=min(prop1),
-                prop1.mx=max(prop1), 
+                prop1.mx=max(prop1),
+                prop1=mean(prop1),
                 n=n()/nbs) %>%
       arrange(desc(diff))
   } else {
-    prev <- data.table(int=character(0), prev1=numeric(0), prev0=numeric(0),
-                       prop1=numeric(0), n=numeric(0), diff=numeric(0))
+    # If no interactions recovered return empty data table
+    prev <- data.table(int=character(0), prev1=numeric(0), 
+                       prev0=numeric(0), prop1=numeric(0), 
+                       n=numeric(0), diff=numeric(0))
     return(prev)
   }
 }
@@ -238,29 +249,8 @@ selectIter <- function(rf.list, y) {
   return(id.select)
 }
 
-
-bootstrapSample <- function(block.bootstrap, y) {
-  # Generate outer layer bootstrap samples
-  
+bootstrapSample <- function(y) {
   n <- length(y)
-  if (is.null(block.bootstrap) & is.factor(y)) {
-    # Take bootstrap sample that maintains class balance in full data
-    ncl <- table(y)
-    class <- as.factor(names(ncl))
-    sample.id <- mapply(function(cc, n) sampleClass(y, cc, n), class, ncl)
-    sample.id <- unlist(sample.id)
-  } else if (is.null(block.bootstrap)) {
-    sample.id <- sample(n, replace=TRUE)
-  } else {
-    sample.id <- sample(length(block.bootstrap), replace=TRUE)
-    sample.id <- unlist(block.bootstrap[sample.id])
-  }
-  
-  if (is.factor(y) & length(unique(y[sample.id])) == 1) {
-    warning('ONLY 1 class in block bootstrap sample, resampling...')
-    bootstrapSample(block.bootstrap, y)
-  }
-
-  return(sample.id)
+  id <- sample(n, n, replace=TRUE)
+  return(id)
 }
-

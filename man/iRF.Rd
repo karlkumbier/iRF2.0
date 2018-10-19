@@ -5,8 +5,7 @@
   Using repeated calls to \code{iRF::randomForest}, this function
   iteratively grows weighted ensembles of decision trees. Optionally,
   for every iteration, returns stable feature interactions by analyzing feature
-  usage on decision paths of large leaf nodes. Implemented only for
-  binary classification with numeric predictors and response taking values in {0,1}.
+  usage on decision paths of large leaf nodes.
 }
 \usage{
   iRF(x, y, xtest=NULL, ytest=NULL, 
@@ -14,23 +13,21 @@
       ntree=500, 
       n.core=1,
       mtry.select.prob = rep(1/ncol(x), ncol(x)),
-      keep.impvar.quantile=NULL, 
       interactions.return=NULL,
-      wt.pred.accuracy=FALSE, 
-      rit.param=list(depth=5, ntree=500, nchild=2, 
-                     class.id=1, min.nd=1, 
-                     class.cut=median(as.numeric(y))), 
+      rit.param=list(depth=5, ntree=500, 
+                     nchild=2, class.id=1, 
+                     min.nd=1, class.cut=NULL), 
       varnames.grp=NULL,
       n.bootstrap=1,
       select.iter=FALSE,
       get.prevalence=FALSE,
-      int.direction=TRUE,
+      signed=TRUE,
       verbose=TRUE, ...
      )
 }
 \arguments{
   \item{x, xtest}{numeric matrices of predictors}
-  \item{y, ytest}{factor with two levels: 0, 1}
+  \item{y, ytest}{response vector. If factor classification is assumed.}
   \item{n.iter}{number of weighted random forest fits}
   \item{ntree}{number of trees to grow in each iteration}
   \item{n.core}{number of cores across which tree growing should be
@@ -40,8 +37,6 @@
   \item{interactions.return}{a numeric vector specifying which iterations to 
     calculate interactions for. Note: interaction computation can be
     computationally intensive, particularly when \code{n.bootstrap} is large.}
-  \item{wt.pred.accuracy}{Should leaf nodes be sampled proportional to both size
-    and decrease in variabiliy of responses?}
   \item{rit.param}{a named list, containing entries to specify 
     \code{depth}: depth of random intersection trees
     \code{ntree}: number of random intersection trees
@@ -62,9 +57,9 @@
     selected by OOB prediction accuracy}
   \item{get.prevalence}{If TRUE, prevalence of all recovered interactions will be 
     computed from the selected RF}
-  \item{int.direction}{If TRUE, interactions will indicate the direction of the
-    inequality associated with the first time a feature is selected for
-    splitting}
+  \item{signed}{If TRUE, signed interactions will be returned, indicating 
+    the direction of the inequality associated with the first time a feature 
+    is selected for splitting}
   \item{verbose}{Display progress messages and intermediate outputs on screen?}
   \item{...}{additional arguments passed to iRF::randomForest}
 }
@@ -75,6 +70,8 @@
     are candidate interactions (feature names separated by "_"), defined
     as frequently appearing features and feature combinations on the
     decision paths of large leaf nodes}
+  \item{prevalence}{(if get.prevalence = TRUE) evaluate the prevalance of each
+    recovered interaction along decision paths.}
 }
 %\details{
 %}
