@@ -1,4 +1,5 @@
-generalizedRIT <- function(x, y, rand.forest=NULL, 
+generalizedRIT <- function(x, y, 
+                           rand.forest=NULL, 
                            read.forest=NULL,
                            weights=rep(1, nrow(x)),
                            varnames.grp=colnames(x),
@@ -9,23 +10,20 @@ generalizedRIT <- function(x, y, rand.forest=NULL,
                                           min.nd=1,
                                           class.cut=NULL),
                            get.prevalence=FALSE,
-                           int.sign=TRUE,
+                           signed=TRUE,
                            obs.rit=FALSE,
-                           out.file=NULL,
+                           ints.full=NULL,
                            n.core=1) {
 
   out <- list()
+  class.irf <- is.factor(y)
+  ntrain <- nrow(x)
+
+
+
   if (is.null(rand.forest) & is.null(read.forest))
     stop('Supply random forest or read forest output')
 
-  if (!is.null(rand.forest)) 
-    class.irf <- rand.forest$type == 'classification'
-  else
-    class.irf <- all(read.forest$tree.info$prediction %in% 1:2)
-
-  ntrain <- nrow(x)
-
-  # Check all RIT and set to defaul if missing
   if (is.null(rit.param$depth)) rit.param$depth <- 5
   if (is.null(rit.param$ntree)) rit.param$ntree <- 500
   if (is.null(rit.param$nchild)) rit.param$nchild <- 2
@@ -50,14 +48,13 @@ generalizedRIT <- function(x, y, rand.forest=NULL,
   }
 
   # Collapse node feature matrix for unsigned iRF
-  if (!int.sign) {
+  if (!signed) {
     read.forest$node.feature <- read.forest$node.feature[,1:p] +
       read.forest$node.feature[,(p + 1):(2 * p)]
   }
 
   yprop <- yProp(read.forest, y, weights)
   read.forest$tree.info$yprop <- yprop
-  if (!is.null(out.file)) save(file=out.file, read.forest, ntrain)
 
   # Select class specific leaf nodes
   pred <- read.forest$tree.info$prediction
@@ -103,7 +100,15 @@ generalizedRIT <- function(x, y, rand.forest=NULL,
 
     if (get.prevalence) {
       id <- read.forest$tree.info$size.node >= rit.param$min.nd
-      out$prev <- mclapply(out$int, prevalence,
+      if (is.null(ints.full)) {
+        ints.full <- out$int
+      } else {
+        ints.full <- lapply(ints.full, int2Id, 
+                            varnames.grp=varnames.grp, 
+                            directed=signed)
+      }
+
+      out$prev <- mclapply(ints.full, prevalence,
                            nf=read.forest$node.feature[id,],
                            yprop=read.forest$tree.info$yprop[id], 
                            select.id=select.id[id], wt=ndcnt[id],
@@ -111,9 +116,9 @@ generalizedRIT <- function(x, y, rand.forest=NULL,
       out$prev <- rbindlist(out$prev) 
     }
      
-    int.names <- nameInts(out$int, varnames.unq, signed=int.sign)
+    int.names <- nameInts(out$int, varnames.unq, signed=signed)
     out$int <- int.names
-    if (get.prevalence) out$prev$int <- int.names
+    if (get.prevalence) out$prev$int <- nameInts(ints.full, varnames.unq, signed=signed)
   }
   return(out)
 }

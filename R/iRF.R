@@ -16,7 +16,6 @@ iRF <- function(x, y,
                 int.sign=TRUE,
                 verbose=TRUE,
                 block.bootstrap=NULL,
-                bootstrap.path=NULL,
                 ...) {
   
   if (ncol(x) < 2 & !is.null(interactions.return))
@@ -84,9 +83,29 @@ iRF <- function(x, y,
     interactions.return <- selectIter(rf.list, y=y)
     if (verbose) print(paste('selected iter:', interactions.return))
   }
+
+  # Weight observations for gRTI: train = 1, test = 0  
+  if (!is.null(xtest)) {
+    xx <- rbind(x, xtest)
+    yy <- c(y, ytest)
+    weights <- c(rep(1, nrow(x)), rep(0, nrow(xtest)))
+  } else {
+    xx <- x
+    yy <- y
+    weights <- rep(1, nrow(x))
+  }
+
   
   for (iter in interactions.return) {
-    
+    # Evaluate interactions in full data random forest
+    ints.full <- generalizedRIT(rand.forest=rf.list[[iter]], x=xx, y=yy,
+                                weights=weights,
+                                varnames.grp=varnames.grp,
+                                rit.param=rit.param,
+                                get.prevalence=get.prevalence,
+                                signed=int.sign,
+                                n.core=n.core)
+
     # Find interactions across bootstrap replicates
     if (verbose) cat('finding interactions ... ')
     
@@ -113,34 +132,14 @@ iRF <- function(x, y,
                                      ...)
                       }
 
-      # Write out bootstrap RFs for later processing
-      if (!is.null(bootstrap.path)) {
-        dir.create(bootstrap.path, showWarnings=FALSE)
-        out.file <- paste0(bootstrap.path, 'bs_iter', 
-                           iter, '_b', i.b, '.Rdata')
-      } else {
-        out.file <- NULL
-      }
-     
-      # Weight observations for gRTI: train = 1, test = 0  
-      if (!is.null(xtest)) {
-        xx <- rbind(x, xtest)
-        yy <- c(y, ytest)
-        weights <- c(rep(1, nrow(x)), rep(0, nrow(xtest)))
-      } else {
-        xx <- x
-        yy <- y
-        weights <- rep(1, nrow(x))
-      }
-
       # Run generalized RIT on rf.b to learn interactions
       ints <- generalizedRIT(rand.forest=rf.b, x=xx, y=yy,
                              weights=weights,
                              varnames.grp=varnames.grp,
                              rit.param=rit.param,
                              get.prevalence=get.prevalence,
-                             int.sign=int.sign,
-                             out.file=out.file,
+                             signed=int.sign,
+                             ints.full=ints.full$int,
                              n.core=n.core)
       
       interact.list[[i.b]] <- ints$int
@@ -192,11 +191,18 @@ summarizePrev <- function(prev) {
   
   prev <- rbindlist(prev)
   if (nrow(prev) > 0) {
-    prev <- group_by(prev, int) %>%
-      summarize(prev1=mean(prev1), prev0=mean(prev0), 
-                prop1=mean(prop1), n=n()/nbs) %>%
-      mutate(diff=(prev1-prev0)) %>%
-      arrange(desc(prop1))
+    prev <- mutate(prev, diff=(prev1-prev0)) %>%
+      group_by(int) %>%
+      summarize(diff.mn=min(diff),
+                diff.mx=max(diff),
+                diff=mean(diff),
+                prev1=mean(prev1), 
+                prev0=mean(prev0), 
+                prop1=mean(prop1),
+                prop1.mn=min(prop1),
+                prop1.mx=max(prop1), 
+                n=n()/nbs) %>%
+      arrange(desc(diff))
   } else {
     prev <- data.table(int=character(0), prev1=numeric(0), prev0=numeric(0),
                        prop1=numeric(0), n=numeric(0), diff=numeric(0))

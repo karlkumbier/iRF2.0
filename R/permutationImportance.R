@@ -1,5 +1,5 @@
 permImportance <- function(rfobj, x, y, ints, n.perms=3, varnames.group=NULL,
-                           n.cores=1) {
+                             n.cores=1) {
   # Evaluate the importance of an interaction by permuting all other features
   # args:
   #   rfobj: fitted random forest
