@@ -202,21 +202,18 @@ summarizePrev <- function(prev) {
   if (nrow(prev) > 0) {
     prev <- mutate(prev, diff=(prev1-prev0)) %>%
       group_by(int) %>%
-      summarize(diff.mn=min(diff),
-                diff.mx=max(diff),
+      summarize(sta.diff=mean(diff > 0),
                 diff=mean(diff),
+                prop1=mean(prop1),
                 prev1=mean(prev1), 
                 prev0=mean(prev0), 
-                prop1.mn=min(prop1),
-                prop1.mx=max(prop1),
-                prop1=mean(prop1),
-                n=n()/nbs) %>%
+                prec=mean(prec)) %>%
       arrange(desc(diff))
   } else {
     # If no interactions recovered return empty data table
-    prev <- data.table(int=character(0), prev1=numeric(0), 
-                       prev0=numeric(0), prop1=numeric(0), 
-                       n=numeric(0), diff=numeric(0))
+    prev <- data.table(sta.diff=numeric(0), diff=numeric(0),
+                       prev1=numeric(0), prev0=numeric(0), 
+                       prop1=numeric(0))
     return(prev)
   }
 }
