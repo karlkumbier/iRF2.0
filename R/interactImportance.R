@@ -1,7 +1,6 @@
 intImportance <- function(int, nf, yprec, select.id, weight) {
   # Calculate the prevalence of an interaction across selected leaf nodes of a
   # random forest
-
   id.rm <- weight == 0
   select.id <- select.id[!id.rm]
   weight <- weight[!id.rm]
@@ -52,3 +51,24 @@ precision <- function(read.forest, y, weights) {
   return(yprec)
 }
 
+subsetTest <- function(int, ints, importance) {
+  # Compare prevalence of interaction on decision paths to expectation under
+  # independent selection
+  require(stringr)
+
+  if (length(int) == 1) return(c(prev.test=0, prec.test=0))
+  ss <- combn(int, length(int) - 1, simplify=FALSE)
+
+  setEq <- function(x, y) all(x %in% y) & all(y %in% x)
+  setsEq <- function(x, y) sapply(y, setEq, x=x)
+  getPair <- function(z) setsEq(z, ints) | setsEq(setdiff(int, z), ints)
+  pairs <- lapply(ss, getPair)
+
+  id <- setsEq(int, ints)
+  prev <- importance$prev1[id]
+  prev.null <- sapply(pairs, function(z) prod(importance$prev1[z]))
+  prec <- importance$prec[id]
+  prec.null <- importance$prec[unlist(lapply(pairs, which))]
+  return(data.table(prev.test=min(prev - prev.null),
+                    prec.test=min(prec - prec.null)))
+}

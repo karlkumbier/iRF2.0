@@ -15,13 +15,19 @@ iRF <- function(x, y,
                 signed=TRUE,
                 verbose=TRUE,
                 ...) {
-  
+ 
+  # Check inputs
   if (ncol(x) < 2 & !is.null(interactions.return))
     stop('cannot find interaction - X has less than two columns!')
-  
   if (any(interactions.return > n.iter))
-    stop('interaction iteration to return greater than n.iter')
- 
+    stop('selected iteration greater than n.iter')
+  if (length(mtry.select.prob) != ncol(x))
+    stop('length mtry.select.prop must equal number of features')
+  if (!is.null(xtest) & ncol(xtest) != ncol(x))
+    stop('training/test data must have same number of features')
+  if (!is.null(xtest) & is.null(ytest))
+    stop('test set responses not indicated')
+
   # Check all RIT and set to defaul if missing
   if (is.null(rit.param$depth)) rit.param$depth <- 5
   if (is.null(rit.param$ntree)) rit.param$ntree <- 500
@@ -31,12 +37,6 @@ iRF <- function(x, y,
   if (is.null(rit.param$class.cut) & is.numeric(y)) 
     rit.param$class.cut <- median(y)
  
-  # Check training/test attributes
-  if (!is.null(xtest) & ncol(xtest) != ncol(x))
-    stop('training/test data must have same number of features')
-  if (!is.null(xtest) & is.null(ytest))
-    stop('test set responses not indicated')
-
   n <- nrow(x)
   p <- ncol(x)
   class.irf <- is.factor(y)
@@ -45,7 +45,7 @@ iRF <- function(x, y,
   rf.list <- list()
   if (!is.null(interactions.return) | select.iter) {
     stability.score <- list()
-    if (get.prevalence) prevalence.score <- list()
+    importance.score <- list()
   }
 
   # Set number of trees to grow in each core
@@ -92,13 +92,11 @@ iRF <- function(x, y,
   # Combine training and test set for RIT, and weight test set to 0. Leaf node
   # class proportions will be evaluated on test set if supplied
   if (!is.null(xtest)) {
-    xx <- rbind(x, xtest)
-    yy <- c(y, ytest)
+    xx <- rbind(x, xtest); yy <- c(y, ytest)
     if (class.irf) yy <- as.factor(yy - 1)
     weights <- c(rep(1, nrow(x)), rep(0, nrow(xtest)))
   } else {
-    xx <- x
-    yy <- y
+    xx <- x; yy <- y
     weights <- rep(1, nrow(x))
   }
 
@@ -109,7 +107,6 @@ iRF <- function(x, y,
                                 weights=weights,
                                 varnames.grp=varnames.grp,
                                 rit.param=rit.param,
-                                get.prevalence=get.prevalence,
                                 signed=signed,
                                 n.core=n.core)
 
@@ -144,7 +141,6 @@ iRF <- function(x, y,
                              weights=weights,
                              varnames.grp=varnames.grp,
                              rit.param=rit.param,
-                             get.prevalence=get.prevalence,
                              signed=signed,
                              ints.full=ints.full$int,
                              n.core=n.core)
@@ -203,16 +199,17 @@ summarizeImp <- function(imp) {
       group_by(int) %>%
       summarize(sta.diff=mean(diff > 0),
                 diff=mean(diff),
-                prop1=mean(prop1),
+                sta.prev=mean(prev.test > 0),
                 prev1=mean(prev1), 
-                prev0=mean(prev0), 
+                prev0=mean(prev0),
+                sta.prec=mean(prec.test > 0), 
                 prec=mean(prec)) %>%
       arrange(desc(diff))
   } else {
     # If no interactions recovered return empty data table
     imp <- data.table(sta.diff=numeric(0), diff=numeric(0),
                        prev1=numeric(0), prev0=numeric(0), 
-                       prop1=numeric(0))
+                       prec=numeric(0))
     return(imp)
   }
 }
@@ -224,15 +221,20 @@ sampleClass <- function(y, cl, n) {
 }
 
 selectIter <- function(rf.list, y) {
-  # Evaluate optimal iteration based on prediction error in OOB samples
+  # Evaluate optimal iteration based on prediction error in OOB samples.
+  # For classification, error is given by weighted missclassification rate.
+  # For regression, error is given by MSE
   predicted <- lapply(rf.list, function(z) 
                       as.numeric(z$predicted) - is.factor(y))
   
   if (is.factor(y)){
     y <- as.numeric(y) - 1
     errFun <- function(y, yhat) {
-     out <- mean(y == 1) * sum(y == 0 & yhat == 1) + 
-       mean(y == 0) * sum(y == 1 & yhat == 0)
+      wt1 <- mean(y == 1)
+      err1 <- sum(y == 0 & yhat == 1)
+      wt0 <- mean(y == 0)
+      err0 <- sum(y == 1 & yhat == 0)
+      out <- wt1 * err1 + wt0 * err0
      return(out)
     }
   } else {

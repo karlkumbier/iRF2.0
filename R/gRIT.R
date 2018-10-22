@@ -60,11 +60,8 @@ gRIT <- function(x, y,
   # class-1 observations in node
   yprec <- precision(read.forest, y, weights)
   ndcnt <- Matrix::colSums(t(read.forest$node.obs) * weights)
+  rit.param$min.nd <- min(rit.param$min.nd, quantile(ndcnt, prob=0.9))
   idcnt <- ndcnt >= rit.param$min.nd
-  if (all(!id.rm)) {
-    warning('Minimum node size too small. Using all nodes.')
-    idcnt <- rep(TRUE, length(ndcnt))
-  }
   ndcnt <- ndcnt[idcnt]
   read.forest <- subsetReadForest(read.forest, idcnt)
   
@@ -75,7 +72,7 @@ gRIT <- function(x, y,
     idcl <- read.forest$tree.info$prediction > rit.param$class.cut
 
   if (sum(idcl) < 2) {
-    return(character(0))
+    return(nullReturn())
   } else {
   
     # Run RIT on leaf nodes of selected class  
@@ -92,29 +89,35 @@ gRIT <- function(x, y,
       } else {
         ints.full <- lapply(ints.full, int2Id, 
                             varnames.grp=varnames.grp, 
-                            directed=signed)
+                            signed=signed)
       }
-      
-      out$imp <- mclapply(ints.full, intImportance,
-                           nf=read.forest$node.feature,
-                           yprec=read.forest$tree.info$yprec, 
-                           select.id=idcl, 
-                           weight=ndcnt,
-                           mc.cores=n.core)
-      out$imp <- rbindlist(out$imp) 
+     
+      ints.sub <- lapply(ints.full, intSubsets)
+      ints.sub <- unique(unlist(ints.sub, recursive=FALSE))
+      imp <- mclapply(ints.sub, intImportance,
+                      nf=read.forest$node.feature,
+                      yprec=yprec, 
+                      select.id=idcl, 
+                      weight=ndcnt,
+                      mc.cores=n.core)
+      out$imp <- rbindlist(imp) 
+      imp.test <- lapply(ints.full, subsetTest, importance=out$imp, ints=ints.sub)
+      imp.test <- rbindlist(imp.test)
     }
 
-    if (is.null(out$int)) return(character(0))
+    if (is.null(out$int)) return(nullReturn())
     out$int <- nameInts(out$int, varnames.unq, signed=signed)
-    out$imp$int <- nameInts(ints.full, varnames.unq, signed=signed)
+    imp.test <- imp.test %>%
+      mutate(int=nameInts(ints.full, varnames.unq, signed=signed))
+    out$imp <- out$imp %>%
+      mutate(int=nameInts(ints.sub, varnames.unq, signed=signed)) %>%
+      right_join(imp.test, by='int')
   }
   return(out)
 }
 
 runRIT <- function(read.forest, weights, rit.param, n.core=1) {
   # Run a weighted version of RIT across RF decision paths
-
-  # Remove nodes below specified size threshold
   xrit <- cbind(read.forest$node.feature[weights > 0,])
   interactions <- RIT(xrit,
                       weights=weights[weights > 0],
@@ -146,4 +149,14 @@ collapseNF <- function(x) {
   p <- ncol(x) / 2
   x <- x[,1:p] + x[,(p + 1):(2 * p)]
   return(x)
+}
+
+nullReturn <- function() {
+  # Return empty interaction and importance
+  out <- list()
+  out$int <- character(0)
+  out$imp <- data.table(prev1=numeric(0), prev0=numeric(0),
+                        prec=numeric(0), prev.test=numeric(0),
+                        prec.test=numeric(0), int=character(0))
+  return(out)
 }

@@ -5,7 +5,8 @@ importFrom(methods, is)
 importFrom(AUC, auc, roc)
 importFrom(data.table, data.table, rbindlist)
 importFrom(dplyr, select, arrange, desc, "%>%", group_by, 
-           summarize, mutate)
+           summarize, mutate, right_join)
+importFrom(stringr, str_replace_all, str_remove_all, str_split)
 importFrom(grDevices, rainbow)
 importFrom(graphics, axis, barplot, dotchart, lines,
            matplot, mtext, pairs, par, plot, plot.default,
@@ -22,8 +23,7 @@ importFrom(parallel, mclapply)
 export(combine, getTree, grow, importance, margin, MDSplot, na.roughfix,
        randomForest, rfImpute, treesize, tuneRF, varImpPlot, 
        varUsed, rfNews, outlier, classCenter, rfcv, readForest, iRF, 
-       RIT, prevalence, nameInts, subsetReadForest, interactPredict, 
-       generalizedRIT, permPredict, summarizePrev)
+       RIT, subsetReadForest, interactPredict, gRIT, permPredict)
 
 
 S3method(print, randomForest)

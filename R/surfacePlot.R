@@ -27,7 +27,7 @@ plotInt2 <- function(rectangles, interact, x, y,
   require(rgl)
   
   if (is.null(varnames.grp)) varnames.grp <- 1:ncol(x)
-  interact <- int2Id(interact, varnames.grp, directed=TRUE, split=TRUE)
+  interact <- int2Id(interact, varnames.grp, signed=TRUE, split=TRUE)
   stopifnot(length(interact) == 2) 
   
   n <- nrow(x)
@@ -137,7 +137,7 @@ facetSurface <- function(int, nf, tree.info, varnames.grp, x,
   #   xg:
   
   # evaluate median thresholds for faceting variables
-  id.int <- int2Id(int, varnames.grp=varnames.grp, split=TRUE, directed=TRUE)
+  id.int <- int2Id(int, varnames.grp=varnames.grp, split=TRUE, signed=TRUE)
   id.nf <- apply(nf[,id.int], MAR=1, function(z) all(z != 0))
   qq <- function(x) quantile(x, probs = qcut)
   thresholds <- apply(nf[id.nf, id.int], MAR=2, qq)
@@ -227,7 +227,7 @@ forestHyperrectangle <- function(tree.info, nf, x, y, interact,
   
   interact <- strsplit(interact, '_')[[1]]
   if (is.null(varnames.grp)) varnames.grp <- 1:ncol(x)
-  interact <- int2Id(interact, varnames.grp, directed=TRUE, split=TRUE)
+  interact <- int2Id(interact, varnames.grp, signed=TRUE, split=TRUE)
 
   print('Extracting paths...')
   out <- getPathsTree(tree.info, nf, interact) 
@@ -258,29 +258,4 @@ quantileGrid <- function(x, grid.size, interact) {
   grids$g1 <- quantile(x[,interact[1]], probs=seq(0, 1, length.out=grid.size))
   grids$g2 <- quantile(x[,interact[2]], probs=seq(0, 1, length.out=grid.size))
   return(grids)
-}
-
-int2Id <- function(int, varnames.grp, directed=FALSE, split=FALSE) {
-  # Determine integer index of named variable in nf matrix (directed or not)
-  # args:
-  #   int: a character vector of interacting features
-  #   varnames.grp: character vector indicating feature grouping
-  #   directed: if TRUE, indicated interactions are directed
-  #   split: if TRUE, int contains one entry per interacting feature  
-  if (!split) int <- strsplit(int, '_')[[1]]
-  if (directed) {
-    dir <- grep('\\+$', int)  
-    varnames.grp <- gsub('[\\+\\-]', '', varnames.grp)
-    int <- gsub('[\\+\\-]', '', int)
-  }
-  
-  varnames.grp <- unique(varnames.grp)
-  id <- sapply(int, function(i) which(varnames.grp == i))
-  if (directed) {
-    adjust <- rep(0, length(int))
-    adjust[dir] <- length(varnames.grp)
-    id <- id + adjust
-  }
-  
-  return(id)
 }
