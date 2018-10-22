@@ -12,7 +12,6 @@ iRF <- function(x, y,
                 varnames.grp=colnames(x), 
                 n.bootstrap=1,
                 select.iter=FALSE,
-                get.prevalence=TRUE,
                 signed=TRUE,
                 verbose=TRUE,
                 ...) {
@@ -118,7 +117,7 @@ iRF <- function(x, y,
     if (verbose) cat('finding interactions ... ')
     
     interact.list <- list()
-    if (get.prevalence) prev.list <- list()
+    imp.list <- list()
 
     for (i.b in 1:n.bootstrap) { 
 
@@ -151,27 +150,27 @@ iRF <- function(x, y,
                              n.core=n.core)
       
       interact.list[[i.b]] <- ints$int
-      if (get.prevalence) prev.list[[i.b]] <- ints$prev
+      imp.list[[i.b]] <- ints$imp
       rm(rf.b)       
     }
     
     # Calculate stability scores of interactions
     stability.score[[iter]] <- summarizeInteract(interact.list)
-    if (get.prevalence)  prevalence.score[[iter]] <- summarizePrev(prev.list)
+    importance.score[[iter]] <- summarizeImp(imp.list)
   } # end for (iter in ... )
   
   out <- list()
   out$rf.list <- rf.list
   if (!is.null(interactions.return)) {
     out$interaction <- stability.score
-    if (get.prevalence) out$prevalence <- prevalence.score
+    out$importance <- importance.score
   }
 
   if (length(interactions.return) == 1) {
     out$rf.list <- out$rf.list[[interactions.return]]
     out$interaction <- out$interaction[[interactions.return]]
     out$selected.iter <- interactions.return
-    if (get.prevalence) out$prevalence <- out$prevalence[[interactions.return]]
+    out$importance <- out$importance[[interactions.return]]
   }
 
   return(out)
@@ -193,14 +192,14 @@ summarizeInteract <- function(x){
   }
 }
 
-summarizePrev <- function(prev) {
+summarizeImp <- function(imp) {
   # Summarize interaction prevalence across bootstrap samples
   require(data.table)
-  nbs <- length(prev)
+  nbs <- length(imp)
   
-  prev <- rbindlist(prev)
-  if (nrow(prev) > 0) {
-    prev <- mutate(prev, diff=(prev1-prev0)) %>%
+  imp <- rbindlist(imp)
+  if (nrow(imp) > 0) {
+    imp <- mutate(imp, diff=(prev1-prev0)) %>%
       group_by(int) %>%
       summarize(sta.diff=mean(diff > 0),
                 diff=mean(diff),
@@ -211,10 +210,10 @@ summarizePrev <- function(prev) {
       arrange(desc(diff))
   } else {
     # If no interactions recovered return empty data table
-    prev <- data.table(sta.diff=numeric(0), diff=numeric(0),
+    imp <- data.table(sta.diff=numeric(0), diff=numeric(0),
                        prev1=numeric(0), prev0=numeric(0), 
                        prop1=numeric(0))
-    return(prev)
+    return(imp)
   }
 }
 
