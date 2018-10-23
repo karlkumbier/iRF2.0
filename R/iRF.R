@@ -23,8 +23,9 @@ iRF <- function(x, y,
     stop('selected iteration greater than n.iter')
   if (length(mtry.select.prob) != ncol(x))
     stop('length mtry.select.prop must equal number of features')
-  if (!is.null(xtest) & ncol(xtest) != ncol(x))
-    stop('training/test data must have same number of features')
+  if (!is.null(xtest))
+    if(ncol(xtest) != ncol(x))
+      stop('training/test data must have same number of features')
   if (!is.null(xtest) & is.null(ytest))
     stop('test set responses not indicated')
 
@@ -64,8 +65,8 @@ iRF <- function(x, y,
                                               xtest, ytest, 
                                               ntree=ntree.id[i], 
                                               mtry.select.prob=mtry.select.prob, 
-                                              keep.forest=TRUE,
-                                              ...)
+                                              keep.forest=TRUE)#,
+                                              #...)
                                }
     
     # Update feature selection probabilities
@@ -103,12 +104,14 @@ iRF <- function(x, y,
   
   for (iter in interactions.return) {
     # Evaluate interactions in full data random forest
+    rit.param$ntree <- rit.param$ntree * n.bootstrap
     ints.full <- gRIT(rand.forest=rf.list[[iter]], x=xx, y=yy,
-                                weights=weights,
-                                varnames.grp=varnames.grp,
-                                rit.param=rit.param,
-                                signed=signed,
-                                n.core=n.core)
+                      weights=weights,
+                      varnames.grp=varnames.grp,
+                      rit.param=rit.param,
+                      signed=signed,
+                      n.core=n.core)
+    rit.param$ntree <- rit.param$ntree / n.bootstrap
 
     # Find interactions across bootstrap replicates
     if (verbose) cat('finding interactions ... ')
@@ -132,8 +135,8 @@ iRF <- function(x, y,
                                      xtest, ytest, 
                                      ntree=ntree.id[i], 
                                      mtry.select.prob=mtry.select.prob, 
-                                     keep.forest=TRUE, 
-                                     ...)
+                                     keep.forest=TRUE)#, 
+                                     #...)
                       }
 
       # Run generalized RIT on rf.b to learn interactions
