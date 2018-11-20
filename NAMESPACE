@@ -15,15 +15,17 @@ importFrom(stats, delete.response, mad, median, model.frame,
            model.response, na.fail, na.omit, napredict,
            predict, quantile, reformulate, terms, update,
            var, weighted.mean)
-importFrom(doMC, registerDoMC)
+importFrom(doParallel, registerDoParallel)
 importFrom(doRNG, "%dorng%")
 importFrom(foreach, foreach, "%dopar%")
-importFrom(parallel, mclapply)
+importFrom(parallel, detectCores)
+importFrom(RColorBrewer, brewer.pal)
+importFrom(utils, combn)
 
 export(combine, getTree, grow, importance, margin, MDSplot, na.roughfix,
        randomForest, rfImpute, treesize, tuneRF, varImpPlot, 
        varUsed, rfNews, outlier, classCenter, rfcv, readForest, iRF, 
-       RIT, subsetReadForest, interactPredict, gRIT, permPredict)
+       RIT, gRIT, interactPredict)
 
 
 S3method(print, randomForest)

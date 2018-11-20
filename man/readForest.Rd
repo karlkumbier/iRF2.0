@@ -10,13 +10,13 @@
   available cores.
 }
 \usage{
-  function(rfobj, x, 
-           return.node.feature=TRUE,
-           return.node.obs=FALSE, 
-           varnames.group=NULL,
-           get.split=FALSE,
-           first.split=TRUE,
-           n.core=1)
+  readForest(rfobj, x, 
+             return.node.feature=TRUE,
+             return.node.obs=FALSE, 
+             varnames.grp=NULL,
+             get.split=FALSE,
+             first.split=TRUE,
+             n.core=1)
 }
 \arguments{
   \item{rfobj}{a fitted \code{randomForest} object with the
@@ -33,7 +33,8 @@
     threshold associated with a feature split}
   \item{first.split}{if TRUE, only the threshold associated with the first time
     a feature is selected will be recorded}
-  \item{n.core}{the number of cores to parallelize over}
+  \item{n.core}{the number of cores to parallelize over. If -1, all available
+    cores will be used.}
 }
 \value{ A list containing the following items:
   \item{tree.info}{a data frame with number of rows equal to total number of
@@ -60,10 +61,6 @@
 }
 
 \examples{
-  library(doMC)
-  registerDoMC()
-  options(cores = 7)
-
   n = 200; p = 250
   X = array(rnorm(n*p), c(n, p))
   Y = (X[,1]>0.35 & X[,2]>0.35)|(X[,5]>0.35 & X[,7]>0.35)
@@ -75,20 +72,16 @@
   rf <- randomForest(x=X[train.id,], y=Y[train.id], xtest=X[test.id,],
                      ytest=Y[test.id], keep.forest=TRUE)
 
-  rforest <- readForest(rfobj=rf, x=X[train.id,], y=as.numeric(Y[train.id])-1)
-
-  head(rforest$tree_info)
-
-  # only consider leaf nodes
-  rforest <- readForest(rfobj=rf, x=X[train.id,], y = as.numeric(Y[train.id])-1)
+  rforest <- readForest(rfobj=rf, x=X[train.id,])
+  head(rforest$tree.info)
 
   # count number of leaf nodes with at least 5 observations
   sum(rforest$tree.info$size.node > 5)
 
   # pass test data through the forest
-  rforest <- readForest(rfobj=rf, X[test.id,], y=as.numeric(Y[test.id])-1)
+  rforest <- readForest(rfobj=rf, X[test.id,])
 
-  # count number of leaf nodes with at least 5 observations
+  # count number of leaf nodes with at least 5 test observations
   sum(rforest$tree.info$size.node > 5)
 
 }

@@ -11,21 +11,26 @@ iRF <- function(x, y,
                                min.nd=1, class.cut=NULL), 
                 varnames.grp=colnames(x), 
                 n.bootstrap=1,
-                select.iter=FALSE,
+                select.iter=TRUE,
                 signed=TRUE,
                 verbose=TRUE,
                 ...) {
  
-  # Check inputs
-  if (ncol(x) < 2 & !is.null(interactions.return))
+  # Check input format
+  if (!class(x) %in% c('data.frame', 'matrix'))
+    stop('x must be matrix or data frame')
+  if (nrow(x) != length(y))
+    stop('x and y must contain the same number of observations')
+  if (ncol(x) < 2 & (!is.null(interactions.return) | select.iter))
     stop('cannot find interaction - X has less than two columns!')
   if (any(interactions.return > n.iter))
     stop('selected iteration greater than n.iter')
   if (length(mtry.select.prob) != ncol(x))
     stop('length mtry.select.prop must equal number of features')
-  if (!is.null(xtest))
+  if (!is.null(xtest)) {
     if (ncol(xtest) != ncol(x)) 
       stop('training/test data must have same number of features')
+  }
   if (!is.null(xtest) & is.null(ytest))
     stop('test set responses not indicated')
 
@@ -49,16 +54,18 @@ iRF <- function(x, y,
     importance.score <- list()
   }
 
-  # Set number of trees to grow in each core
+  # Set number of trees to grow in each core 
+  if (n.core == -1) n.core <- detectCores()
   a <- floor(ntree / n.core) 
   b <- ntree %% n.core
   ntree.id <- c(rep(a + 1, b), rep(a, n.core - b))
+  if (n.core > 1) registerDoParallel(n.core)
   
-  registerDoMC(n.core)
   for (iter in 1:n.iter) {
     
     # Grow Random Forest on full data
     print(paste('iteration = ', iter))
+    suppressWarnings(
     rf.list[[iter]] <- foreach(i=1:length(ntree.id), .combine=combine, 
                                .multicombine=TRUE, .packages='iRF') %dorng% {
                                  randomForest(x, y, 
@@ -68,6 +75,7 @@ iRF <- function(x, y,
                                               keep.forest=TRUE,
                                               ...)
                                }
+    )
     
     # Update feature selection probabilities
     mtry.select.prob <- rf.list[[iter]]$importance
@@ -105,11 +113,11 @@ iRF <- function(x, y,
   for (iter in interactions.return) {
     # Evaluate interactions in full data random forest
     ints.full <- gRIT(rand.forest=rf.list[[iter]], x=xx, y=yy,
-                      weights=weights,
-                      varnames.grp=varnames.grp,
-                      rit.param=rit.param,
-                      signed=signed,
-                      n.core=n.core)
+                                weights=weights,
+                                varnames.grp=varnames.grp,
+                                rit.param=rit.param,
+                                signed=signed,
+                                n.core=n.core)
 
     # Find interactions across bootstrap replicates
     if (verbose) cat('finding interactions ... ')
@@ -127,6 +135,7 @@ iRF <- function(x, y,
         mtry.select.prob <- rf.list[[iter - 1]]$importance
 
       # Fit random forest on bootstrap sample
+      suppressWarnings(
       rf.b <- foreach(i=1:length(ntree.id), .combine=combine, 
                       .multicombine=TRUE, .packages='iRF') %dorng% {
                         randomForest(x[sample.id,], y[sample.id], 
@@ -136,6 +145,7 @@ iRF <- function(x, y,
                                      keep.forest=TRUE, 
                                      ...)
                       }
+      )
 
       # Run generalized RIT on rf.b to learn interactions
       ints <- gRIT(rand.forest=rf.b, x=xx, y=yy,
@@ -191,7 +201,6 @@ summarizeInteract <- function(x){
 
 summarizeImp <- function(imp) {
   # Summarize interaction prevalence across bootstrap samples
-  require(data.table)
   nbs <- length(imp)
   
   imp <- rbindlist(imp)
@@ -206,11 +215,12 @@ summarizeImp <- function(imp) {
                 sta.prec=mean(prec.test > 0), 
                 prec=mean(prec)) %>%
       arrange(desc(diff))
+    return(data.table(imp))
   } else {
     # If no interactions recovered return empty data table
     imp <- data.table(sta.diff=numeric(0), diff=numeric(0),
-                      prev1=numeric(0), prev0=numeric(0), 
-                      prec=numeric(0))
+                       prev1=numeric(0), prev0=numeric(0), 
+                       prec=numeric(0))
     return(imp)
   }
 }
