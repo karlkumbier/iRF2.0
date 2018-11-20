@@ -49,9 +49,9 @@ interactPredict <- function(x, int, read.forest, varnames.grp=1:ncol(x),
     #   high -- only order < s nodes
     #   none -- both order = s and order < s nodes
     if (mask == 'low') {
-      int.nds <- nint == length(id)
+      int.nds <- nint == length(id.raw)
     } else if (mask == 'high') {
-      int.nds <- nint < length(id) & nint > 0
+      int.nds <- nint < length(id.raw) & nint > 0
     } else if (mask == 'none') {
       int.nds <- nint > 0
     }

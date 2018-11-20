@@ -33,6 +33,13 @@ gRIT <- function(x, y,
     rit.param$min.nd <- 1
   if (is.null(rit.param$class.cut) & !class.irf) 
     rit.param$class.cut <- median(y)
+  if (length(unique(y)) > 2 & class.irf) {
+    yy <- as.numeric(y) - 1
+    y[yy != rit.param$class.id] <- 0
+    y[yy == rit.param$class.id] <- 1
+    y <- as.factor(y)
+  }
+
 
   # Set feature names for grouping interactions
   if (is.null(varnames.grp) & !is.null(colnames(x)))

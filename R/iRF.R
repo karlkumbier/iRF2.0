@@ -24,7 +24,7 @@ iRF <- function(x, y,
   if (length(mtry.select.prob) != ncol(x))
     stop('length mtry.select.prop must equal number of features')
   if (!is.null(xtest))
-    if(ncol(xtest) != ncol(x))
+    if (ncol(xtest) != ncol(x)) 
       stop('training/test data must have same number of features')
   if (!is.null(xtest) & is.null(ytest))
     stop('test set responses not indicated')
@@ -141,12 +141,12 @@ iRF <- function(x, y,
 
       # Run generalized RIT on rf.b to learn interactions
       ints <- gRIT(rand.forest=rf.b, x=xx, y=yy,
-                             weights=weights,
-                             varnames.grp=varnames.grp,
-                             rit.param=rit.param,
-                             signed=signed,
-                             ints.full=ints.full$int,
-                             n.core=n.core)
+                   weights=weights,
+                   varnames.grp=varnames.grp,
+                   rit.param=rit.param,
+                   signed=signed,
+                   ints.full=ints.full$int,
+                   n.core=n.core)
       
       interact.list[[i.b]] <- ints$int
       imp.list[[i.b]] <- ints$imp

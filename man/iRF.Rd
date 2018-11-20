@@ -20,7 +20,6 @@
       varnames.grp=NULL,
       n.bootstrap=1,
       select.iter=FALSE,
-      get.prevalence=FALSE,
       signed=TRUE,
       verbose=TRUE, ...
      )
@@ -55,8 +54,6 @@
     stability scores of interactiosn obtained by RIT}
   \item{select.iter}{If TRUE, interactions will be computed for iteration
     selected by OOB prediction accuracy}
-  \item{get.prevalence}{If TRUE, prevalence of all recovered interactions will be 
-    computed from the selected RF}
   \item{signed}{If TRUE, signed interactions will be returned, indicating 
     the direction of the inequality associated with the first time a feature 
     is selected for splitting}
