@@ -13,7 +13,6 @@ Imports:
     methods,
     doMC,
     doRNG,
-    FSInteract
 Suggests:
     RColorBrewer,
     MASS
