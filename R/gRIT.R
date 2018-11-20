@@ -15,6 +15,8 @@ gRIT <- function(x, y,
 
   out <- list()
   class.irf <- is.factor(y)
+  if (n.core == -1) n.core <- detectCores()  
+  if (n.core > 1) registerDoParallel(n.core)
 
   # Check rit parameters and set default values if not specified
   if (is.null(rand.forest) & is.null(read.forest))
@@ -101,12 +103,12 @@ gRIT <- function(x, y,
      
       ints.sub <- lapply(ints.full, intSubsets)
       ints.sub <- unique(unlist(ints.sub, recursive=FALSE))
-      imp <- mclapply(ints.sub, intImportance,
-                      nf=read.forest$node.feature,
-                      yprec=yprec, 
-                      select.id=idcl, 
-                      weight=ndcnt,
-                      mc.cores=n.core)
+      suppressWarnings(
+      imp <- foreach(int=ints.sub) %dorng% {
+        intImportance(int, nf=read.forest$node.feature,
+                      yprec=yprec, select.id=idcl, 
+                      weight=ndcnt)
+      })
       out$imp <- rbindlist(imp) 
       imp.test <- lapply(ints.full, subsetTest, importance=out$imp, ints=ints.sub)
       imp.test <- rbindlist(imp.test)
@@ -119,6 +121,7 @@ gRIT <- function(x, y,
     out$imp <- out$imp %>%
       mutate(int=nameInts(ints.sub, varnames.unq, signed=signed)) %>%
       right_join(imp.test, by='int')
+    out$int <- out$int[out$int %in% out$imp$int]
   }
   return(out)
 }

@@ -10,6 +10,9 @@ readForest <- function(rfobj, x,
     stop('No Forest component in the randomForest object')
   if (is.null(varnames.grp)) varnames.grp <- 1:ncol(x)
  
+  if (n.core == -1) n.core <- detectCores()
+  if (n.core > 1) registerDoParallel(n.core)
+  
   ntree <- rfobj$ntree
   n <- nrow(x)
   p <- length(unique(varnames.grp))
@@ -20,14 +23,13 @@ readForest <- function(rfobj, x,
   nodes <- attr(prf, 'nodes')
   
   # read leaf node data from each tree in the forest 
-  rd.forest <- mclapply(1:ntree, readTree, rfobj=rfobj, x=x,
-                        nodes=nodes,
-                        varnames.grp=varnames.grp,
-                        return.node.feature=return.node.feature,
-                        return.node.obs=return.node.obs,
-                        get.split=get.split,
-                        first.split=first.split,
-                        mc.cores=n.core)
+  suppressWarnings(
+  rd.forest <- foreach(tt=1:ntree) %dorng% {
+    readTree(tt, rfobj=rfobj, x=x, nodes=nodes,varnames.grp=varnames.grp,
+             return.node.feature=return.node.feature, 
+             return.node.obs=return.node.obs, get.split=get.split,
+             first.split=first.split)
+  })
   
   # aggregate node level metadata across forest
   out$tree.info <- rbindlist(lapply(rd.forest, function(tt) tt$tree.info))
