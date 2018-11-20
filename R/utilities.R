@@ -56,6 +56,14 @@ unsign <- function(int) {
   return(str_replace_all(as.character(int), '[-\\+]', ''))
 }
 
+intSign <- function(int, split=TRUE) {
+  # Evaluate sign of interactions
+  if (!split) int <- str_split(int, '_')[[1]]
+  sgn <- rep(-1, length(int))
+  sgn[grep('+', int)] <- 1
+  return(sgn)
+}
+
 intSubsets <- function(int, split=TRUE) {
   # Generate order 1, s - 1, and s subsets of an order-s interaction
   require(stringr)

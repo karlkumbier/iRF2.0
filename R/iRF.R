@@ -105,11 +105,11 @@ iRF <- function(x, y,
   for (iter in interactions.return) {
     # Evaluate interactions in full data random forest
     ints.full <- gRIT(rand.forest=rf.list[[iter]], x=xx, y=yy,
-                                weights=weights,
-                                varnames.grp=varnames.grp,
-                                rit.param=rit.param,
-                                signed=signed,
-                                n.core=n.core)
+                      weights=weights,
+                      varnames.grp=varnames.grp,
+                      rit.param=rit.param,
+                      signed=signed,
+                      n.core=n.core)
 
     # Find interactions across bootstrap replicates
     if (verbose) cat('finding interactions ... ')
@@ -139,12 +139,12 @@ iRF <- function(x, y,
 
       # Run generalized RIT on rf.b to learn interactions
       ints <- gRIT(rand.forest=rf.b, x=xx, y=yy,
-                             weights=weights,
-                             varnames.grp=varnames.grp,
-                             rit.param=rit.param,
-                             signed=signed,
-                             ints.full=ints.full$int,
-                             n.core=n.core)
+                   weights=weights,
+                   varnames.grp=varnames.grp,
+                   rit.param=rit.param,
+                   signed=signed,
+                   ints.full=ints.full$int,
+                   n.core=n.core)
       
       interact.list[[i.b]] <- ints$int
       imp.list[[i.b]] <- ints$imp
@@ -209,8 +209,8 @@ summarizeImp <- function(imp) {
   } else {
     # If no interactions recovered return empty data table
     imp <- data.table(sta.diff=numeric(0), diff=numeric(0),
-                       prev1=numeric(0), prev0=numeric(0), 
-                       prec=numeric(0))
+                      prev1=numeric(0), prev0=numeric(0), 
+                      prec=numeric(0))
     return(imp)
   }
 }
