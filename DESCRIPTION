@@ -13,8 +13,9 @@ Imports:
     methods,
     doMC,
     doRNG,
+    doParallel,
+    RColorBrewer
 Suggests:
-    RColorBrewer,
     MASS
 LinkingTo:
     Rcpp

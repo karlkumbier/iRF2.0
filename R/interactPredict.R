@@ -1,6 +1,6 @@
 interactPredict <- function(x, int, read.forest, varnames.grp=1:ncol(x), 
                             nrule=1000, min.node=1, mask='low', wt=TRUE, 
-                            is.split=FALSE, aggregate=TRUE) {
+                            class=NULL, is.split=FALSE, aggregate=TRUE) {
 
   # Generate RF predictions for given interactions, using only information
   # from interacting features.
@@ -28,6 +28,10 @@ interactPredict <- function(x, int, read.forest, varnames.grp=1:ncol(x),
     nf <- nf[tree.info$prediction == 2,]
     tree.info <- tree.info[tree.info$prediction == 2,]
     tree.info$prediction <- tree.info$prediction - 1
+  } else if (!is.null(class)) {
+    nf <- nf[tree.info$prediction == class,]
+    tree.info <- tree.info[tree.info$prediction == class,]
+    tree.info$class <- 1
   }
   
   # Subset node feature matrix to and data matrix based on interacting features
