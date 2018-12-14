@@ -19,7 +19,7 @@ intImportance <- function(int, nf, yprec, select.id, weight) {
     return(data.table(prev1=0, prev0=0, prec=0))
 
   prev <- prevalence(weight, int.id, select.id)
-  prec <- mean(yprec[int.id & select.id], na.rm=TRUE)
+  prec <- mean(yprec[int.id & select.id])
   return(data.table(prev1=prev[1], prev0=prev[2], prec=prec))
 }
 
@@ -37,7 +37,9 @@ prevalence <- function(weight, idint, idcl) {
 precision <- function(read.forest, y, weights) {
   # Evaluate class proportion in each leaf node
   class.irf <- is.factor(y)
-  if (class.irf) y <- as.numeric(y) - 1
+  if (class.irf) {
+    y <- as.numeric(y) - 1
+  }
 
   stopifnot(all(weights %in% 0:1))
   if (!all(weights == 1)) weights <- 1 - weights
@@ -47,15 +49,13 @@ precision <- function(read.forest, y, weights) {
     ndcntY <- Matrix::colSums(ndcnt * y)
     ndcnt <- Matrix::colSums(ndcnt)
     yprec <- ndcntY / ndcnt
-    yprec[is.nan(yprec)] <- 0
+    yprec[ndcnt == 0] <- 0
   } else {
-    ypred <- read.forest$tree.info$prediction
     nds <- t(read.forest$node.obs) * weights
-    err <- Matrix::rowSums((t(nds * y) - t(nds) * ypred) ^ 2)
-    ndcnt <- Matrix::colSums(nds) 
-    mse <- err / ndcnt
-    mse[is.na(mse)] <- var(y)
-    yprec <- pmax(1 - mse / var(y), 0)
+    ynds <- t(nds * y)
+    ndcnt <- Matrix::colSums(nds)
+    yprec <- Matrix::rowSums(ynds) / ndcnt
+    yprec[ndcnt == 0] <- 0  
   }
   return(yprec)
 }

@@ -73,7 +73,8 @@ gRIT <- function(x, y,
   idcnt <- ndcnt >= rit.param$min.nd
   ndcnt <- ndcnt[idcnt]
   read.forest <- subsetReadForest(read.forest, idcnt)
-  
+  yprec <- yprec[idcnt]
+
   # Select class specific leaf nodes
   if (class.irf)
     idcl <- read.forest$tree.info$prediction == rit.param$class.id + 1
