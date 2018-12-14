@@ -42,12 +42,21 @@ precision <- function(read.forest, y, weights) {
   stopifnot(all(weights %in% 0:1))
   if (!all(weights == 1)) weights <- 1 - weights
 
-  # TODO: implement for regression
-  ndcnt <- t(read.forest$node.obs) * weights
-  ndcntY <- Matrix::colSums(ndcnt * y)
-  ndcnt <- Matrix::colSums(ndcnt)
-  yprec <- ndcntY / ndcnt
-  yprec[is.nan(yprec)] <- 0
+  if (class.irf) {
+    ndcnt <- t(read.forest$node.obs) * weights
+    ndcntY <- Matrix::colSums(ndcnt * y)
+    ndcnt <- Matrix::colSums(ndcnt)
+    yprec <- ndcntY / ndcnt
+    yprec[is.nan(yprec)] <- 0
+  } else {
+    ypred <- read.forest$tree.info$prediction
+    nds <- t(read.forest$node.obs) * weights
+    err <- Matrix::rowSums((t(nds * y) - t(nds) * ypred) ^ 2)
+    ndcnt <- Matrix::colSums(nds) 
+    mse <- err / ndcnt
+    mse[is.na(mse)] <- var(y)
+    yprec <- pmax(1 - mse / var(y), 0)
+  }
   return(yprec)
 }
 

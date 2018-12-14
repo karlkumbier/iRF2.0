@@ -72,8 +72,8 @@ iRF <- function(x, y,
                                               xtest, ytest, 
                                               ntree=ntree.id[i], 
                                               mtry.select.prob=mtry.select.prob, 
-                                              keep.forest=TRUE)#,
-                                              #...)
+                                              keep.forest=TRUE,
+                                              ...)
                                }
     )
     
@@ -144,8 +144,8 @@ iRF <- function(x, y,
                                      xtest, ytest, 
                                      ntree=ntree.id[i], 
                                      mtry.select.prob=mtry.select.prob, 
-                                     keep.forest=TRUE)#, 
-                                     #...)
+                                     keep.forest=TRUE, 
+                                     ...)
                       }
       )
 
