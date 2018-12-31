@@ -13,6 +13,7 @@ iRF <- function(x, y,
                 n.bootstrap=1,
                 select.iter=TRUE,
                 signed=TRUE,
+                block.bootstrap=NULL,
                 verbose=TRUE,
                 ...) {
  
@@ -129,7 +130,7 @@ iRF <- function(x, y,
 
     for (i.b in 1:n.bootstrap) { 
 
-      sample.id <- bootstrapSample(y)
+      sample.id <- bootstrapSample(block.bootstrap, y)
       # Use feature weights from current iteraction of full data RF
       if (iter == 1) 
         mtry.select.prob <- rep(1, ncol(x))
@@ -260,8 +261,33 @@ selectIter <- function(rf.list, y) {
   return(id.select)
 }
 
-bootstrapSample <- function(y) {
+bootstrapSample <- function(block.bootstrap, y) {
+  # Generate outer layer bootstrap samples
+
   n <- length(y)
-  id <- sample(n, n, replace=TRUE)
-  return(id)
+  if (is.null(block.bootstrap) & is.factor(y)) {
+    # Take bootstrap sample that maintains class balance in full data
+    ncl <- table(y)
+    class <- as.factor(names(ncl))
+    sample.id <- mapply(function(cc, n) sampleClass(y, cc, n), class, ncl)
+    sample.id <- unlist(sample.id)
+  } else if (is.null(block.bootstrap)) {
+    sample.id <- sample(n, replace=TRUE)
+  } else {
+    sample.id <- sample(length(block.bootstrap), replace=TRUE)
+    sample.id <- unlist(block.bootstrap[sample.id])
+  }
+
+  #if (is.factor(y) & length(unique(y[sample.id])) == 1) {
+  #  warning('ONLY 1 class in block bootstrap sample, resampling...')
+  #  bootstrapSample(block.bootstrap, y)
+  #}
+
+  return(sample.id)
 }
+
+#bootstrapSample <- function(y) {
+#  n <- length(y)
+#  id <- sample(n, n, replace=TRUE)
+#  return(id)
+#}
