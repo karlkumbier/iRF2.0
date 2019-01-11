@@ -14,6 +14,7 @@ iRF <- function(x, y,
                 select.iter=TRUE,
                 signed=TRUE,
                 block.bootstrap=NULL,
+                ints.eval=NULL,
                 verbose=TRUE,
                 ...) {
  
@@ -113,14 +114,19 @@ iRF <- function(x, y,
   
   for (iter in interactions.return) {
     # Evaluate interactions in full data random forest
-    rit.param$ntree <- rit.param$ntree * n.bootstrap
-    ints.full <- gRIT(rand.forest=rf.list[[iter]], x=xx, y=yy,
-                      weights=weights,
-                      varnames.grp=varnames.grp,
-                      rit.param=rit.param,
-                      signed=signed,
-                      n.core=n.core)
-    rit.param$ntree <- rit.param$ntree / n.bootstrap
+    
+    if (!ints.eval) {
+      rit.param$ntree <- rit.param$ntree * n.bootstrap
+      ints.full <- gRIT(rand.forest=rf.list[[iter]], x=xx, y=yy,
+                        weights=weights,
+                        varnames.grp=varnames.grp,
+                        rit.param=rit.param,
+                        signed=signed,
+                        n.core=n.core)
+      rit.param$ntree <- rit.param$ntree / n.bootstrap
+    } else {
+      ints.full$int <- ints.eval
+    }
 
     # Find interactions across bootstrap replicates
     if (verbose) cat('finding interactions ... ')
