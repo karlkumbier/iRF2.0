@@ -6,9 +6,10 @@ iRF <- function(x, y,
                 n.core=1, 
                 mtry.select.prob=rep(1, ncol(x)),
                 interactions.return=NULL, 
-                rit.param=list(depth=5, ntree=500, 
-                               nchild=2, class.id=1, 
-                               min.nd=1, class.cut=NULL), 
+                rit.param=list(depth=ifelse(signed, 3, 5), 
+                               ntree=500, nchild=2, 
+                               class.id=1, min.nd=1, 
+                               class.cut=NULL), 
                 varnames.grp=colnames(x), 
                 n.bootstrap=1,
                 select.iter=TRUE,
@@ -115,7 +116,7 @@ iRF <- function(x, y,
   for (iter in interactions.return) {
     # Evaluate interactions in full data random forest
     
-    if (!ints.eval) {
+    if (is.null(ints.eval)) {
       rit.param$ntree <- rit.param$ntree * n.bootstrap
       ints.full <- gRIT(rand.forest=rf.list[[iter]], x=xx, y=yy,
                         weights=weights,
@@ -125,6 +126,7 @@ iRF <- function(x, y,
                         n.core=n.core)
       rit.param$ntree <- rit.param$ntree / n.bootstrap
     } else {
+      ints.full <- list()
       ints.full$int <- ints.eval
     }
 
