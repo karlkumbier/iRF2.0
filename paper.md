@@ -1,35 +1,33 @@
 ---
-title: 'iRF: Extracting interactions from random forests'
+title: 'iRF: extracting interactions from random forests'
 tags:
   - R
   - Random Forests
   - Interpretable machine learning
 authors:
   - name: Sumanta Basu
-    affiliation: "&#8727;, 1, 2"
+    affiliation: "1, a, b"
   - name: Karl Kumbier
-    affiliation: "&#8727;, 3"
+    affiliation: "1, c"
   - name: James B. Brown
-    affiliation: "3, 4, 5"
+    affiliation: "c, d, e"
   - name: Bin Yu
-    affiliation: "3, 6"
+    affiliation: "c, f"
 affiliations:
- - name: Department of Biological Statistics and Computational Biology, Cornell University
-   index: 1
- - name: Department of Statistical Science, Cornell University
-   index: 2
- - name: Statistics Department, University of California, Berkeley
-   index: 3
- - name: Centre for Computational Biology, School of Biosciences, University of Birmingham
-   index: 4
- - name: Molecular Ecosystems Biology Department, Biosciences Area, Lawrence
-   Berkeley National Laboratory 
-   index: 5
- - name: Department of Electrical Engineering and Computer Sciences, University
-   of California, Berkeley 
-   index: 6
  - name: Denotes equal contribution
-   index: &#8727;
+   index: 1
+ - name: Department of Biological Statistics and Computational Biology, Cornell University
+   index: a
+ - name: Department of Statistical Science, Cornell University
+   index: b
+ - name: Statistics Department, University of California, Berkeley
+   index: c
+ - name: Centre for Computational Biology, School of Biosciences, University of Birmingham
+   index: d
+ - name: Molecular Ecosystems Biology Department, Biosciences Area, Lawrence Berkeley National Laboratory 
+   index: e
+ - name: Department of Electrical Engineering and Computer Sciences, University of California, Berkeley 
+   index: f
 date: 2 October 2018
 bibliography: paper.bib
 ---
@@ -49,17 +47,17 @@ forest decision paths.
 The iterative Random Forest algorithm (iRF), and corresponding `iRF` R package,
 take a step towards addressing these issues with a computationally tractable
 approach to search for important interactions in a fitted random forest
-[@basu2018iterative]. Our algorithm grows a series of feature weighted random
-forests [@amaratunga2008enriched] to perform soft regularization on the model
-based on predictive features. We then search for prevalent interactions in the
-fitted random forest using a generalization of random intersection trees
-[@shah2014random].  Finally, we assess the stability of recovered interactions
-by repeating this search across random forests trained on bootstrap samples of
-the data. The `iRF` R package combines these steps into a single workflow. It is
-based on the source codes from the R packages `randomForest`
-[@liaw2002classification] and `FSInteract` [@shah2014random]. A detailed
-vignette is available on
-[github](https://cdn.rawgit.com/sumbose/iRF/master/vignettes/vignette2.html).
+[@basu2018iterative,@kumbier2018refining]. Our algorithm grows a series of
+feature weighted random forests [@amaratunga2008enriched] to perform soft
+regularization on the model based on predictive features. We then search for
+prevalent interactions in the fitted random forest using a generalization of
+random intersection trees [@shah2014random].  Finally, we assess the stability
+of recovered interactions by repeating this search across random forests trained
+on bootstrap samples of the data. The `iRF` R package combines these steps into
+a single workflow. It is based on the source codes from the R packages
+`randomForest` [@liaw2002classification] and `FSInteract` [@shah2014random]. A
+detailed vignette is available
+[here](https://www.stat.berkeley.edu/~kkumbier/vignette.html).
 
 # Acknowledgements
 This research was supported in part by grants NHGRI U01HG007031, ARO
@@ -74,3 +72,5 @@ acknowledges support from the Miller Institute for her Miller Professorship in
 2016-2017. SB acknowledges the support of UC Berkeley and LBNL, where he
 conducted most of his work on this paper as a postdoc. We thank P. Bickel and S.
 Shrotriya for helpful discussions and comments.
+
+# References

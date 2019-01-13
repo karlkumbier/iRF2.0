@@ -1,6 +1,12 @@
 ## iterative Random Forests (iRF)
 
-The R package `iRF` implements iterative Random Forests, a method for iteratively growing ensemble of weighted decision trees, and detecting high-order feature interactions by analyzing feature usage on decision paths. This version uses source codes from the R package `randomForest` by Andy Liaw and Matthew Weiner, the original Fortran codes by Leo Breiman and Adele Cutler, and source codes from the R package `FSInteract` by Hyun Jik Kim and Rajen D. Shah.
+The R package `iRF` implements iterative Random Forests, a method for
+iteratively growing ensemble of weighted decision trees, and detecting
+high-order feature interactions by analyzing feature usage on decision paths.
+This version uses source codes from the R package `randomForest` by Andy Liaw
+and Matthew Weiner, the original Fortran codes by Leo Breiman and Adele Cutler,
+and source codes from the R package `FSInteract` by Hyun Jik Kim and Rajen D.
+Shah.
 
 `iRF` can be loaded using the `library` command:
 ```{r, message=FALSE}
@@ -11,9 +17,17 @@ library(iRF)
 
 ##  A. Weighted random forest
 
-Unlike Breiman's original random forest, which uses uniform random sampling to select \texttt{mtry} variables during each node split, the 'randomForest' function in 'iRF' allows non-uniform sampling using a given vector of nonnegative weights (e.g., feature importances from a previous model fit). In particular, given a vector of weights $\mathbf{w} = (w_1, \ldots, w_p)$, the `mtry` variables are selected so that $P(\text{variable }j \text{ is selected}) = w_j/\sum_{j=1}^p w_j$, for $j = 1, \ldots, p$. 
+Unlike Breiman's original random forest, which uses uniform random sampling to
+select \texttt{mtry} variables during each node split, the 'randomForest'
+function in 'iRF' allows non-uniform sampling using a given vector of
+nonnegative weights (e.g., feature importances from a previous model fit). In
+particular, given a vector of weights $\mathbf{w} = (w_1, \ldots, w_p)$, the
+`mtry` variables are selected so that $P(\text{variable }j \text{ is selected})
+= w_j/\sum_{j=1}^p w_j$, for $j = 1, \ldots, p$. 
 
-Based on this weighting scheme, we can iteratively grow weighted random forests, where Gini importances from the previous random forest fit are used as weights in the current iteration.
+Based on this weighting scheme, we can iteratively grow weighted random forests,
+where Gini importances from the previous random forest fit are used as weights
+in the current iteration.
 
 ```{r seed_random}
 # set seed for random number generation
@@ -21,7 +35,8 @@ set.seed(47)
 ```
 
 ### Binary Classification:
-We simulate some data for a binary classification exercise. Out of $250$ features, only three $\{1, 2, 3\}$ are important.
+We simulate some data for a binary classification exercise. Out of $250$
+features, only three $\{1, 2, 3\}$ are important.  
 ```{r simulate_data}
   # simulate data for classification
   n <- 500
@@ -35,7 +50,8 @@ We simulate some data for a binary classification exercise. Out of $250$ feature
   test.id <- setdiff(1:n, train.id)
 ```
 
-Next, we iteratively grow weighted random forests and use feature importances from last iteration as weights.
+Next, we iteratively grow weighted random forests and use feature importances
+from last iteration as weights.  
 ```{r fit_irf}
 sel.prob <- rep(1/p, p)
 
@@ -67,7 +83,9 @@ legend('bottomright', legend=paste('iter:', 1:iter), col=1:iter, lwd=2, bty='n')
 ```
 
 ### Variable Importance
-The outputs  of `iRF::randomForest` are objects of class `randomForest` and can be used with other functions in the R package `randomForest` directly, e.g., to visualize variable importance measures:
+The outputs  of `iRF::randomForest` are objects of class `randomForest` and can
+be used with other functions in the R package `randomForest` directly, e.g., to
+visualize variable importance measures:
 
 ```{r varimp, fig.width=16, fig.height=5}
 par(mfrow=c(1,4))
@@ -104,12 +122,14 @@ for (iter in 1:4){
 ```
 
 ### Parallel implementation
-The weighted random forests can be grown in parallel on multiple servers, using the `doMC` library:
+The weighted random forests can be grown in parallel on multiple servers, using
+the `doMC` library:
+
 ```{r setup_parallel, results="hide", message=FALSE}
 # set up cores for parallel implementation
 library(doMC)
 registerDoMC()
-n.cores <- 4
+n.cores <- detectCores()
 options(cores=n.cores)
 n.tree.per.core <- 30
 
@@ -122,10 +142,22 @@ rfpar <- foreach(n.tree=rep(n.tree.per.core, n.cores),
 ```
 
 ## B. Detect high-order feature interactions in a stable fashion
-`iRF` detects high-order interaction among features by analyzing feature usage on the decision paths of large leaf nodes in a random forest. In particular, given a (weighted) random forest fit, `iRF` (i) passes the training data through the fitted forest and records the features used on the associated decision paths; (ii) Applies a weighted version of the random intersection tree (RIT) algorithm proposed by [Shah and Meinshausen (2014)](http://jmlr.org/papers/v15/shah14a.html) to find high-order feature combinations prevalent on the decision paths, where weights are determined by user specified features; (iii) performs the above two steps on many bootstrap replicates of the training set to assess stability of the features and their interactions. 
+`iRF` detects high-order interaction among features by analyzing feature usage
+on the decision paths of large leaf nodes in a random forest. In particular,
+given a (weighted) random forest fit, `iRF` (i) passes the training data through
+the fitted forest and records the features used on the associated decision
+paths; (ii) Applies a weighted version of the random intersection tree (RIT)
+algorithm proposed by [Shah and Meinshausen
+(2014)](http://jmlr.org/papers/v15/shah14a.html) to find high-order feature
+combinations prevalent on the decision paths, where weights are determined by
+user specified features; (iii) performs the above two steps on many bootstrap
+replicates of the training set to assess stability of the features and their
+interactions. 
 
 ### Feature usage on decision paths of large leaf nodes
-Consider a classification example as before. We iteratively grow weighted random forests as before, but save the forest components for further processing.
+Consider a classification example as before. We iteratively grow weighted random
+forests as before, but save the forest components for further processing.
+
 ```{r fit_irf2}
 sel.prob <- rep(1/p, p)
 
@@ -142,11 +174,12 @@ for (iter in 1:4){
 }
 ```
 
-To read feature usage on nodes, use the function `readForest`. This function can be run in parallel with the argument `n.core`, provided `doMC` has been set up for parallel processing. This function will calculate the the decrease in purity of responses in each leaf node relative to the full data, provided `wt.pred.accuracy` is TRUE.
+To read feature usage on nodes, use the function `readForest`. This function can
+be run in parallel with the argument `n.core`, provided `doMC` has been set up
+for parallel processing.
 
 ```{r large_leaf, message=FALSE}
-rforest <- readForest(rfobj=rf[[3]], x=X[train.id,], y=Y[train.id], 
-                      wt.pred.accuracy=TRUE)
+rforest <- readForest(rfobj=rf[[3]], x=X[train.id,])
 ```
 
 The `tree.info` data frame provides meta data for each leaf node.
@@ -155,7 +188,13 @@ The `tree.info` data frame provides meta data for each leaf node.
 head(rforest$tree.info, n=10)
 ```
 
-The `readForest` function optionally computes a sparse matrix `node.feature` that encodes the splitting features and directions along the decision path of each leaf node. This encoding can be represented as a binary vector of length $2p$`, where an entry $j\in\{1\dots p\}$ indicates that a decision path contains the left child of a node that splits on feature $j$ and an entry $j\in\{p+1\dots 2p\}$ indicates that a decision path contains the right child of a node that splits on feature $j-p$.
+The `readForest` function optionally computes a sparse matrix `node.feature`
+that encodes the splitting features and directions along the decision path of
+each leaf node. This encoding can be represented as a binary vector of length
+$2p$`, where an entry $j\in\{1\dots p\}$ indicates that a decision path contains
+the left child of a node that splits on feature $j$ and an entry $j\in\{p+1\dots
+2p\}$ indicates that a decision path contains the right child of a node that
+splits on feature $j-p$.
 
 ```{r node_feature, message=FALSE}
 rforest$node.feature[1:10, c(1:5, p + 1:5)]
@@ -163,7 +202,11 @@ rforest$node.feature[1:10, c(1:5, p + 1:5)]
 
 ### Finding feature interactions using random intersection trees (RIT)
 
-To find prevalent sets of features and their high-order combinations used to define these nodes, use the random intersection trees (RIT) function. The following  with the following command runs RIT on all class 1 nodes, sampling each leaf node with probability proportional to the number of observations in each leaf node:
+To find prevalent sets of features and their high-order combinations used to
+define these nodes, use the random intersection trees (RIT) function. The
+following  with the following command runs RIT on all class 1 nodes, sampling
+each leaf node with probability proportional to the number of observations in
+each leaf node:
 
 ```{r rit}
 class1.nodes <- rforest$tree.info$prediction - 1 == 1
@@ -174,7 +217,11 @@ RIT(rforest$node.feature[class1.nodes,], weights=wt,
 
 ### Selecting Stable interactions
 
-The function `iRF` combines all the above steps and uses bootstrap aggregation to assess stability of the selected interactions. Setting `select.iter = TRUE` chooses the optimal iteration number by maximizing prediction accuracy on out of bag samples and searches for interactions in the corresponding random forest.
+The function `iRF` combines all the above steps and uses bootstrap aggregation
+to assess stability of the selected interactions. Setting `select.iter = TRUE`
+chooses the optimal iteration number by maximizing prediction accuracy on out of
+bag samples and searches for interactions in the corresponding random forest.
+
 ```{r irf, message=FALSE}
 fit <- iRF(x=X[train.id,], 
          y=Y[train.id], 
@@ -187,35 +234,36 @@ fit <- iRF(x=X[train.id,],
         )
 ```
 
-The output of `iRF` is a list containing up to five entries. If `select.iter = FALSE`, outputs for each entry will be lists with one entry per iteration. 
+The output of `iRF` is a list containing up to three entries. If `select.iter =
+FALSE`, outputs for each entry will be lists with one entry per iteration. 
 
 (1) `rf.list`: a `randomForest` object.
-(2) `interaction`: the interaction stability scores. The `i0` entry indicates interaction stability scores for class-$0$ leaf nodes and the `i1` entry indicates interaction stability scores for class-$1$ leaf nodes. The $+$ and $-$ indicate whether the interaction is characterized by high or low levels of the indicated feature. For instance, the interaction `1+_2+_3+` describes an interaction that is "active" when features $1, 2,$ and $3$ are all high
+
+(2) `interaction`: the interaction stability scores. The $+$ and $-$
+indicate whether the interaction is characterized by high or low levels of the
+indicated feature. For instance, the interaction `1+_2+_3+` describes an
+interaction that is defined by high levels of $1, 2,$ and $3$.
+
 ```{r stability}
-head(fit$interaction$i0)
-head(fit$interaction$i1)
+head(fit$interaction)
 ```
-(3) `prevalence`: the prevalence of interactions along decision paths. The `i0` entry indicates interaction prevalence for class-$0$ leaf nodes and the `i1` entry indicates interaction prevalence for class-$1$ leaf nodes. Columns of the returned data frame indicate the minimum, mean, and maximum prevalence of an interaction in the bootstrapped random forests. Since RIT searches for prevalent interactions on random forest decision paths, prevalence can be used as a refined measure of interaction importance. For instance, looking at the difference in prevalence among class$-1$ and class$-0$ nodes identifies interacitons that are frequently used on the leaf nodes for a particular class and not the other.
+
+(3) `importance`: a data table of importance metrics associated with each interaction. The `prev0` entry indicates interaction prevalence for class-$0$ leaf nodes and the `prev1` entry indicates interaction prevalence for class-$1$ leaf nodes. `sta.prev` indicates the proportion of times (across `n.bootsrap` samples) an interaction is more prevalent than expected under independent feature selection. `diff` indicates the difference in prevalence between class-$0$ and class-$1$ leaf nodes. `sta.diff` indicates the proportion of times (across `n.bootsrap` samples) an interaction is more prevalent among class-$1$ leaf nodes. `prec` describes the precision of leaf nodes for which an interaction is active. `sta.prec` indicates the proportion of times (across `n.bootsrap` samples) that an interaction is more precise than any subset. For a more detailed description of these importance metrics, see our paper: https://arxiv.org/abs/1810.07287.
+
+(4) `iter.select`: The selected iteration.
+
 ```{r prevalence, message=FALSE}
 library(dplyr)
-prev.joined <- left_join(fit$prevalence$i1, fit$prevalence$i0, by='int') %>%
-  mutate(diff=mean.x-mean.y) %>%
-  select(int, diff) %>%
-  arrange(desc(diff))
-
-head(prev.joined)
+head(fit$importance)
 ```
-(4) `opt.k`: the number of iterations that maximizes prediction accuracy on out of bag samples.
-(5) `weights`: the feature weights used to fit the random forest that maximizes prediction accuracy on out of bag samples.
-
-
 The selected interactions can be visualized using simple R functions like `dotchart`:
 
 ```{r dotchart, fig.height=6, fig.width=6}
-toplot <- prev.joined$diff
-names(toplot) <- prev.joined$int
+toplot <- fit$importance$diff
+names(toplot) <- fit$importance$int
 
-dotchart(rev(toplot[1:min(20, length(toplot))]), xlab='Stability Score', 
+dotchart(rev(toplot[1:min(20, length(toplot))]), 
+         xlab='Prevalence enrichment', xlim=c(0, 1),
          main='Prevalent Features/Interactions \n on Decision paths')
 ```
 
