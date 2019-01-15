@@ -38,7 +38,8 @@ iRF <- function(x, y,
     stop('test set responses not indicated')
 
   # Check all RIT and set to defaul if missing
-  if (is.null(rit.param$depth)) rit.param$depth <- 5
+  if (is.null(rit.param$depth) & !signed) rit.param$depth <- 5
+  if (is.null(rit.param$depth) & signed) rit.param$depth <- 3
   if (is.null(rit.param$ntree)) rit.param$ntree <- 500
   if (is.null(rit.param$nchild)) rit.param$nchild <- 2
   if (is.null(rit.param$class.id) & is.factor(y)) rit.param$class.id <- 1
@@ -287,17 +288,6 @@ bootstrapSample <- function(block.bootstrap, y) {
     sample.id <- sample(length(block.bootstrap), replace=TRUE)
     sample.id <- unlist(block.bootstrap[sample.id])
   }
-
-  #if (is.factor(y) & length(unique(y[sample.id])) == 1) {
-  #  warning('ONLY 1 class in block bootstrap sample, resampling...')
-  #  bootstrapSample(block.bootstrap, y)
-  #}
-
   return(sample.id)
 }
 
-#bootstrapSample <- function(y) {
-#  n <- length(y)
-#  id <- sample(n, n, replace=TRUE)
-#  return(id)
-#}
