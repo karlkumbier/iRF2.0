@@ -6,7 +6,7 @@ iRF <- function(x, y,
                 n.core=1, 
                 mtry.select.prob=rep(1, ncol(x)),
                 interactions.return=NULL, 
-                rit.param=list(depth=ifelse(signed, 3, 5), 
+                rit.param=list(depth=5, 
                                ntree=500, nchild=2, 
                                class.id=1, min.nd=1, 
                                class.cut=NULL), 
@@ -67,7 +67,7 @@ iRF <- function(x, y,
   for (iter in 1:n.iter) {
     
     # Grow Random Forest on full data
-    print(paste('iteration = ', iter))
+    if (verbose) print(paste('iteration = ', iter))
     suppressWarnings(
     rf.list[[iter]] <- foreach(i=1:length(ntree.id), .combine=combine, 
                                .multicombine=TRUE, .packages='iRF') %dorng% {
@@ -96,8 +96,9 @@ iRF <- function(x, y,
 
   # Select iteration for which to return interactions based on minimizing 
   # prediction error on OOB samples
+  selected.iter <- selectIter(rf.list, y=y)
   if (select.iter) {
-    interactions.return <- selectIter(rf.list, y=y)
+    interactions.return <- selected.iter
     if (verbose) print(paste('selected iter:', interactions.return))
   }
 
@@ -179,6 +180,7 @@ iRF <- function(x, y,
   
   out <- list()
   out$rf.list <- rf.list
+  out$selected.iter <- selected.iter
   if (!is.null(interactions.return)) {
     out$interaction <- stability.score
     out$importance <- importance.score
