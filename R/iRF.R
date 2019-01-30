@@ -1,48 +1,58 @@
 # Iteratively grows random forests, finds case specific feature interactions
-iRF <- function(x, y, 
-                xtest=NULL, ytest=NULL, 
+iRF <- function(x, y, xtest=NULL, ytest=NULL, 
                 n.iter=5, 
                 ntree=500, 
                 n.core=1, 
                 mtry.select.prob=rep(1, ncol(x)),
-                interactions.return=NULL, 
-                rit.param=list(depth=5, 
-                               ntree=500, nchild=2, 
-                               class.id=1, min.nd=1, 
-                               class.cut=NULL), 
+                iter.return=NULL, 
+                select.iter=ifelse(is.null(iter.return), TRUE, FALSE),
+                rit.param=list(depth=5, ntree=500, 
+                               nchild=2, class.id=1, 
+                               min.nd=1, class.cut=NULL), 
                 varnames.grp=colnames(x), 
                 n.bootstrap=1,
-                select.iter=TRUE,
+                weights=rep(1, nrow(x)),
                 signed=TRUE,
                 block.bootstrap=NULL,
                 ints.eval=NULL,
                 verbose=TRUE,
+                interactions.return=NULL,
+                wt.pred.accuracy=NULL,
                 ...) {
  
-  # Check input format
+  # Check input attributes and adjust to default values if necessary
+  if (!is.null(interactions.return)) {
+    warning('interactions.return is depricated, use iter.return instead')
+    iter.return <- interactions.return
+    select.iter <- FALSE
+  }
+  if (!is.null(wt.pred.accuracy))
+    warning('wt.pred.accuracy is depricated')
+
   if (!class(x) %in% c('data.frame', 'matrix'))
     stop('x must be matrix or data frame')
-  if (nrow(x) != length(y))
+  if (nrow(x) != length(y) | nrow(xtest) != length(ytest))
     stop('x and y must contain the same number of observations')
-  if (ncol(x) < 2 & (!is.null(interactions.return) | select.iter))
-    stop('cannot find interaction - X has less than two columns!')
-  if (any(interactions.return > n.iter))
+  if (ncol(x) < 2 & (!is.null(iter.return) | select.iter))
+    stop('cannot find interaction - x has less than two columns!')
+  if (any(iter.return > n.iter))
     stop('selected iteration greater than n.iter')
   if (length(mtry.select.prob) != ncol(x))
-    stop('length mtry.select.prop must equal number of features')
+    stop('length mtry.select.prob must equal number of features')
   if (!is.null(xtest)) {
     if (ncol(xtest) != ncol(x)) 
       stop('training/test data must have same number of features')
+    if (is.null(ytest))
+      stop('test set responses not indicated')
   }
-  if (!is.null(xtest) & is.null(ytest))
-    stop('test set responses not indicated')
+  if (length(weights) != nrow(x))
+    stop('length weights differs from # training observations')
 
   # Check all RIT and set to defaul if missing
-  if (is.null(rit.param$depth) & !signed) rit.param$depth <- 5
-  if (is.null(rit.param$depth) & signed) rit.param$depth <- 3
+  if (is.null(rit.param$depth)) rit.param$depth <- 5
   if (is.null(rit.param$ntree)) rit.param$ntree <- 500
   if (is.null(rit.param$nchild)) rit.param$nchild <- 2
-  if (is.null(rit.param$class.id) & is.factor(y)) rit.param$class.id <- 1
+  if (is.null(rit.param$class.id)) rit.param$class.id <- 1
   if (is.null(rit.param$min.nd)) rit.param$min.nd <- 1
   if (is.null(rit.param$class.cut) & is.numeric(y)) 
     rit.param$class.cut <- median(y)
@@ -53,7 +63,7 @@ iRF <- function(x, y,
   importance <- ifelse(class.irf, 'MeanDecreaseGini', 'IncNodePurity')
    
   rf.list <- list()
-  if (!is.null(interactions.return) | select.iter) {
+  if (!is.null(iter.return) | select.iter) {
     stability.score <- list()
     importance.score <- list()
   }
@@ -72,8 +82,7 @@ iRF <- function(x, y,
     suppressWarnings(
     rf.list[[iter]] <- foreach(i=1:length(ntree.id), .combine=combine, 
                                .multicombine=TRUE, .packages='iRF') %dorng% {
-                                 randomForest(x, y, 
-                                              xtest, ytest, 
+                                 randomForest(x, y, xtest, ytest, 
                                               ntree=ntree.id[i], 
                                               mtry.select.prob=mtry.select.prob, 
                                               keep.forest=TRUE,
@@ -99,8 +108,8 @@ iRF <- function(x, y,
   # prediction error on OOB samples
   selected.iter <- selectIter(rf.list, y=y)
   if (select.iter) {
-    interactions.return <- selected.iter
-    if (verbose) print(paste('selected iter:', interactions.return))
+    iter.return <- selected.iter
+    if (verbose) print(paste('selected iter:', iter.return))
   }
 
   # Combine training and test set for RIT, and weight test set to 0. Leaf node
@@ -108,20 +117,22 @@ iRF <- function(x, y,
   if (!is.null(xtest)) {
     xx <- rbind(x, xtest); yy <- c(y, ytest)
     if (class.irf) yy <- as.factor(yy - 1)
-    weights <- c(rep(1, nrow(x)), rep(0, nrow(xtest)))
+    weights <- c(weights, rep(0, nrow(xtest)))
+    test.id <- c(rep(0, nrow(x)), rep(1, nrow(xtest)))
   } else {
     xx <- x; yy <- y
-    weights <- rep(1, nrow(x))
+    test.id <- rep(1, nrow(x))
   }
 
   
-  for (iter in interactions.return) {
+  for (iter in iter.return) {
     # Evaluate interactions in full data random forest
     
     if (is.null(ints.eval)) {
       rit.param$ntree <- rit.param$ntree * n.bootstrap
       ints.full <- gRIT(rand.forest=rf.list[[iter]], x=xx, y=yy,
                         weights=weights,
+                        test.id=test.id,
                         varnames.grp=varnames.grp,
                         rit.param=rit.param,
                         signed=signed,
@@ -175,49 +186,51 @@ iRF <- function(x, y,
     }
     
     # Calculate stability scores of interactions
-    stability.score[[iter]] <- summarizeInteract(interact.list)
+    stability.score[[iter]] <- summarizeInteract(interact.list, ints.full$int)
     importance.score[[iter]] <- summarizeImp(imp.list)
   } # end for (iter in ... )
   
   out <- list()
   out$rf.list <- rf.list
   out$selected.iter <- selected.iter
-  if (!is.null(interactions.return)) {
+  if (!is.null(iter.return)) {
     out$interaction <- stability.score
     out$importance <- importance.score
   }
 
-  if (length(interactions.return) == 1) {
-    out$rf.list <- out$rf.list[[interactions.return]]
-    out$interaction <- out$interaction[[interactions.return]]
-    out$selected.iter <- interactions.return
-    out$importance <- out$importance[[interactions.return]]
+  if (length(iter.return) == 1) {
+    out$rf.list <- out$rf.list[[iter.return]]
+    out$interaction <- out$interaction[[iter.return]]
+    out$selected.iter <- iter.return
+    out$importance <- out$importance[[iter.return]]
   }
 
   return(out)
 }
 
 
-summarizeInteract <- function(x){
+summarizeInteract <- function(x, ints.full){
   # Aggregate interactions across bootstrap samples
 
   n.bootstrap <- length(x)
   x <- unlist(x)
+  out <- rep(0, length(ints.full))
+  names(out) <- ints.full
   
   if (length(x) >= 1){
     int.tbl <- sort(c(table(x)), decreasing=TRUE)
     int.tbl <- int.tbl / n.bootstrap
-    return(int.tbl)
+    out[names(int.tbl)] <- int.tbl
+    return(out)
   } else {
     return(c(interaction=numeric(0)))
   }
 }
 
 summarizeImp <- function(imp) {
-  # Summarize interaction prevalence across bootstrap samples
-  nbs <- length(imp)
-  
+  # Summarize interaction importance metrics across bootstrap samples
   imp <- rbindlist(imp)
+  
   if (nrow(imp) > 0) {
     imp <- mutate(imp, diff=(prev1-prev0)) %>%
       group_by(int) %>%
@@ -229,44 +242,40 @@ summarizeImp <- function(imp) {
                 sta.prec=mean(prec.test > 0), 
                 prec=mean(prec)) %>%
       arrange(desc(diff))
-    return(data.table(imp))
   } else {
-    # If no interactions recovered return empty data table
-    imp <- data.table(sta.diff=numeric(0), diff=numeric(0),
-                       prev1=numeric(0), prev0=numeric(0), 
-                       prec=numeric(0))
-    return(imp)
+    imp <- data.table(sta.diff=numeric(0), 
+                      diff=numeric(0),
+                      sta.prev=numeric(0), 
+                      prev1=numeric(0), 
+                      prev0=numeric(0),
+                      sta.prec=numeric(0), 
+                      prec=numeric(0))
   }
+
+  return(data.table(imp)))
 }
 
 sampleClass <- function(y, cl, n) {
-  # Sample indices specific to a given class
+  # Take a bootstrap sample from a particular class of observations
   sampled <- sample(which(y == cl), n, replace=TRUE)
   return(sampled)
 }
 
 selectIter <- function(rf.list, y) {
   # Evaluate optimal iteration based on prediction error in OOB samples.
-  # For classification, error is given by weighted missclassification rate.
+  # For classification, error is given by missclassification rate.
   # For regression, error is given by MSE
-  predicted <- lapply(rf.list, function(z) 
-                      as.numeric(z$predicted) - is.factor(y))
+  predicted <- lapply(rf.list, function(z) as.numeric(z$predicted))
   
-  if (is.factor(y)){
+  if (is.factor(y)) {
+    predicted <- lapply(predicted, '-', 1)
     y <- as.numeric(y) - 1
-    errFun <- function(y, yhat) {
-      wt1 <- mean(y == 1)
-      err1 <- sum(y == 0 & yhat == 1)
-      wt0 <- mean(y == 0)
-      err0 <- sum(y == 1 & yhat == 0)
-      out <- wt1 * err1 + wt0 * err0
-     return(out)
-    }
+    eFun <- function(y, yhat) sum(y == 1 & yhat == 0) + sum(y == 0 & yhat == 1)
   } else {
-    errFun <- function(y, yhat) mean((yhat - y) ^ 2, na.rm=TRUE)
+    eFun <- function(y, yhat) mean((yhat - y) ^ 2, na.rm=TRUE)
   }
   
-  error <- sapply(predicted, errFun, y=y)
+  error <- sapply(predicted, eFun, y=y)
   min.err <- min(error)
   id.select <- max(which(error == min.err))
   return(id.select)
@@ -274,7 +283,6 @@ selectIter <- function(rf.list, y) {
 
 bootstrapSample <- function(block.bootstrap, y) {
   # Generate outer layer bootstrap samples
-
   n <- length(y)
   if (is.null(block.bootstrap) & is.factor(y)) {
     # Take bootstrap sample that maintains class balance in full data

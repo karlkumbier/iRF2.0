@@ -2,6 +2,7 @@ gRIT <- function(x, y,
                  rand.forest=NULL, 
                  read.forest=NULL,
                  weights=rep(1, nrow(x)),
+                 test.id=rep(1, nrow(x)),
                  varnames.grp=colnames(x),
                  rit.param=list(depth=5,
                          ntree=500,
@@ -40,7 +41,10 @@ gRIT <- function(x, y,
     y[yy != rit.param$class.id] <- 0
     y[yy == rit.param$class.id] <- 1
     y <- as.factor(y)
+  } else if (!class.irf) {
+    y <- as.numeric(y >= rit.param$class.cut)
   }
+
 
 
   # Set feature names for grouping interactions
@@ -67,7 +71,7 @@ gRIT <- function(x, y,
 
   # Evaluate leaf node attributes: number of observations in node, proportion of
   # class-1 observations in node
-  yprec <- precision(read.forest, y, weights)
+  yprec <- precision(read.forest, y, test.id)
   ndcnt <- Matrix::colSums(t(read.forest$node.obs) * weights)
   rit.param$min.nd <- min(rit.param$min.nd, quantile(ndcnt, prob=0.9))
   idcnt <- ndcnt >= rit.param$min.nd
