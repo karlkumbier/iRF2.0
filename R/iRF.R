@@ -97,23 +97,11 @@ iRF <- function(x, y,
   }
 
 
-  # Combine training and test set for RIT, and weight test set to 0. Leaf node
-  # class proportions will be evaluated on test set if supplied
-  if (!is.null(xtest)) {
-    xx <- rbind(x, xtest); yy <- c(y, ytest)
-    if (class.irf) yy <- as.factor(yy - 1)
-    weights <- c(weights, rep(0, nrow(xtest)))
-    test.id <- c(rep(0, nrow(x)), rep(1, nrow(xtest)))
-  } else {
-    xx <- x; yy <- y
-    test.id <- rep(1, nrow(x))
-  }
-
-
   # Evaluate stability/importance metrics of recovered interactions across outer 
   # layer bootstrap samples.
   stability.score <- list()
   importance.score <- list()
+
   if (is.null(bs.sample)) 
     bs.sample <- replicate(n.bootstrap, bootstrapSample(y), SIMPLIFY=FALSE)
 

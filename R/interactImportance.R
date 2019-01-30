@@ -34,7 +34,7 @@ prevalence <- function(weight, idint, idcl) {
   return(c(prev1, prev0))
 }
 
-precision <- function(read.forest, y, test.id) {
+precision <- function(read.forest, y) {
   # Evaluate class proportion in each leaf node
   class.irf <- is.factor(y)
   if (class.irf) {
@@ -44,13 +44,13 @@ precision <- function(read.forest, y, test.id) {
   stopifnot(all(test.id %in% 0:1))
 
   if (class.irf) {
-    ndcnt <- t(read.forest$node.obs) * test.id
+    ndcnt <- t(read.forest$node.obs)
     ndcntY <- Matrix::colSums(ndcnt * y)
     ndcnt <- Matrix::colSums(ndcnt)
     yprec <- ndcntY / ndcnt
     yprec[ndcnt == 0] <- 0
   } else {
-    ndcnt <- t(read.forest$node.obs) * test.id
+    ndcnt <- t(read.forest$node.obs)
     ndcntY <- Matrix::colSums(ndcnt * y)
     ndcnt <- Matrix::colSums(ndcnt)
     yprec <- ndcntY / ndcnt
