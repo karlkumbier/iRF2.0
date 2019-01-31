@@ -77,7 +77,7 @@ iRF <- function(x, y,
     if (verbose) print(paste('iteration = ', iter))
     rf.list[[iter]] <- parRF(x=x, y=y, xtest=xtest, ytest=ytest,
                              mtry.select.prob=mtry.select.prob,
-                             ntree=ntree)
+                             ntree=ntree, n.core=n.core)
    
     # Update feature selection probabilities
     mtry.select.prob <- rf.list[[iter]]$importance
@@ -96,30 +96,28 @@ iRF <- function(x, y,
     if (verbose) print(paste('selected iteration:', iter.return))
   }
 
-
-  # Evaluate stability/importance metrics of recovered interactions across outer 
-  # layer bootstrap samples.
   stability.score <- list()
   importance.score <- list()
 
   if (is.null(bs.sample)) 
-    bs.sample <- replicate(n.bootstrap, bootstrapSample(y), SIMPLIFY=FALSE)
+    bs.sample <- replicate(n.bootstrap, bootstrapSample(y), simplify=FALSE)
 
   for (iter in iter.return) {
     
     # Search for interactions to evaluate across full-data RF 
     rit.param$ntree <- rit.param$ntree * n.bootstrap
-    ints.eval <- gRIT(rand.forest=rf.list[[iter]], x=xx, y=yy,
+    ints.eval <- gRIT(rand.forest=rf.list[[iter]], x=x, y=y,
                       weights=weights, varnames.grp=varnames.grp,
                       rit.param=rit.param, signed=signed,
                       n.core=n.core)
+    ints.eval <- ints.eval$int
     rit.param$ntree <- rit.param$ntree / n.bootstrap
        
     # Evaluate stability/importance of recovered interactions
-    int.stab <- stabilityScore(fit=rf.list[[iter]], iter=iter, x=xx, y=yy,
+    int.stab <- stabilityScore(fit=rf.list, iter=iter, x=x, y=y,
                                bs.sample=bs.sample, ints.eval=ints.eval,
                                weights=weights, varnames.grp=varnames.grp,
-                               rit.param=rit.param, signed=signed,
+                               rit.param=rit.param, signed=signed, ntree=ntree,
                                n.core=n.core, ...)
     
     stability.score[[iter]] <- int.stab$stab
