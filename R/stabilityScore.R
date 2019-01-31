@@ -1,36 +1,38 @@
 stabilityScore <- function(fit, iter, bs.sample, ints.eval, x, y, weights, 
-                           varnames.grp, rit.param, signed, n.core, ...) {
+                           varnames.grp, rit.param, signed, n.core, ntree, 
+                           ...) {
   # Wrapper function for stabilityScore_. Calcuates stability of importance
   # metrics across bootstrap samples.
 
   interact <- list()
   importance <- list()
   for (i in 1:length(bs.sample)) {
-    out <- stabilityScore_(sample.id=bs.sample[i], fit=fit, iter=iter,
-                           ints.eval=ints.eval, x=x, y=y, 
+    out <- stabilityScore_(sample.id=bs.sample[[i]], fit=fit, iter=iter,
+                           ints.eval=ints.eval, x=x, y=y, ntree=ntree,
                            weights=weights, rit.param=rit.param, 
                            varnames.grp=varnames.grp, signed=signed, 
                            n.core=n.core, ...)
-    interact[[i]] <- out$interact
-    importance[[i]] <- out$importance
+    interact[[i]] <- out$stab
+    importance[[i]] <- out$imp
   }
-  stab <- summarizeInteract(interact.list, ints.full$int)
-  imp <- summarizeImp(imp.list)
+  stab <- summarizeInteract(interact, ints.eval)
+  imp <- summarizeImp(importance)
   return(list(stab=stab, imp=imp))
 }
 
 stabilityScore_ <- function(fit, iter, sample.id, ints.eval, x, y, weights,
-                            varnames.grp, rit.param, signed, n.core, ...) {    
+                            varnames.grp, rit.param, signed, n.core, ntree,
+                            ...) {    
   # Evalutes interaction importance metrics across a single bootstrap replicate.
   
   if (iter == 1)
     mtry.select.prob <- rep(1, ncol(x))
   else
-    mtry.select.prob <- rf.list[[iter - 1]]$importance
+    mtry.select.prob <- fit[[iter - 1]]$importance
 
   # Fit random forest on bootstrap sample
   rf <- parRF(x=x[sample.id,], y=y[sample.id], xtest=xtest, ytest=ytest,
-              mtry.select.prob=mtry.select.prob, ntree=ntree)  
+              mtry.select.prob=mtry.select.prob, ntree=ntree, n.core=n.core)  
 
   # Run generalized RIT on rf.b to learn interactions
   ints <- gRIT(rand.forest=rf, x=x, y=y,
@@ -41,7 +43,7 @@ stabilityScore_ <- function(fit, iter, sample.id, ints.eval, x, y, weights,
                ints.full=ints.eval,
                n.core=n.core)
 
-  return(interact=ints$int, imp=ints$imp)
+  return(list(stab=ints$int, imp=ints$imp))
 }
 
 summarizeInteract <- function(x, ints.full){
@@ -69,24 +71,20 @@ summarizeImp <- function(imp) {
   if (nrow(imp) > 0) {
     imp <- mutate(imp, diff=(prev1-prev0)) %>%
     group_by(int) %>%
-    summarize(sta.diff=mean(diff > 0),
-              diff=mean(diff),
-              sta.prev=mean(prev.test
-                            > 0),
-              prev1=mean(prev1),
-              prev0=mean(prev0),
-              sta.prec=mean(prec.test
-                            > 0),
-              prec=mean(prec)) %>%
-    arrange(desc(diff))
+    summarize(prevalence.diff=mean(diff),
+              sta.diff=mean(diff > 0),
+              independence=mean(prev.test),
+              sta.independence=mean(prev.test > 0),
+              precision=mean(prec),
+              sta.precision=mean(prec.test > 0)) %>%
+    arrange(desc(prevalence.diff))
   } else {
-    imp <- data.table(sta.diff=numeric(0),
-                      diff=numeric(0),
-                      sta.prev=numeric(0),
-                      prev1=numeric(0),
-                      prev0=numeric(0),
-                      sta.prec=numeric(0),
-                      prec=numeric(0))
+    imp <- data.table(prevalence.diff=numeric(0),
+                      sta.diff=numeric(0),
+                      independence=numeric(0),
+                      sta.independence=numeric(0),
+                      precision=numeric(0),
+                      sta.precision=numeric(0))
   }
 
   return(data.table(imp))

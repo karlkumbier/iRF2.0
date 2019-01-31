@@ -44,7 +44,6 @@ nameInt <- function(varnames, idx, sgn) {
 
 int2Id <- function(int, varnames.grp, signed=FALSE, split=FALSE) {
   # Determine integer index of named variable (signed or not)
-  require(stringr)
   if (!split) int <- str_split(int, '_')[[1]]
 
   if (signed) {
@@ -66,7 +65,6 @@ int2Id <- function(int, varnames.grp, signed=FALSE, split=FALSE) {
 
 unsign <- function(int) {
   # Remove sign indicators from interaction strings
-  require(stringr)
   return(str_replace_all(as.character(int), '[-\\+]', ''))
 }
 
@@ -80,7 +78,6 @@ intSign <- function(int, split=TRUE) {
 
 intSubsets <- function(int, split=TRUE) {
   # Generate order 1, s - 1, and s subsets of an order-s interaction
-  require(stringr)
 
   if (!split) int <- strs_plit(as.character(int), '_')[[1]]
   if (length(int) == 1) return(int)
