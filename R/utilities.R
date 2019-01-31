@@ -2,7 +2,7 @@ printAcc <- function(fit, y, class.irf) {
   # Generate prediction accuracy string for printing
   if (class.irf) {
     acc <- auc(roc(fit$test$votes[,2], y))
-    out <- paste('AUROC: ', round(auroc, 2))
+    out <- paste('AUROC: ', round(acc, 2))
   } else {
     pct.var <- 1 - mean((fit$test$predicted - y) ^ 2) / var(y)
     pct.var <- max(pct.var, 0)

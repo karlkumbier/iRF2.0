@@ -12,9 +12,9 @@ Imports:
     dplyr,
     Rcpp,
     methods,
+    foreach,
     doParallel,
     doRNG,
-    foreach,
     stringr,
     RColorBrewer
 Suggests:

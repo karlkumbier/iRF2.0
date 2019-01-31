@@ -31,6 +31,7 @@ iRF <- function(x, y,
     warning('wt.pred.accuracy is depricated')
 
   # Check input attributes for correct format
+  require(doRNG, quiet=TRUE)
   if (!class(x) %in% c('data.frame', 'matrix'))
     stop('x must be matrix or data frame')
   if (nrow(x) != length(y) | nrow(xtest) != length(ytest))
@@ -94,7 +95,7 @@ iRF <- function(x, y,
   for (iter in iter.return) {
     
     # Evaluate interactions in full data random forest 
-    if (verbose) cat('finding interactions ... ')
+    if (verbose) cat('finding interactions...\n')
     rit.param$ntree <- rit.param$ntree * n.bootstrap
     ints.eval <- gRIT(rf.list[[iter]], x=x, y=y,
                       weights=weights,
@@ -105,6 +106,7 @@ iRF <- function(x, y,
     ints.eval <- ints.eval$int
     rit.param$ntree <- rit.param$ntree / n.bootstrap
 
+    if (verbose) cat('evaluating interactions...\n')
     # Find interactions across bootstrap replicates
     importance[[iter]] <- stabilityScore(rf.list, x, y, iter, bs.sample,
                                          ints.eval=ints.eval, ntree=ntree,

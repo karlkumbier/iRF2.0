@@ -31,10 +31,8 @@ bsgRIT <- function(fit, x, y, iter, sample.id, ints.eval, weights, ntree,
     mtry.select.prob <- fit[[iter - 1]]$importance
 
   # Fit random forest on bootstrap sample
-  rf <- parRF(x=x[sample.id,], y=y[sample.id], xtest=xtest, ytest=ytest,
-              mtry.select.prob=mtry.select.prob, ntree=ntree,
-              n.core=n.core,
-              ...)
+  rf <- parRF(x[sample.id,], y[sample.id], ntree=ntree, n.core=n.core, 
+              mtry.select.prob=mtry.select.prob, ...)
 
   # Run generalized RIT on rf.b to learn interactions
   ints <- gRIT(rand.forest=rf, x=x, y=y,

@@ -15,9 +15,10 @@ importFrom(stats, delete.response, mad, median, model.frame,
            model.response, na.fail, na.omit, napredict,
            predict, quantile, reformulate, terms, update,
            var, weighted.mean)
+
+importFrom(foreach, foreach, "%dopar%")
 importFrom(doParallel, registerDoParallel)
 importFrom(doRNG, "%dorng%")
-importFrom(foreach, foreach, "%dopar%")
 importFrom(parallel, detectCores)
 importFrom(RColorBrewer, brewer.pal)
 importFrom(utils, combn)
