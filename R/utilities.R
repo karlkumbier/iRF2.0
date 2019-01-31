@@ -8,7 +8,6 @@ printAcc <- function(fit, y, class.irf) {
     pct.var <- max(pct.var, 0)
     out <- paste('% var explained:', pct.var * 100)
   }
-
   return(out)
 }
 
@@ -78,7 +77,6 @@ intSign <- function(int, split=TRUE) {
 
 intSubsets <- function(int, split=TRUE) {
   # Generate order 1, s - 1, and s subsets of an order-s interaction
-
   if (!split) int <- strs_plit(as.character(int), '_')[[1]]
   if (length(int) == 1) return(int)
   sub.ord <- c(1, length(int) - 1, length(int))
@@ -87,3 +85,8 @@ intSubsets <- function(int, split=TRUE) {
   return(subs)
 }
 
+lreplicate <- function(n, expr, ...) {
+  # replicate with list return
+  out <- replicate(n, expr, ..., simplify=FALSE)
+  return(out)
+}

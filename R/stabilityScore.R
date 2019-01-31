@@ -1,30 +1,30 @@
-stabilityScore <- function(fit, iter, bs.sample, ints.eval, x, y, weights, 
-                           varnames.grp, rit.param, signed, n.core, ntree, 
+stabilityScore <- function(fit, x, y, iter, bs.sample, ints.eval, weights,
+                           varnames.grp, rit.param, signed, n.core, ntree,
                            ...) {
-  # Wrapper function for stabilityScore_. Calcuates stability of importance
+  # Wrapper function for bsgRIT. Calcuates stability of importance
   # metrics across bootstrap samples.
-
-  interact <- list()
-  importance <- list()
+  out <- list()
   for (i in 1:length(bs.sample)) {
-    out <- stabilityScore_(sample.id=bs.sample[[i]], fit=fit, iter=iter,
-                           ints.eval=ints.eval, x=x, y=y, ntree=ntree,
-                           weights=weights, rit.param=rit.param, 
-                           varnames.grp=varnames.grp, signed=signed, 
-                           n.core=n.core, ...)
-    interact[[i]] <- out$stab
-    importance[[i]] <- out$imp
+
+    sample.id <- bs.sample[[i]]
+    out[[i]] <- bsgRIT(fit, x, y, iter, sample.id, ints.eval=ints.eval, 
+                       ntree=ntree, weights=weights, rit.param=rit.param,
+                       varnames.grp=varnames.grp, signed=signed, n.core=n.core,
+                       ...)
+
   }
-  stab <- summarizeInteract(interact, ints.eval)
-  imp <- summarizeImp(importance)
-  return(list(stab=stab, imp=imp))
+
+  # Summarize stability and importance metrics across bootstrap replicates
+  out <- summarizeInteract(out)
+  return(out)
 }
 
-stabilityScore_ <- function(fit, iter, sample.id, ints.eval, x, y, weights,
-                            varnames.grp, rit.param, signed, n.core, ntree,
-                            ...) {    
-  # Evalutes interaction importance metrics across a single bootstrap replicate.
-  
+
+bsgRIT <- function(fit, x, y, iter, sample.id, ints.eval, weights, ntree,
+                   varnames.grp, rit.param, signed, n.core, ...) {
+  # Fit RF on single bootstrap replicate and evalutes interaction importance 
+  # metrics for fitted RF. 
+
   if (iter == 1)
     mtry.select.prob <- rep(1, ncol(x))
   else
@@ -32,7 +32,9 @@ stabilityScore_ <- function(fit, iter, sample.id, ints.eval, x, y, weights,
 
   # Fit random forest on bootstrap sample
   rf <- parRF(x=x[sample.id,], y=y[sample.id], xtest=xtest, ytest=ytest,
-              mtry.select.prob=mtry.select.prob, ntree=ntree, n.core=n.core)  
+              mtry.select.prob=mtry.select.prob, ntree=ntree,
+              n.core=n.core,
+              ...)
 
   # Run generalized RIT on rf.b to learn interactions
   ints <- gRIT(rand.forest=rf, x=x, y=y,
@@ -43,48 +45,33 @@ stabilityScore_ <- function(fit, iter, sample.id, ints.eval, x, y, weights,
                ints.full=ints.eval,
                n.core=n.core)
 
-  return(list(stab=ints$int, imp=ints$imp))
+  return(ints)
 }
 
-summarizeInteract <- function(x, ints.full){
-  # Aggregate interactions across bootstrap samples
-
-  n.bootstrap <- length(x)
-  x <- unlist(x)
-  out <- rep(0, length(ints.full))
-  names(out) <- ints.full
-
-  if (length(x) >= 1){
-    int.tbl <- sort(c(table(x)), decreasing=TRUE)
-    int.tbl <- int.tbl / n.bootstrap
-    out[names(int.tbl)] <- int.tbl
-    return(out)
-  } else {
-    return(c(interaction=numeric(0)))
-  }
-}
-
-summarizeImp <- function(imp) {
+summarizeInteract <- function(x) {
   # Summarize interaction importance metrics across bootstrap samples
-  imp <- rbindlist(imp)
+  n.bootstrap <- length(x)
+  x <- rbindlist(x)
 
-  if (nrow(imp) > 0) {
-    imp <- mutate(imp, diff=(prev1-prev0)) %>%
-    group_by(int) %>%
-    summarize(prevalence.diff=mean(diff),
-              sta.diff=mean(diff > 0),
-              independence=mean(prev.test),
-              sta.independence=mean(prev.test > 0),
-              precision=mean(prec),
-              sta.precision=mean(prec.test > 0)) %>%
-    arrange(desc(prevalence.diff))
+  if (nrow(x) > 0) {
+    imp <- mutate(x, diff=(prev1-prev0)) %>%
+      group_by(int) %>%
+      summarize(prevalence.diff=mean(diff),
+                sta.diff=mean(diff > 0),
+                independence=mean(prev.test),
+                sta.independence=mean(prev.test > 0),
+                precision=mean(prec),
+                sta.precision=mean(prec.test > 0),
+                stability=mean(recovered)) %>%
+      arrange(desc(prevalence.diff))
   } else {
     imp <- data.table(prevalence.diff=numeric(0),
                       sta.diff=numeric(0),
                       independence=numeric(0),
                       sta.independence=numeric(0),
                       precision=numeric(0),
-                      sta.precision=numeric(0))
+                      sat.precision=numeric(0),
+                      stability=numeric(0))
   }
 
   return(data.table(imp))

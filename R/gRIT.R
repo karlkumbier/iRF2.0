@@ -13,7 +13,6 @@ gRIT <- function(x, y,
                  ints.full=NULL,
                  n.core=1) {
 
-  out <- list()
   class.irf <- is.factor(y)
   if (n.core == -1) n.core <- detectCores()  
   if (n.core > 1) registerDoParallel(n.core)
@@ -21,8 +20,6 @@ gRIT <- function(x, y,
   # Check rit parameters and set default values if not specified
   if (is.null(rand.forest) & is.null(read.forest))
     stop('Supply random forest or read forest output')
-  if (!all(weights %in% 0:1))
-    stop('Only 0-1 weighting supported')
   if (is.null(rit.param$depth)) 
     rit.param$depth <- 5
   if (is.null(rit.param$ntree)) 
@@ -37,8 +34,6 @@ gRIT <- function(x, y,
     rit.param$class.cut <- median(y)
   if (!class.irf) 
     y <- as.numeric(y >= rit.param$class.cut)
-  
-
 
 
   # Set feature names for grouping interactions
@@ -46,9 +41,11 @@ gRIT <- function(x, y,
     varnames.grp <- colnames(x)
   else if (is.null(varnames.grp))
     varnames.grp <- as.character(1:ncol(x))
+  
   varnames.unq <- unique(varnames.grp)
   p <- length(varnames.unq)
-  
+
+
   # Read RF object to extract decision path metadata
   if (is.null(read.forest)) {
     read.forest <- readForest(rand.forest, x=x,
@@ -60,18 +57,17 @@ gRIT <- function(x, y,
   }
 
   # Collapse node feature matrix for unsigned iRF
-  if (!signed) 
-    read.forest$node.feature <- collapseNF(read.forest$node.feature)
+  if (!signed) read.forest$node.feature <- collapseNF(read.forest$node.feature)
 
-  # Evaluate leaf node attributes: number of observations in node, proportion of
-  # class-1 observations in node
-  yprec <- precision(read.forest, y)
+  # Evaluate leaf node attributes
+  prec.nd <- precision(read.forest, y)
   ndcnt <- Matrix::colSums(t(read.forest$node.obs) * weights)
-  rit.param$min.nd <- min(rit.param$min.nd, quantile(ndcnt, prob=0.9))
+  
+  # Subset leaf nodes based on mimimum size
   idcnt <- ndcnt >= rit.param$min.nd
-  ndcnt <- ndcnt[idcnt]
   read.forest <- subsetReadForest(read.forest, idcnt)
-  yprec <- yprec[idcnt]
+  ndcnt <- ndcnt[idcnt]
+  prec.nd <- prec.nd[idcnt]
 
   # Select class specific leaf nodes
   if (class.irf)
@@ -84,45 +80,47 @@ gRIT <- function(x, y,
   } else {
   
     # Run RIT on leaf nodes of selected class  
-    out$int <- runRIT(subsetReadForest(read.forest, idcl),
-                      weights=ndcnt[idcl],
-                      rit.param=rit.param,
-                      n.core=n.core)
-
-    # Evaluate prevalence of recovered/supplied interactions 
-    if (!is.null(out$int)) {
-
-      if (is.null(ints.full)) {
-        ints.full <- out$int
-      } else {
-        ints.full <- lapply(ints.full, int2Id, 
-                            varnames.grp=varnames.grp, 
-                            signed=signed)
-      }
-     
-      ints.sub <- lapply(ints.full, intSubsets)
-      ints.sub <- unique(unlist(ints.sub, recursive=FALSE))
-      suppressWarnings(
-      imp <- foreach(int=ints.sub) %dorng% {
-        intImportance(int, nf=read.forest$node.feature,
-                      yprec=yprec, select.id=idcl, 
-                      weight=ndcnt)
-      })
-      out$imp <- rbindlist(imp) 
-      imp.test <- lapply(ints.full, subsetTest, importance=out$imp, ints=ints.sub)
-      imp.test <- rbindlist(imp.test)
+    ints <- runRIT(subsetReadForest(read.forest, idcl), weights=ndcnt[idcl],
+                  rit.param=rit.param, n.core=n.core)
+    
+    if (is.null(ints)) return(nullReturn())
+    
+    # Set recovered interactions or convert to indices if supplied
+    if (is.null(ints.full)) {
+      ints.full <- ints
+    } else {
+      ints.full <- lapply(ints.full, int2Id, signed=signed,
+                          varnames.grp=varnames.grp)
     }
+   
+    # Evaluate importance metrics for supplied/recovered interactions and lower
+    # order subsets.
+    ints.sub <- lapply(ints.full, intSubsets)
+    ints.sub <- unique(unlist(ints.sub, recursive=FALSE))
 
-    if (is.null(out$int)) return(nullReturn())
-    out$int <- nameInts(out$int, varnames.unq, signed=signed)
-    imp.test <- imp.test %>%
-      mutate(int=nameInts(ints.full, varnames.unq, signed=signed))
-    out$imp <- out$imp %>%
-      mutate(int=nameInts(ints.sub, varnames.unq, signed=signed)) %>%
-      right_join(imp.test, by='int')
-    out$int <- out$int[out$int %in% out$imp$int]
+    suppressWarnings(
+    ximp <- foreach(int=ints.sub) %dorng% {
+      intImportance(int, nf=read.forest$node.feature, weight=ndcnt,
+                    prec.nd=prec.nd, select.id=idcl)
+    })
+    ximp <- rbindlist(ximp) 
+
+    imp.test <- lapply(ints.full, subsetTest, importance=ximp, ints=ints.sub)
+    imp.test <- rbindlist(imp.test)
   }
-  return(out)
+
+  # Aggregate evaluated interations for return
+  ints.recovered <- nameInts(ints, varnames.unq, signed=signed)
+  
+  imp.test <- imp.test %>%
+    mutate(int=nameInts(ints.full, varnames.unq, signed=signed))
+  
+  ximp <- ximp %>%
+    mutate(int=nameInts(ints.sub, varnames.unq, signed=signed),
+           recovered=int %in% ints.recovered) %>%
+    right_join(imp.test, by='int')
+
+  return(ximp)
 }
 
 runRIT <- function(read.forest, weights, rit.param, n.core=1) {

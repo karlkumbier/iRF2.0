@@ -20,14 +20,13 @@ iRF <- function(x, y,
                 interactions.return=NULL,
                 wt.pred.accuracy=NULL,
                 ...) {
-
-  # Check for depricated input arguments and warn if used
+ 
+  # Check for depricated arguments
   if (!is.null(interactions.return)) {
     warning('interactions.return is depricated, use iter.return instead')
     iter.return <- interactions.return
     select.iter <- FALSE
   }
-
   if (!is.null(wt.pred.accuracy))
     warning('wt.pred.accuracy is depricated')
 
@@ -59,102 +58,85 @@ iRF <- function(x, y,
   if (is.null(rit.param$min.nd)) rit.param$min.nd <- 1
   if (is.null(rit.param$class.cut) & is.numeric(y)) 
     rit.param$class.cut <- median(y)
-
-  # Register cores for parallel computation 
-  if (n.core == -1) n.core <- detectCores()
-  if (n.core > 1) registerDoParallel(n.core)
   
 
   class.irf <- is.factor(y)
   importance <- ifelse(class.irf, 'MeanDecreaseGini', 'IncNodePurity')
   
-
-  # Iteratively fit random forests, reweighting towards important features.
-  rf.list <- list()
+  # Fit a series of iteratively re-weighted RFs 
+  rf.list <- list()  
   for (iter in 1:n.iter) {
-
+    
     # Grow Random Forest on full data
     if (verbose) print(paste('iteration = ', iter))
-    rf.list[[iter]] <- parRF(x=x, y=y, xtest=xtest, ytest=ytest,
-                             mtry.select.prob=mtry.select.prob,
-                             ntree=ntree, n.core=n.core)
-   
+    rf.list[[iter]] <- parRF(x, y, xtest, ytest, ntree=ntree, n.core=n.core, 
+                             mtry.select.prob=mtry.select.prob, ...)
+    
     # Update feature selection probabilities
     mtry.select.prob <- rf.list[[iter]]$importance
 
-    # Report test set accuracy if test set supplied and verbose 
+    # Evaluate test set error if supplied
     if (!is.null(xtest) & verbose) 
-      print(printAcc(fit=rf.list[[iter]], y=ytest, class.irf=class.irf))
+      print(printAcc(rf.list[[iter]], ytest, class.irf))
   
   }
+  
 
-
-  # Select iteration based on prediction error for OOB samples
+  # Select iteration to return interactions based on OOB error
   selected.iter <- selectIter(rf.list, y=y)
-  if (select.iter) {
-    iter.return <- selected.iter
-    if (verbose) print(paste('selected iteration:', iter.return))
-  }
+  if (select.iter) iter.return <- selected.iter
+  
 
-  stability.score <- list()
-  importance.score <- list()
-
-  if (is.null(bs.sample)) 
-    bs.sample <- replicate(n.bootstrap, bootstrapSample(y), simplify=FALSE)
-
+  # Run gRIT across full data RF and outer layer boostrap stability analysis of
+  # recovered interactions 
+  importance <- list()
+  if (is.null(bs.sample)) bs.sample <- lreplicate(n.bootstrap, bsSample(y))
   for (iter in iter.return) {
     
-    # Search for interactions to evaluate across full-data RF 
+    # Evaluate interactions in full data random forest 
+    if (verbose) cat('finding interactions ... ')
     rit.param$ntree <- rit.param$ntree * n.bootstrap
-    ints.eval <- gRIT(rand.forest=rf.list[[iter]], x=x, y=y,
-                      weights=weights, varnames.grp=varnames.grp,
-                      rit.param=rit.param, signed=signed,
+    ints.eval <- gRIT(rf.list[[iter]], x=x, y=y,
+                      weights=weights,
+                      varnames.grp=varnames.grp,
+                      rit.param=rit.param,
+                      signed=signed,
                       n.core=n.core)
     ints.eval <- ints.eval$int
     rit.param$ntree <- rit.param$ntree / n.bootstrap
-       
-    # Evaluate stability/importance of recovered interactions
-    int.stab <- stabilityScore(fit=rf.list, iter=iter, x=x, y=y,
-                               bs.sample=bs.sample, ints.eval=ints.eval,
-                               weights=weights, varnames.grp=varnames.grp,
-                               rit.param=rit.param, signed=signed, ntree=ntree,
-                               n.core=n.core, ...)
-    
-    stability.score[[iter]] <- int.stab$stab
-    importance.score[[iter]] <- int.stab$imp
+
+    # Find interactions across bootstrap replicates
+    importance[[iter]] <- stabilityScore(rf.list, x, y, iter, bs.sample,
+                                         ints.eval=ints.eval, ntree=ntree,
+                                         weights=weights, signed=signed,
+                                         varnames.grp=varnames.grp,
+                                         rit.param=rit.param, n.core=n.core, 
+                                         ...)
   
   }
   
-
-  # Generate list for output, selecting iteraction if specified.
+  # Combine reults for return
   out <- list()
   out$rf.list <- rf.list
   out$selected.iter <- selected.iter
   if (!is.null(iter.return)) {
-    out$interaction <- stability.score
-    out$importance <- importance.score
+    out$interaction <- importance
   }
 
   if (length(iter.return) == 1) {
     out$rf.list <- out$rf.list[[iter.return]]
-    out$interaction <- out$interaction[[iter.return]]
-    out$importance <- out$importance[[iter.return]]
+    out$interaction <- importance[[iter.return]]
     out$selected.iter <- iter.return
   }
 
   return(out)
 }
 
-sampleClass <- function(y, cl, n) {
-  # Take a bootstrap sample from a particular class of observations
-  sampled <- sample(which(y == cl), n, replace=TRUE)
-  return(sampled)
-}
 
 selectIter <- function(rf.list, y) {
   # Evaluate optimal iteration based on prediction error in OOB samples.
-  # For classification, error is given by missclassification rate.
-  # For regression, error is given by MSE
+  #   For classification: accuracy.
+  #   For regression: MSE.
   predicted <- lapply(rf.list, function(z) as.numeric(z$predicted))
   
   if (is.factor(y)) {
@@ -171,18 +153,24 @@ selectIter <- function(rf.list, y) {
   return(id.select)
 }
 
-bootstrapSample <- function(y) {
+sampleClass <- function(y, cl, n) {
+  # Take a bootstrap sample from a particular class of observations
+  sampled <- sample(which(y == cl), n, replace=TRUE)
+  return(sampled)
+}
+
+bsSample <- function(y) {
   # Generate outer layer bootstrap samples
   n <- length(y)
   if (is.factor(y)) {
-    # Take bootstrap sample that maintains class balance in full data
+    # Take bootstrap sample that maintains class balance of full data
     ncl <- table(y)
     class <- as.factor(names(ncl))
     sample.id <- mapply(function(cc, n) sampleClass(y, cc, n), class, ncl)
     sample.id <- unlist(sample.id)
   } else {
     sample.id <- sample(n, replace=TRUE)
-  }  
+  }
   return(sample.id)
 }
 
