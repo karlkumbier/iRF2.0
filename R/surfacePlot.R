@@ -9,7 +9,7 @@ plotInt2 <- function(x, y, int,
                      n.cols=100, 
                      grids=NULL, 
                      axes=TRUE,
-                     varnames.grp=colnames(x),
+                     varnames.grp=NULL,
                      pred.prob=FALSE, 
                      min.node=10) {
   # Generates surface map of order-2 interaction
@@ -33,10 +33,14 @@ plotInt2 <- function(x, y, int,
   #     probability from the forest or raw data distribution
   #   min.node: minimum leaf node size to use for grid
   stopifnot(!is.null(rectangles) | !is.null(read.forest))
-  if (is.null(varnames.grp)) varnames.grp <- 1:ncol(x)
-  
+
+  if (is.null(varnames.grp)) {
+    if (is.null(colnames(x))) varnames.grp <- 1:ncol(x)
+    else varnames.grp <- colnames(x)
+  }
+
   int <- int2Id(int, varnames.grp, signed=TRUE)
-  stopifnot(length(interact) == 2) 
+  stopifnot(length(int) == 2) 
   i1 <- int[1] %% p + p * (int[1] %% p == 0)
   i2 <- int[2] %% p + p * (int[2] %% p == 0)
 
@@ -59,7 +63,7 @@ plotInt2 <- function(x, y, int,
   }
  
   # Evaluate responses over grid based on RF hyperrectangles
-  if (is.null(rectangles)) rectangles <- forestHR(read.forest, int) 
+  if (is.null(rectangles))rectangles <- forestHR(read.forest, int, min.node)
   grid <- matrix(0, nrow=grid.size, ncol=grid.size)
   removed <- rep(FALSE, nrow(rectangles))
   for (i in 1:nrow(rectangles)) {
@@ -70,7 +74,7 @@ plotInt2 <- function(x, y, int,
     tt2 <- unlist(rcur$splits)[unlist(rcur$vars) == int[2]]
     
     # Evalaute which observations/grid elements correspond to current HR
-    if (int1 <= p) {
+    if (int[1] <= p) {
       idcs1 <- g1 < tt1
       x1 <- x[, i1] < tt1
     } else {
@@ -78,7 +82,7 @@ plotInt2 <- function(x, y, int,
       x1 <- x[,i1] >= tt1
     }
     
-    if (int2 <= p) {
+    if (int[2] <= p) {
       idcs2 <- g2 < tt2
       x2 <- x[, i2] < tt2
     } else {
@@ -218,21 +222,17 @@ getPathsTree <- function(read.forest, int) {
   return(out)
 }
 
-forestHyperrectangle <- function(read.forest, int, varnames.grp, min.node=1) {
+forestHR<- function(read.forest, int, min.node=1) {
   # Read hyperrectangles from RF for a specified interactin
   # args:
   #   read.forest: list as returned by readForest, including node.feature and
   #     tree.info entries
   #   varnames.group: character vector indicating feature grouping
   #   int: vector of features for which to generate hyperrectangles
-  #   min.node.size: filter all leaf nodes that are not larger than specified 
+  #   min.node: filter all leaf nodes that are not larger than specified 
   #     value for faster processing
-  
-  int <- str_split(int, '_')[[1]]
-  int <- int2Id(int, varnames.grp, signed=TRUE, split=TRUE)
-
   out <- getPathsTree(read.forest, int) 
-  out <- filter(out, size.node > min.node.size)
+  out <- filter(out, size.node > min.node)
   
   return(out)
 }
