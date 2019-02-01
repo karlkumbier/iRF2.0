@@ -34,7 +34,7 @@ iRF <- function(x, y,
   require(doRNG, quiet=TRUE)
   if (!class(x) %in% c('data.frame', 'matrix'))
     stop('x must be matrix or data frame')
-  if (nrow(x) != length(y) | nrow(xtest) != length(ytest))
+  if (nrow(x) != length(y))
     stop('x and y must contain the same number of observations')
   if (ncol(x) < 2 & (!is.null(iter.return) | select.iter))
     stop('cannot find interaction - x has less than two columns!')
@@ -49,6 +49,8 @@ iRF <- function(x, y,
       stop('training/test data must have same number of features')
     if (is.null(ytest))
       stop('test set responses not indicated')
+    if (nrow(xtest) != length(ytest))
+      stop('xtest and ytest must contain the same number of observations')
   }
 
   # Check all RIT and set to defaul if missing
