@@ -24,9 +24,9 @@ importFrom(RColorBrewer, brewer.pal)
 importFrom(utils, combn)
 
 export(combine, getTree, grow, importance, margin, MDSplot, na.roughfix,
-       randomForest, rfImpute, treesize, tuneRF, varImpPlot, 
+       randomForest, rfImpute, treesize, tuneRF, varImpPlot, int2Id, 
        varUsed, rfNews, outlier, classCenter, rfcv, readForest, iRF, 
-       RIT, subsetReadForest, gRIT, stabilityScore, interactPredict)
+       RIT, subsetReadForest, gRIT, stabilityScore, interactPredict, plotInt)
 
 
 S3method(print, randomForest)
