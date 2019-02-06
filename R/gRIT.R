@@ -45,6 +45,8 @@ gRIT <- function(x, y,
   varnames.unq <- unique(varnames.grp)
   p <- length(varnames.unq)
 
+  print('read forest')
+  print(detectCores())
 
   # Read RF object to extract decision path metadata
   if (is.null(read.forest)) {
@@ -56,12 +58,15 @@ gRIT <- function(x, y,
                               n.core=n.core)
   }
 
+  print('summarize nodes')
+  print(detectCores())
   # Collapse node feature matrix for unsigned iRF
   if (!signed) read.forest$node.feature <- collapseNF(read.forest$node.feature)
 
   # Evaluate leaf node attributes
-  prec.nd <- precision(read.forest, y)
-  ndcnt <- Matrix::colSums(t(read.forest$node.obs) * weights)
+  nd.attr <- nodeAttr(read.forest, y, weights)
+  prec.nd <- nd.attr$precision
+  ndcnt <- nd.attr$ndcnt
   
   # Subset leaf nodes based on mimimum size
   idcnt <- ndcnt >= rit.param$min.nd
@@ -75,6 +80,8 @@ gRIT <- function(x, y,
   else
     idcl <- read.forest$tree.info$prediction > rit.param$class.cut
 
+  print('RIT')
+  print(detectCores())
   if (sum(idcl) < 2) {
     return(nullReturn())
   } else {
@@ -97,7 +104,9 @@ gRIT <- function(x, y,
     # order subsets.
     ints.sub <- lapply(ints.full, intSubsets)
     ints.sub <- unique(unlist(ints.sub, recursive=FALSE))
-
+    
+    print('Importance')
+    print(detectCores())
     suppressWarnings(
     ximp <- foreach(int=ints.sub) %dorng% {
       intImportance(int, nf=read.forest$node.feature, weight=ndcnt,
@@ -105,10 +114,12 @@ gRIT <- function(x, y,
     })
     ximp <- rbindlist(ximp) 
 
+    print('Test')
     imp.test <- lapply(ints.full, subsetTest, importance=ximp, ints=ints.sub)
     imp.test <- rbindlist(imp.test)
   }
 
+  print('aggregate')
   # Aggregate evaluated interations for return
   ints.recovered <- nameInts(ints, varnames.unq, signed=signed)
   
