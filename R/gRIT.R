@@ -81,7 +81,7 @@ gRIT <- function(x, y,
   
     # Run RIT on leaf nodes of selected class  
     ints <- runRIT(subsetReadForest(read.forest, idcl), weights=ndcnt[idcl],
-                  rit.param=rit.param, n.core=n.core)
+                   rit.param=rit.param, n.core=n.core)
     
     if (is.null(ints)) return(nullReturn())
     
@@ -98,11 +98,8 @@ gRIT <- function(x, y,
     ints.sub <- lapply(ints.full, intSubsets)
     ints.sub <- unique(unlist(ints.sub, recursive=FALSE))
     
-    suppressWarnings(
-    ximp <- foreach(int=ints.sub) %dorng% {
-      intImportance(int, nf=read.forest$node.feature, weight=ndcnt,
-                    prec.nd=prec.nd, select.id=idcl)
-    })
+    ximp <- lapply(ints.sub, intImportance, nf=read.forest$node.feature,
+                   weight=ndcnt, prec.nd=prec.nd, select.id=idcl)
     ximp <- rbindlist(ximp) 
 
     imp.test <- lapply(ints.full, subsetTest, importance=ximp, ints=ints.sub)
@@ -112,12 +109,12 @@ gRIT <- function(x, y,
   # Aggregate evaluated interations for return
   ints.recovered <- nameInts(ints, varnames.unq, signed=signed)
   
-  imp.test <- imp.test %>%
-    mutate(int=nameInts(ints.full, varnames.unq, signed=signed))
+  name.full <- nameInts(ints.full, varnames.unq, signed=signed)
+  imp.test <- mutate(imp.test, int=name.full)
   
-  ximp <- ximp %>%
-    mutate(int=nameInts(ints.sub, varnames.unq, signed=signed),
-           recovered=int %in% ints.recovered) %>%
+  name.sub <- nameInts(ints.sub, varnames.unq, signed=signed)
+  id.recovered <- name.sub %in% ints.recovered
+  ximp <- mutate(ximp, int=name.sub, recovered=id.recovered) %>%
     right_join(imp.test, by='int')
 
   stopImplicitCluster()
