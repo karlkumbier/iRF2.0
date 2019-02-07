@@ -53,6 +53,7 @@ readForest <- function(rfobj, x,
     out$node.obs <- sparseMatrix(i=nobs[,1], j=nobs[,2], dims=c(max(nf[,1]), n))
   }
 
+  stopImplicitCluster()
   return(out)
   
 }
