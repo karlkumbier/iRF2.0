@@ -1,11 +1,18 @@
-interactPredict <- function(x, int, read.forest, varnames.grp=colnames(x), 
+interactPredict <- function(x, int, read.forest, varnames.grp=NULL, 
                             nrule=1000, min.node=1, mask='low', wt=TRUE, 
-                            class=NULL, is.split=FALSE, aggregate=TRUE) {
+                            is.split=FALSE, aggregate=TRUE) {
 
   # Generate RF predictions for given interactions, using only information
   # from interacting features.
   p <- ncol(x)
-  if (is.null(varnames.grp)) varnames.grp <- 1:p
+  if (is.null(varnames.grp)) {
+    if (!is.null(colnames(x))) {
+      varnames.grp <- colnames(x)
+    } else {
+      varnames.grp <- 1:p
+    }
+  }
+
   stopifnot(p == length(varnames.grp))
   stopifnot(p == ncol(read.forest$node.feature) / 2)
 

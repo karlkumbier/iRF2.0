@@ -17,7 +17,7 @@ importFrom(stats, delete.response, mad, median, model.frame,
            var, weighted.mean)
 
 importFrom(foreach, foreach, "%dopar%")
-importFrom(doParallel, registerDoParallel)
+importFrom(doParallel, registerDoParallel, stopImplicitCluster)
 importFrom(doRNG, "%dorng%")
 importFrom(parallel, detectCores)
 importFrom(RColorBrewer, brewer.pal)

@@ -69,6 +69,6 @@ subsetTest <- function(int, ints, importance) {
   prev.null <- sapply(pairs, function(z) prod(importance$prev1[z]))
   prec <- importance$prec[id]
   prec.null <- importance$prec[unlist(lapply(pairs, which))]
-  return(data.table(prev.test=min(prev - prev.null),
-                    prec.test=min(prec - prec.null)))
+  return(data.table(prev.test=mean(prev - prev.null),
+                    prec.test=mean(prec - prec.null)))
 }
