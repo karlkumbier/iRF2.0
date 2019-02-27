@@ -15,6 +15,7 @@ importFrom(stats, delete.response, mad, median, model.frame,
            model.response, na.fail, na.omit, napredict,
            predict, quantile, reformulate, terms, update,
            var, weighted.mean)
+importFrom(rgl, open3d, persp3d, par3d, rgl.viewpoint, movie3d, spin3d)
 
 importFrom(foreach, foreach, "%dopar%")
 importFrom(doParallel, registerDoParallel)
