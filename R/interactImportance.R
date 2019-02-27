@@ -37,17 +37,17 @@ prevalence <- function(weight, idint, idcl) {
   return(c(prev1, prev0))
 }
 
-precision <- function(read.forest, y) {
+nodeAttr <- function(read.forest, y, weight=rep(1, length(y))) {
   # Evaluate class proportion of class-1 observations in each leaf node of  a
   # fitted RF.
   if (is.factor(y)) y <- as.numeric(y) - 1
 
   ndcnt <- t(read.forest$node.obs)
-  ndcntY <- Matrix::colSums(ndcnt * y)
-  ndcnt <- Matrix::colSums(ndcnt)
+  ndcntY <- Matrix::colSums(ndcnt * y * weight)
+  ndcnt <- Matrix::colSums(ndcnt * weight)
   prec.nd <- ndcntY / ndcnt
   prec.nd[ndcnt == 0] <- 0
-  return(prec.nd)
+  return(list(precision=prec.nd, ndcnt=ndcnt))
 }
 
 subsetTest <- function(int, ints, importance) {
@@ -69,6 +69,6 @@ subsetTest <- function(int, ints, importance) {
   prev.null <- sapply(pairs, function(z) prod(importance$prev1[z]))
   prec <- importance$prec[id]
   prec.null <- importance$prec[unlist(lapply(pairs, which))]
-  return(data.table(prev.test=min(prev - prev.null),
-                    prec.test=min(prec - prec.null)))
+  return(data.table(prev.test=mean(prev - prev.null),
+                    prec.test=mean(prec - prec.null)))
 }

@@ -24,6 +24,8 @@ parRF <- function(x, y, xtest=NULL, ytest=NULL, ntree=500, n.core=1,
                                  ...)                         
     }
   )
+
+  stopImplicitCluster()
   return(rf)
 }
 

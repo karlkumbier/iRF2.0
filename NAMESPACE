@@ -18,7 +18,7 @@ importFrom(stats, delete.response, mad, median, model.frame,
 importFrom(rgl, open3d, persp3d, par3d, rgl.viewpoint, movie3d, spin3d)
 
 importFrom(foreach, foreach, "%dopar%")
-importFrom(doParallel, registerDoParallel)
+importFrom(doParallel, registerDoParallel, stopImplicitCluster)
 importFrom(doRNG, "%dorng%")
 importFrom(parallel, detectCores)
 importFrom(RColorBrewer, brewer.pal)
@@ -26,7 +26,7 @@ importFrom(utils, combn)
 
 export(combine, getTree, grow, importance, margin, MDSplot, na.roughfix,
        randomForest, rfImpute, treesize, tuneRF, varImpPlot, int2Id, 
-       varUsed, rfNews, outlier, classCenter, rfcv, readForest, iRF, 
+       varUsed, outlier, classCenter, rfcv, readForest, iRF, 
        RIT, subsetReadForest, gRIT, stabilityScore, interactPredict, plotInt)
 
 
