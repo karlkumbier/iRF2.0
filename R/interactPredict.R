@@ -44,7 +44,7 @@ interactPredict <- function(x, int, read.forest, varnames.grp=NULL, wt=TRUE,
     int.nds <- nint > 0
   }
 
-  if (sum(int.nds) == 0) {
+  if (sum(int.nds) < 2) {
     warning('interaction does not appear on RF paths')
     return(rep(0, nrow(x)))
   }
