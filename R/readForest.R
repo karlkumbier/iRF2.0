@@ -8,13 +8,8 @@ readForest <- function(rfobj, x,
   
   if (is.null(rfobj$forest))
     stop('No Forest component in the randomForest object')
-  if (is.null(varnames.grp)) {
-    if (is.null(colnames(x)))
-      varnames.grp <- 1:ncol(x)
-    else
-      varnames.grp <- colnames(x)
-  }
- 
+  varnames.grp <- groupVars(varnames.grp, x)
+
   if (n.core == -1) n.core <- detectCores()
   if (n.core > 1) registerDoParallel(n.core)
   

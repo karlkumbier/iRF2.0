@@ -11,6 +11,20 @@ printAcc <- function(fit, y, class.irf) {
   return(out)
 }
 
+groupVars <- function(varnames.grp, x) {
+  # Generate grouped variable names
+  if (is.null(varnames.grp)) {
+    if (!is.null(colnames(x))) {
+      varnames.grp <- colnames(x)
+    } else {
+      varnames.grp <- 1:ncol(x)
+    }
+  }
+
+  stopifnot(length(varnames.grp) == ncol(x))
+  return(varnames.grp)
+}
+
 pasteInt <- function(x) {
   # Combine interaction into single string
   x <- paste(x, collapse='_')
