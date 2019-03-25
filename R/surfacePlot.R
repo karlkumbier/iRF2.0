@@ -6,6 +6,7 @@ plotInt <- function(x, y, int,
                       '#6e96c4', '#ffb003',  '#ff8300'), 
                     xlab=NULL, ylab=NULL, zlab=NULL,
                     range.color=NULL,
+                    z.range=c(0, 1),
                     grid.size=50,
                     min.surface=100,
                     min.node=5,
@@ -96,7 +97,7 @@ plotInt <- function(x, y, int,
     
     # Generate response surface for curent group
     plotInt2(surfaces[[i]], xlab=xlab, ylab=ylab, zlab=zlab, main=main,
-             col.pal=col.pal, range.color=range.color)
+             col.pal=col.pal, range.color=range.color, z.range=z.range)
     
     # Write plot to output directory
     if (!is.null(plot.dir)) {
