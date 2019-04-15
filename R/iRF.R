@@ -110,7 +110,10 @@ iRF <- function(x, y,
 
     if (verbose) cat('evaluating interactions...\n')
     # Find interactions across bootstrap replicates
-    importance[[iter]] <- stabilityScore(rf.list, x, y, iter, bs.sample,
+
+    if (iter == 1) rf.weight <- rep(1, ncol(x))
+    if (iter > 1) rf.weight <- rf.list[[iter - 1]]$importance
+    importance[[iter]] <- stabilityScore(x, y, rf.weight, bs.sample,
                                          ints.eval=ints.eval, ntree=ntree,
                                          weights=weights, signed=signed,
                                          varnames.grp=varnames.grp,
@@ -128,6 +131,8 @@ iRF <- function(x, y,
   }
 
   if (length(iter.return) == 1) {
+    iter.wt <- iter.return - 1
+    if (iter.return > 1) out$weights <- out$rf.list[[iter.wt]]$importance 
     out$rf.list <- out$rf.list[[iter.return]]
     out$interaction <- importance[[iter.return]]
     out$selected.iter <- iter.return

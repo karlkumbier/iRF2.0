@@ -1,13 +1,20 @@
-stabilityScore <- function(fit, x, y, iter, bs.sample, ints.eval, weights,
-                           varnames.grp, rit.param, signed, n.core, ntree,
+stabilityScore <- function(x, y, rf.weight, bs.sample, ints.eval=NULL,
+                           weights=rep(1, nrow(x)), varnames.grp=NULL, 
+                           rit.param=list(depth=5, ntree=500,
+                                          nchild=2, class.id=1,
+                                          min.nd=1, class.cut=NULL), 
+                            signed=TRUE, n.core=1, ntree=500,
                            ...) {
+  
   # Wrapper function for bsgRIT. Calcuates stability of importance
   # metrics across bootstrap samples.
+  varnames.grp <- groupVars(varnames.grp, x)
+
   out <- list()
   for (i in 1:length(bs.sample)) {
 
     sample.id <- bs.sample[[i]]
-    out[[i]] <- bsgRIT(fit, x, y, iter, sample.id, ints.eval=ints.eval, 
+    out[[i]] <- bsgRIT(rf.weight, x, y, sample.id, ints.eval=ints.eval, 
                        ntree=ntree, weights=weights, rit.param=rit.param,
                        varnames.grp=varnames.grp, signed=signed, n.core=n.core,
                        ...)
@@ -20,15 +27,11 @@ stabilityScore <- function(fit, x, y, iter, bs.sample, ints.eval, weights,
 }
 
 
-bsgRIT <- function(fit, x, y, iter, sample.id, ints.eval, weights, ntree,
+bsgRIT <- function(rf.weight, x, y, sample.id, ints.eval, weights, ntree,
                    varnames.grp, rit.param, signed, n.core, ...) {
   # Fit RF on single bootstrap replicate and evalutes interaction importance 
   # metrics for fitted RF. 
-
-  if (iter == 1)
-    mtry.select.prob <- rep(1, ncol(x))
-  else
-    mtry.select.prob <- fit[[iter - 1]]$importance
+  mtry.select.prob <- rf.weight
 
   # Fit random forest on bootstrap sample
   rf <- parRF(x[sample.id,], y[sample.id], ntree=ntree, n.core=n.core, 
@@ -55,11 +58,11 @@ summarizeInteract <- function(x) {
     imp <- mutate(x, diff=(prev1-prev0)) %>%
       group_by(int) %>%
       summarize(prevalence.diff=mean(diff),
-                sta.diff=mean(diff > 0),
+                sta.diff=mean(diff >= 0),
                 independence=mean(prev.test),
-                sta.independence=mean(prev.test > 0),
+                sta.independence=mean(prev.test >= 0),
                 precision=mean(prec),
-                sta.precision=mean(prec.test > 0),
+                sta.precision=mean(prec.test >= 0),
                 stability=mean(recovered)) %>%
       arrange(desc(prevalence.diff))
   } else {
