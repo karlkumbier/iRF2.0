@@ -1,10 +1,58 @@
-# Iteratively grows random forests, finds case specific feature interactions
+#' Iterative random forests (iRF)
+#'
+#' Itaratively grow feature weighted random forests and search for prevalent
+#' interactions on decision paths.
+#' 
+#' @param x numeric feature matrix
+#' @param y response vector. If factor, classification is assumed.
+#' @param xtest numeric feature matrix for test set.
+#' @param ytest response vector for test set.
+#' @param number of iterations to run.
+#' @param ntree number of random forest trees.
+#' @param mtry.select.prob feature weights for first iteration. Defaults to
+#'  equal weights
+#' @param iter.return which iterations should interactions be returned for.
+#'  Defaults to iteration with highest OOB accuracy.
+#' @param select.iter if TRUE, returns interactions from iteration with highest
+#'  OOB accuracy.
+#' @param rit.param named list specifying RIT parameters. Entries include
+#'  \code{depth}: depths of RITs, \code{ntree}: number of RITs, \code{nchild}:
+#'  number of child nodes for each RIT, \code{class.id}: 0-1 indicating which
+#'  leaf nodes RIT should be run over, \code{min.nd}: minimum node size to run
+#'  RIT over, \code{class.cut}: threshold for converting leaf nodes in
+#'  regression to binary classes.
+#' @param varnames.grp grouping "hyper-features" for RIT search. Features with 
+#'  the same name will be treated as identical for interaction search.
+#' @param n.bootstrap number of bootstrap samples to calculate stability scores.
+#' @param bs.sample list of observation indices to use for bootstrap samples. If
+#'  NULL, iRF will take standard bootstrap samples of observations.
+#' @param weights numeric weight for each observation. Leaf nodes will be
+#'  sampled for RIT with probability proprtional to the total weight of
+#'  observations they contain.
+#' @param signed if TRUE, signed interactions will be returned
+#' @param verbose if TRUE, display progress of iRF fit.
+#' @param n.core number of cores to use. If -1, all available cores are used.
+#' @param ... additional arguments passed to iRF::randomForest.
+#'
+#' @return A list containing the following entries:
+#' \itemize{
+#'    \item{rf.list}{a list of randomForest objects}
+#'    \item{interaction}{a data table containing recovered interactions and
+#'      importance scores}
+#'    \item{selected.iter}{iterations returned by iRF}
+#'    \item{weights}{feature weights used to fit each entry of rf.list}
+#'  }
+#'
+#' @export
+#'
+#' @useDynLib iRF, .registration = TRUE
+#' @importFrom Rcpp sourceCpp
+#' @importFrom AUC auc roc
 iRF <- function(x, y, 
                 xtest=NULL, 
                 ytest=NULL, 
                 n.iter=5, 
                 ntree=500, 
-                n.core=1, 
                 mtry.select.prob=rep(1, ncol(x)),
                 iter.return=NULL, 
                 select.iter=ifelse(is.null(iter.return), TRUE, FALSE),
@@ -13,10 +61,11 @@ iRF <- function(x, y,
                                min.nd=1, class.cut=NULL), 
                 varnames.grp=colnames(x), 
                 n.bootstrap=1,
+                bs.sample=NULL,
                 weights=rep(1, nrow(x)),
                 signed=TRUE,
-                bs.sample=NULL,
                 verbose=TRUE,
+                n.core=1, 
                 interactions.return=NULL,
                 wt.pred.accuracy=NULL,
                 ...) {
@@ -27,6 +76,7 @@ iRF <- function(x, y,
     iter.return <- interactions.return
     select.iter <- FALSE
   }
+
   if (!is.null(wt.pred.accuracy))
     warning('wt.pred.accuracy is depricated')
 
@@ -87,16 +137,15 @@ iRF <- function(x, y,
 
   # Select iteration to return interactions based on OOB error
   selected.iter <- selectIter(rf.list, y=y)
-  if (select.iter) iter.return <- selected.iter
-  
+  if (select.iter) iter.return <- selected.iter 
 
-  # Run gRIT across full data RF and outer layer boostrap stability analysis of
-  # recovered interactions 
-  importance <- list()
+  # Generate bootstrap samples for stability analysis
   if (is.null(bs.sample)) bs.sample <- lreplicate(n.bootstrap, bsSample(y))
+    
+  importance <- list()
   for (iter in iter.return) {
     
-    # Evaluate interactions in full data random forest 
+    # Run gRIT across RF grown on full dataset to extract interactions.
     if (verbose) cat('finding interactions...\n')
     rit.param$ntree <- rit.param$ntree * n.bootstrap
     ints.eval <- gRIT(rf.list[[iter]], x=x, y=y,
@@ -108,16 +157,20 @@ iRF <- function(x, y,
     ints.eval <- ints.eval$int
     rit.param$ntree <- rit.param$ntree / n.bootstrap
 
+    # Grow RFs on BS samples to evaluate stability of recovered interacitons.
     if (verbose) cat('evaluating interactions...\n')
-    # Find interactions across bootstrap replicates
-
     if (iter == 1) rf.weight <- rep(1, ncol(x))
     if (iter > 1) rf.weight <- rf.list[[iter - 1]]$importance
-    importance[[iter]] <- stabilityScore(x, y, rf.weight, bs.sample,
-                                         ints.eval=ints.eval, ntree=ntree,
-                                         weights=weights, signed=signed,
+    importance[[iter]] <- stabilityScore(x, y, 
+                                         ntree=ntree,
+                                         mtry.select.prob=rf.weight,
+                                         ints.eval=ints.eval,
+                                         rit.param=rit.param,
                                          varnames.grp=varnames.grp,
-                                         rit.param=rit.param, n.core=n.core, 
+                                         bs.sample=bs.sample,
+                                         weights=weights, 
+                                         signed=signed,
+                                         n.core=n.core, 
                                          ...)
   
   }
@@ -126,9 +179,7 @@ iRF <- function(x, y,
   out <- list()
   out$rf.list <- rf.list
   out$selected.iter <- selected.iter
-  if (!is.null(iter.return)) {
-    out$interaction <- importance
-  }
+  if (!is.null(iter.return)) out$interaction <- importance
 
   if (length(iter.return) == 1) {
     iter.wt <- iter.return - 1
@@ -144,8 +195,7 @@ iRF <- function(x, y,
 
 selectIter <- function(rf.list, y) {
   # Evaluate optimal iteration based on prediction error in OOB samples.
-  #   For classification: accuracy.
-  #   For regression: MSE.
+  # For classification: accuracy. For regression: MSE.
   predicted <- lapply(rf.list, function(z) as.numeric(z$predicted))
   
   if (is.factor(y)) {

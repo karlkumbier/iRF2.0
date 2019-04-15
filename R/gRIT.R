@@ -1,16 +1,50 @@
+#' Generalized random intersection trees
+#'
+#' Run RIT across decision paths of a fitted random forest.
+#'
+#' @param x numeric feature matrix
+#' @param y response vector. If factor, classification is assumed.
+#' @param rand.forest an object of class randomForest. Required if read.forest
+#'  is NULL.
+#' @param read.forest output of readForest. Required if rand.forest is NULL.
+#' @param rit.param named list specifying RIT parameters. Entries include
+#'  \code{depth}: depths of RITs, \code{ntree}: number of RITs, \code{nchild}:
+#'  number of child nodes for each RIT, \code{class.id}: 0-1 indicating which
+#'  leaf nodes RIT should be run over, \code{min.nd}: minimum node size to run
+#'  RIT over, \code{class.cut}: threshold for converting leaf nodes in
+#'  regression to binary classes.
+#' @param varnames.grp grouping "hyper-features" for RIT search. Features with
+#'  the same name will be treated as identical for interaction search.
+#' @param weights numeric weight for each observation. Leaf nodes will be
+#'  sampled for RIT with probability proprtional to the total weight of
+#'  observations they contain.
+#' @param signed if TRUE, signed interactions will be returned
+#' @param ints.eval interactions to evaluate. If specified, importance metrics
+#'  will be evaluated for these interactions instead of those recovered by RIT.
+#' @param n.core number of cores to use. If -1, all available cores are used.
+#'
+#' @return a data table containing the recovered interactions and importance
+#'  scores.
+#'
+#' @export
+#'
+#' @importFrom dplyr mutate right_join
+#' @importFrom parallel detectCores
+#' @importFrom doParallel registerDoParallel stopImplicitCluster
+#' @importFrom data.table data.table
 gRIT <- function(x, y, 
                  rand.forest=NULL, 
                  read.forest=NULL,
-                 weights=rep(1, nrow(x)),
-                 varnames.grp=colnames(x),
                  rit.param=list(depth=5,
                          ntree=500,
                          nchild=2,
                          class.id=1,
                          min.nd=1,
                          class.cut=NULL),
+                 varnames.grp=colnames(x), 
+                 weights=rep(1, nrow(x)),
                  signed=TRUE,
-                 ints.full=NULL,
+                 ints.eval=NULL,
                  n.core=1) {
 
   class.irf <- is.factor(y)
@@ -58,7 +92,7 @@ gRIT <- function(x, y,
   # Collapse node feature matrix for unsigned iRF
   if (!signed) read.forest$node.feature <- collapseNF(read.forest$node.feature)
 
-  # Evaluate leaf node attributes
+  # Evaluate leaf node attributes: size and proportion of class-1 observations
   nd.attr <- nodeAttr(read.forest, y, weights)
   prec.nd <- nd.attr$precision
   ndcnt <- nd.attr$ndcnt
@@ -86,30 +120,29 @@ gRIT <- function(x, y,
     if (is.null(ints)) return(nullReturn())
     
     # Set recovered interactions or convert to indices if supplied
-    if (is.null(ints.full)) {
-      ints.full <- ints
+    if (is.null(ints.eval)) {
+      ints.eval <- ints
     } else {
-      ints.full <- lapply(ints.full, int2Id, signed=signed,
+      ints.eval <- lapply(ints.eval, int2Id, signed=signed,
                           varnames.grp=varnames.grp)
     }
    
-    # Evaluate importance metrics for supplied/recovered interactions and lower
-    # order subsets.
-    ints.sub <- lapply(ints.full, intSubsets)
+    # Evaluate importance metrics for interactions and lower order subsets.
+    ints.sub <- lapply(ints.eval, intSubsets)
     ints.sub <- unique(unlist(ints.sub, recursive=FALSE))
     
     ximp <- lapply(ints.sub, intImportance, nf=read.forest$node.feature,
                    weight=ndcnt, prec.nd=prec.nd, select.id=idcl)
     ximp <- rbindlist(ximp) 
 
-    imp.test <- lapply(ints.full, subsetTest, importance=ximp, ints=ints.sub)
+    imp.test <- lapply(ints.eval, subsetTest, importance=ximp, ints=ints.sub)
     imp.test <- rbindlist(imp.test)
   }
 
   # Aggregate evaluated interations for return
   ints.recovered <- nameInts(ints, varnames.unq, signed=signed)
   
-  name.full <- nameInts(ints.full, varnames.unq, signed=signed)
+  name.full <- nameInts(ints.eval, varnames.unq, signed=signed)
   imp.test <- mutate(imp.test, int=name.full)
   
   name.sub <- nameInts(ints.sub, varnames.unq, signed=signed)

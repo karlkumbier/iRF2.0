@@ -1,3 +1,6 @@
+#' Predict random forest
+#' @method predict randomForest
+#' @export
 "predict.randomForest" <-
     function (object, newdata, type = "response", norm.votes = TRUE,
               predict.all=FALSE, proximity = FALSE, nodes=FALSE, cutoff, ...)

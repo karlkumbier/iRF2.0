@@ -1,6 +1,13 @@
+#' @importFrom data.table data.table
+#' @importFrom Matrix colSums rowSums t
+#' @importFrom utils combn
 intImportance <- function(int, nf, prec.nd, select.id, weight) {
-  # Calculate the prevalence of an interaction across selected leaf nodes of a
-  # random forest
+  # Calculate importance metrics for an interaction across selected elaf nodes
+  # of a fitted random forest.
+  #   prev: the prevalence of an interaction across all selected leaf nodes,
+  #   weighted by observations in each leaf node.
+  #   prec: the proportion of class-1 observations in leaf nodes containing the
+  #   interaction.
   
   # Remove all 0-weighted leaf nodes from further analysis
   id.rm <- weight == 0
@@ -70,5 +77,5 @@ subsetTest <- function(int, ints, importance) {
   prec <- importance$prec[id]
   prec.null <- importance$prec[unlist(lapply(pairs, which))]
   return(data.table(prev.test=mean(prev - prev.null),
-                    prec.test=mean(prec - prec.null)))
+                    prec.test=mean(prec - prec.null) / prec))
 }

@@ -1,4 +1,39 @@
-readForest <- function(rfobj, x, 
+#' Read forest
+#'
+#' Read out metadata from random forest decision paths
+#'
+#' @param rand.forest an object of class randomForest.
+#' @param x numeric feature matrix
+#' @param return.node.feature if True, will return sparse matrix indicating
+#'  features used on each decision path of the rand.forest
+#' @param return.node.obs if True, will return sparse matrix indicating
+#'  observations in x that fall in each leaf node of rand.forest.
+#' @param varnames.grp grouping "hyper-features" for RIT search. Features with
+#'  the same name will be treated as identical for interaction search.
+#' @param get.split if True, node feature matrix will indicate splitting
+#'  threshold for each selected feature.
+#' @param first.split if True, splitting threshold will only be evaluated for
+#'  the first time a feature is selected.
+#' @param n.core number of cores to use. If -1, all available cores are used.
+#'
+#' @return a list containing the follosing entries
+#' \itemize{
+#'    \item{tree.info}{data frame of metadata for each leaf node in rand.forest}
+#'    \item{node.feature}{optional sparse matrix indicating feature usage on
+#'      each decision path}
+#'    \item{node.obs}{optional sparse matrix indicating observations appearing
+#'      in each leaf node}
+#'  }
+#'
+#' @export
+#'
+#' @importFrom Matrix Matrix t sparseMatrix rowSums colSums
+#' @importFrom data.table data.table rbindlist
+#' @importFrom foreach foreach "%dopar%"
+#' @importFrom doParallel registerDoParallel stopImplicitCluster
+#' @importFrom doRNG "%dorng%"
+#' @importFrom parallel detectCores
+readForest <- function(rand.forest, x, 
                        return.node.feature=TRUE, 
                        return.node.obs=FALSE,
                        varnames.grp=NULL,
@@ -6,20 +41,20 @@ readForest <- function(rfobj, x,
                        first.split=TRUE,
                        n.core=1){
   
-  if (is.null(rfobj$forest))
+  if (is.null(rand.forest$forest))
     stop('No Forest component in the randomForest object')
   varnames.grp <- groupVars(varnames.grp, x)
 
   if (n.core == -1) n.core <- detectCores()
   if (n.core > 1) registerDoParallel(n.core)
   
-  ntree <- rfobj$ntree
+  ntree <- rand.forest$ntree
   n <- nrow(x)
   p <- length(unique(varnames.grp))
   out <- list()
   
   # Determine leaf nodes for observations in x
-  prf <- predict(rfobj, newdata=x, nodes=TRUE)
+  prf <- predict(rand.forest, newdata=x, nodes=TRUE)
   nodes <- attr(prf, 'nodes')
   
   # Read leaf node data from each tree in the forest 
@@ -31,7 +66,7 @@ readForest <- function(rfobj, x,
   suppressWarnings(
   rd.forest <- foreach(id=1:n.core) %dorng% {
     tree.id <- which(core.id == id)
-    readTrees(k=tree.id, rfobj=rfobj, x=x, 
+    readTrees(k=tree.id, rand.forest=rand.forest, x=x, 
               nodes=nodes,varnames.grp=varnames.grp,
               return.node.feature=return.node.feature, 
               return.node.obs=return.node.obs, 
@@ -67,14 +102,14 @@ readForest <- function(rfobj, x,
   
 }
 
-readTrees <- function(rfobj, k, x, nodes,
+readTrees <- function(rand.forest, k, x, nodes,
                       varnames.grp=1:ncol(x),
                       return.node.feature=TRUE,
                       return.node.obs=FALSE,
                       get.split=FALSE,
                       first.split=TRUE) {
 
-  out <- lapply(k, readTree, rfobj=rfobj, x=x, 
+  out <- lapply(k, readTree, rand.forest=rand.forest, x=x, 
                 nodes=nodes,varnames.grp=varnames.grp,
                 return.node.feature=return.node.feature, 
                 return.node.obs=return.node.obs, 
@@ -82,7 +117,7 @@ readTrees <- function(rfobj, k, x, nodes,
   return(out)
 }
 
-readTree <- function(rfobj, k, x, nodes,
+readTree <- function(rand.forest, k, x, nodes,
                      varnames.grp=1:ncol(x), 
                      return.node.feature=TRUE,
                      return.node.obs=FALSE,
@@ -90,10 +125,10 @@ readTree <- function(rfobj, k, x, nodes,
                      first.split=TRUE) {
   
   n <- nrow(x) 
-  ntree <- rfobj$ntree
+  ntree <- rand.forest$ntree
 
   # Read tree metadata from forest
-  tree.info <- as.data.frame(getTree(rfobj, k))
+  tree.info <- as.data.frame(getTree(rand.forest, k))
   n.node <- nrow(tree.info)
   tree.info$node.idx <- 1:nrow(tree.info)
   tree.info$parent <- getParent(tree.info) %% n.node

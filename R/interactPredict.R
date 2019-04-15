@@ -1,17 +1,36 @@
-interactPredict <- function(x, int, read.forest, varnames.grp=NULL, wt=TRUE, 
-                            min.node=1, mask='low', is.split=FALSE) {
+#' Predict interaction
+#'
+#' Generate predictions from random forest decision rules corresponding to a
+#' signed interaction.
+#'
+#' @param x numeric feature matrix
+#' @param int a signed interaction. Formatted as 'X1+_X2+_X3-_...'
+#' @param read.forest output of readForest.
+#' @param varnames.grp grouping "hyper-features" for RIT search. Features with
+#'  the same name will be treated as identical for interaction search.
+#' @param min.nd minimum leaf node size to extract decision rules from.
+#' @param mask if True, only leaf nodes containing the full interaction will be
+#'  used to generate predictions. If false, any leaf node containing a subset of
+#'  interacting features will be used to generate predictions.
+#'
+#' @return a numeric vector of length nrow(x), entries indicating a predicted
+#'  response for the corresponding observation. Predictions are generated from
+#'  random forest decision rules using only the features in int.
+#'  
+#' @export
+interactPredict <- function(x, int, read.forest, varnames.grp=NULL,
+                            min.nd=1, mask=TRUE) {
   
   p <- ncol(x) 
   stopifnot(p == ncol(read.forest$node.feature) / 2)
   varnames.grp <- groupVars(varnames.grp, x)
 
   # filter out small leaf nodes
-  id.keep <- read.forest$tree.info$size.node >= min.node
+  id.keep <- read.forest$tree.info$size.node >= min.nd
   read.forest <- subsetReadForest(read.forest, id.keep)
 
-  # Get feature indices for interaction in feature matrix <x> and node feature
-  # matrix <nf>
-  if (!is.split) int <- strsplit(int, '_')[[1]]
+  # Get indices for interaction features in <x> and <nf>
+  int <- strsplit(int, '_')[[1]]
   stopifnot(length(int) > 1)
   int.adj <- isPositive(int)
   int.unsgn <- intUnsign(int) 
@@ -22,9 +41,9 @@ interactPredict <- function(x, int, read.forest, varnames.grp=NULL, wt=TRUE,
   id.x <- id.nf %% p  + p * (id.nf == p | id.nf == 2 * p) 
   id.pos <- id.nf > p
 
-  # Subset node feature matrix and data matrix based on interacting features
-  nf <- read.forest$node.feature[,id.nf]
+  # Subset node feature matrix and data matrix based on interacting features 
   tree.info <- read.forest$tree.info
+  nf <- read.forest$node.feature[,id.nf]
   x <- x[,id.x]
 
   # if classification, subset to class 1 leaf nodes
@@ -36,10 +55,10 @@ interactPredict <- function(x, int, read.forest, varnames.grp=NULL, wt=TRUE,
   
   # Determine leaf nodes corresponding to the specified interaction 
   nint <- Matrix::rowSums(nf != 0)
-  if (mask == 'low') {
+  if (mask) {
     # Only evaluate nodes containing the specified interaction
     int.nds <- nint == length(id.x)
-  } else if (mask == 'none') {
+  } else {
     # Evaluate nodes containing any interacting features
     int.nds <- nint > 0
   }
@@ -55,10 +74,9 @@ interactPredict <- function(x, int, read.forest, varnames.grp=NULL, wt=TRUE,
   
   # Set response values for each region proportional to node size
   y <- tree.info$prediction
-  if (wt) size <- tree.info$size.node
-  else size <- rep(1, nrow(tree.info))
+  size <- tree.info$size.node
  
-  # Evaluate predictions over subsample of active rules
+  # Sample one decision rule per tree containing the specified interaction
   trees <- unique(tree.info$tree)
   ss <- sapply(trees, sampleTree, tree=tree.info$tree, size=size)
   nrule <- length(ss)
@@ -79,6 +97,7 @@ interactPredict <- function(x, int, read.forest, varnames.grp=NULL, wt=TRUE,
 }
 
 sampleTree <- function(k, tree, size) { 
+  # Sample a leaf node from specified tree
   tree.id <- which(tree == k)
   if (length(tree.id) == 1) return(tree.id)
   sample.id <- sample(tree.id, 1, prob=size[tree.id])
@@ -86,6 +105,7 @@ sampleTree <- function(k, tree, size) {
 }
 
 isPositive <- function(x) {
+  # Generate T/F vector indicating which signed interactions are +
   out <- rep(FALSE, length(x))
   out[grep('+', x, fixed=TRUE)] <- TRUE
   return(out)

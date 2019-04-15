@@ -1,3 +1,4 @@
+#' @importFrom stringr str_replace_all str_remove_all str_split
 printAcc <- function(fit, y, class.irf) {
   # Generate prediction accuracy string for printing
   if (class.irf) {

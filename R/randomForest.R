@@ -1,7 +1,12 @@
-"randomForest" <-
-function(x, ...)
-  UseMethod("randomForest")
-
+#' random forest
+#'
+#' @export
+#'
+#' @importFrom foreach foreach "%dopar%"
+#' @importFrom doParallel registerDoParallel stopImplicitCluster
+#' @importFrom doRNG "%dorng%"
+#' @importFrom parallel detectCores
+"randomForest" <- function(x, ...) UseMethod("randomForest")
 
 parRF <- function(x, y, xtest=NULL, ytest=NULL, ntree=500, n.core=1,
                   mtry.select.prob=rep(1, ncol(x)), ...) {  

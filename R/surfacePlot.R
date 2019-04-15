@@ -1,3 +1,36 @@
+#' Plot interaction
+#'
+#' Generate response surface plots for a given interaction.
+#' @param x numeric feature matrix, with replicate features grouped
+#' @param y response vector
+#' @param int signed interaction to plot. Formatted as 'X1+_X2+_X3-_...'
+#' @param varnames character vector indicating feature names. If NULL,
+#'  colnames(x) are used as feature names.
+#' @param read.forest output of readForest
+#' @param qcut: quantile to define low/high levels of additional features beyond
+#'  order-2 interations. Thresholds will generated using the specified quantile
+#'  of random forest thresholds for corresponding features. 
+#' @param col.pal color palette for response surfaces
+#' @param xlab x-axis label
+#' @param ylab y-axis label
+#' @param zlab z-axis label
+#' @param range.col range of response values for color palette
+#' @param z.range z-axiz range
+#' @param grid.surface size of grid to generate response surfaces over.
+#' @param min.surface minimum number of observations required to generate a
+#'  response surface.
+#' @param min.nd minimum leaf node size to extract decision rules from.
+#' @param pred.prob: if TRUE, z-axis indicates predicted probability from the
+#'  random forest. If false, z-axis indicates distribution of responses y
+#' @param main plot title for response surfaces
+#'
+#' @export
+#'
+#' @importFrom rgl open3d persp3d par3d rgl.viewpoint movie3d spin3d mfrow3d
+#' @importFrom dplyr select group_by summarize
+#' @importFrom data.table data.table
+#' @importFrom stringr str_split str_remove_all str_replace_all
+#' @importFrom RColorBrewer brewer.pal
 plotInt <- function(x, y, int, 
                     varnames=NULL,
                     read.forest=NULL,
@@ -5,31 +38,15 @@ plotInt <- function(x, y, int,
                     col.pal=c('#1c3f66', '#306aab', 
                       '#6e96c4', '#ffb003',  '#ff8300'), 
                     xlab=NULL, ylab=NULL, zlab=NULL,
-                    range.color=NULL,
+                    range.col=NULL,
                     z.range=c(0, 1),
                     grid.size=50,
                     min.surface=100,
-                    min.node=5,
+                    min.nd=5,
                     pred.prob=FALSE,
                     main=NULL,
                     plot.dir=NULL) {
-  # Generates surface plots for first two interacting features by levels 
-  # of the remaining features
-  # args:
-  #   x: data matrix, with replicate features grouped
-  #   y: response vector, binary or continuous
-  #   int: signed interaction to plot, formatted as <xi>_<xj>  
-  #   varnames: vector of feature names corresponding to columns of x
-  #   read.forest: list output of readForest, required if rectangles is null
-  #   qcut: quantile to define low/high levels of additional features 
-  #     (when order int > 2).
-  #   xlab, ylab, zlab: axis labels
-  #   min.surface: minimum number of observations required to generate surface 
-  #     map plot.
-  #   min.node: minimum leaf node size to use for grid
-  #   pred.prob: T/F indicating whether the z axis should indicate predicted
-  #     probability from the forest or raw data distribution
-  #   plot.dir: directory to write plots to
+ #   plot.dir: directory to write plots to
   if (! 'rgl' %in% rownames(installed.packages()))
     stop('Surface map plots require rgl installation')
 
@@ -67,23 +84,33 @@ plotInt <- function(x, y, int,
   grids <- quantileGrid(x, grid.size, int.x[1:2])
   
   # Extract hyperrectangles from read forest output
-  rectangles <- forestHR(read.forest, int.nf, min.node)
+  rectangles <- forestHR(read.forest, int.nf, min.nd)
   
   # Generate surface maps for each group of observations
   ids <- lapply(unique(id), '==', id)
   surfaces <- lapply(ids, function(ii) {
     if (sum(ii) < min.surface) return(NULL)
     genSurface(x[ii,], y[ii], int.nf[1:2], varnames=varnames, 
-               rectangles=rectangles, min.node=min.node, grids=grids)
+               rectangles=rectangles, min.nd=min.nd, grids=grids)
   })
   
   # Set color range for surface map plots
-  if (is.null(range.color)) range.color <- range(unlist(surfaces))
+  if (is.null(range.col)) range.col <- range(unlist(surfaces))
+
+  ngroup <- length(unique(id))
+  if (ngroup > 4) stop('Surface plots supported for up to order-4 interactions')
+  if (ngroup == 1) open3d()
+  if (ngroup == 2) {
+    open3d()
+    mfrow3d(nr=1, nc=2, sharedMouse = T)
+  } 
+  if (ngroup == 4) {
+    open3d()
+    mfrow3d(nr=4, nc=2, sharedMouse = T) 
+  } 
 
   # Iterate over observation groups to generate response surfaces
   for (i in 1:length(unique(id))) {
-    
-    open3d()
     if (is.null(surfaces[[i]])) next
     
     # Generate title for surface map
@@ -97,7 +124,7 @@ plotInt <- function(x, y, int,
     
     # Generate response surface for curent group
     plotInt2(surfaces[[i]], xlab=xlab, ylab=ylab, zlab=zlab, main=main,
-             col.pal=col.pal, range.color=range.color, z.range=z.range)
+             col.pal=col.pal, range.col=range.col, z.range=z.range)
     
     # Write plot to output directory
     if (!is.null(plot.dir)) {
@@ -117,7 +144,7 @@ plotInt2 <- function(surface,
                        '#6e96c4', '#ffb003',  '#ff8300'), 
                      xlab=NULL, ylab=NULL, zlab=NULL,
                      main=NULL,
-                     range.color=NULL,
+                     range.col=NULL,
                      z.range=c(0,1),
                      n.cols=100, 
                      axes=TRUE) {
@@ -126,18 +153,18 @@ plotInt2 <- function(surface,
   #   surface: response surface matrix, output of genSurface
   #   col.pal: color palette of surface map
   #   xlab, ylab, zlab: axis labels
-  #   range.color: range of color values
+  #   range.col: range of color values
   #   z.range: range for response axis
   #   n.cols: number of colors in color pal
   #   grids: user generated grid to plot over. If supplied, grid.size is 
   #     ignored
   #   axes: T/F indicating whether axes should be plotted
-  range.color <- c(range.color, as.vector(surface))
-  if (length(unique(range.color)) == 1) n.cols <- 1
+  range.col <- c(range.col, as.vector(surface))
+  if (length(unique(range.col)) == 1) n.cols <- 1
   
   palette <- colorRampPalette(col.pal)
   colors <- palette(n.cols)
-  facet.col <- cut(range.color, n.cols)[-seq(2)]
+  facet.col <- cut(range.col, n.cols)[-seq(2)]
 
   # Plot interaction response surface
   par3d(cex=1.5)
@@ -156,7 +183,7 @@ genSurface <- function(x, y, int,
                        grid.size=100, 
                        grids=NULL, 
                        pred.prob=FALSE, 
-                       min.node=5) {
+                       min.nd=5) {
   # Generates surface map of order-2 interaction
   # args:
   #   x: design matrix
@@ -168,7 +195,7 @@ genSurface <- function(x, y, int,
   #   grid.size: number of bins to plot surface map over
   #   col.pal: color palette of surface map
   #   xlab, ylab, zlab: axis labels
-  #   range.color: range of color values
+  #   range.col: range of color values
   #   z.range: range for response axis
   #   n.cols: number of colors in color pal
   #   grids: user generated grid to plot over. If supplied, grid.size is 
@@ -176,7 +203,7 @@ genSurface <- function(x, y, int,
   #   axes: T/F indicating whether axes should be plotted
   #   pred.prob: T/F indicating whether the z axis should indicate predicted
   #     probability from the forest or raw data distribution
-  #   min.node: minimum leaf node size to use for grid
+  #   min.nd: minimum leaf node size to use for grid
   stopifnot(!is.null(rectangles) | !is.null(read.forest))
   
   if (is.null(varnames)) {
@@ -207,7 +234,7 @@ genSurface <- function(x, y, int,
   }
   
   # Evaluate responses over grid based on RF hyperrectangles
-  if (is.null(rectangles)) rectangles <- forestHR(read.forest, int, min.node)
+  if (is.null(rectangles)) rectangles <- forestHR(read.forest, int, min.nd)
   grid <- matrix(0, nrow=grid.size, ncol=grid.size)
   removed <- rep(FALSE, nrow(rectangles))
   for (i in 1:nrow(rectangles)) {
@@ -281,16 +308,16 @@ getPathsTree <- function(read.forest, int) {
   return(out)
 }
 
-forestHR<- function(read.forest, int, min.node=1) {
+forestHR<- function(read.forest, int, min.nd=1) {
   # Read hyperrectangles from RF for a specified interactin
   # args:
   #   read.forest: list as returned by readForest, including node.feature and
   #     tree.info entries
   #   varnames.group: character vector indicating feature grouping
   #   int: vector of features for which to generate hyperrectangles
-  #   min.node: filter all leaf nodes that are not larger than specified 
+  #   min.nd: filter all leaf nodes that are not larger than specified 
   #     value for faster processing
-  idrm <- read.forest$tree.info$size.node < min.node
+  idrm <- read.forest$tree.info$size.node < min.nd
   read.forest <- subsetReadForest(read.forest, !idrm)
   out <- getPathsTree(read.forest, int) 
   
