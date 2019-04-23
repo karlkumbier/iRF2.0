@@ -3,10 +3,9 @@
 The R package `iRF` implements iterative Random Forests, a method for
 iteratively growing ensemble of weighted decision trees, and detecting
 high-order feature interactions by analyzing feature usage on decision paths.
-This version uses source codes from the R package `randomForest` by Andy Liaw
-and Matthew Weiner, the original Fortran codes by Leo Breiman and Adele Cutler,
-and source codes from the R package `FSInteract` by Hyun Jik Kim and Rajen D.
-Shah.
+It uses source codes from the R package `randomForest` by Andy Liaw and Matthew
+Weiner, the original Fortran codes by Leo Breiman and Adele Cutler, and source
+codes from the R package `FSInteract` by Hyun Jik Kim and Rajen D.  Shah.
 
 `iRF` can be loaded using the `library` command:
 ```{r, message=FALSE}
@@ -90,7 +89,9 @@ visualize variable importance measures:
 ```{r varimp, fig.width=16, fig.height=5}
 par(mfrow=c(1,4))
 for (iter in 1:4)
-  varImpPlot(rf[[iter]], n.var=10, main=paste('Variable Importance (iter:', iter, ')'))
+  varImpPlot(rf[[iter]], n.var=10, 
+             main=paste('Variable Importance (iter:', iter, ')')
+             ) 
 ```
 
 
@@ -143,16 +144,15 @@ rfpar <- foreach(n.tree=rep(n.tree.per.core, n.cores),
 
 ## B. Detect high-order feature interactions in a stable fashion
 `iRF` detects high-order interaction among features by analyzing feature usage
-on the decision paths of a random forest. In particular,
-given a (weighted) random forest fit, `iRF` (i) passes the training data through
-the fitted forest and records the features used on the associated decision
-paths; (ii) Applies a weighted version of the random intersection tree (RIT)
-algorithm proposed by [Shah and Meinshausen
-(2014)](http://jmlr.org/papers/v15/shah14a.html) to find high-order feature
-combinations prevalent on the decision paths, where weights are determined by
-user specified features; (iii) performs the above two steps on many bootstrap
-replicates of the training set to assess stability of the features and their
-interactions. 
+on the decision paths of a random forest. In particular, given a (weighted)
+random forest fit, `iRF` (i) passes the training data through the fitted forest
+and records the features used on the associated decision paths; (ii) Applies a
+weighted version of the random intersection tree (RIT) algorithm proposed by
+[Shah and Meinshausen (2014)](http://jmlr.org/papers/v15/shah14a.html) to find
+high-order feature combinations prevalent on the decision paths, where weights
+are determined by user specified features; (iii) performs the above two steps on
+many bootstrap replicates of the training set to assess stability of the
+features and their interactions. 
 
 ### Feature usage on decision paths of large leaf nodes
 Consider a classification example as before. We iteratively grow weighted random
@@ -189,12 +189,12 @@ head(rforest$tree.info, n=10)
 ```
 
 The `readForest` function optionally computes a sparse matrix `node.feature`
-that encodes the splitting features and direction of inequality along the decision path of
-each leaf node. This encoding can be represented as a binary vector of length
-$2p$`, where an entry $j\in\{1\dots p\}$ indicates that a decision path contains
-the left child of a node that splits on feature $j$ and an entry $j\in\{p+1\dots
-2p\}$ indicates that a decision path contains the right child of a node that
-splits on feature $j-p$.
+that encodes the splitting features and direction of inequality along the
+decision path of each leaf node. This encoding can be represented as a binary
+vector of length $2p$`, where an entry $j\in\{1\dots p\}$ indicates that a
+decision path contains the left child of a node that splits on feature $j$ and
+an entry $j\in\{p+1\dots 2p\}$ indicates that a decision path contains the right
+child of a node that splits on feature $j-p$.
 
 ```{r node_feature, message=FALSE}
 rforest$node.feature[1:10, c(1:5, p + 1:5)]
@@ -241,18 +241,33 @@ FALSE`, outputs for each entry will be lists with one entry per iteration.
 
 (2) `iter.select`: The selected iteration.
 
-(3) `interaction`: a data table of interactions and associated importance metrics. 
-- `int` indicates the interaction, with $+$ and $-$ describing whether the interaction is characterized by high or low levels of the feature. For instance, the interaction `1+_2+_3+` describes an interaction that is defined by high levels of $1, 2,$ and $3$. 
+(3) `interaction`: a data table of interactions and associated importance
+metrics. For a more detailed description of these importance metrics, see our
+paper: https://arxiv.org/abs/1810.07287.
 
-- `prevalence.diff` indicates the difference in prevalence between class-$0$ and class-$1$ leaf nodes, `sta.diff` indicates the proportion of times this value is greater than 0 across bootstrap replicates. 
+    + `int` indicates the interaction, with $+$ and $-$ describing whether the
+      interaction is characterized by high or low levels of the feature. For
+      instance, the interaction `1+_2+_3+` describes an interaction that is
+      defined by high levels of $1, 2,$ and $3$. 
 
-- `independence` indicates the difference between the prevalence of an interaction and the expected prevalence of an interaction if features were selected independently, `sta.independence` indicates the proportion of times this value is greater than 0 across bootstrap replicates. 
+    + `prevalence.diff` indicates the difference in prevalence between class-$0$ and
+      class-$1$ leaf nodes, `sta.diff` indicates the proportion of times this value
+      is greater than 0 across bootstrap replicates. 
 
-- `precision` indicates the difference between the proportion of class-1 observations in leaf nodes containing the interaction and the proportion of class-1 leaf nodes in leaf nodes containing subsets of the interaction, `sta.precision` indicates the proportion of times this value is greater than 0 across bootstrap replicates.
+    + `independence` indicates the difference between the prevalence of an
+      interaction and the expected prevalence of an interaction if features were
+      selected independently, scaled by the prevalence of the interaction,
+      `sta.independence` indicates the proportion of times this value is greater
+      than 0 across bootstrap replicates. 
 
-- `stability` indicates the proportion of times the interaction was recovered by RIT across bootstrap replicates.
+    + `precision` indicates the difference between the proportion of class-1
+      observations in leaf nodes containing the interaction and the proportion of
+      class-1 leaf nodes in leaf nodes containing subsets of the interaction,
+      `sta.precision` indicates the proportion of times this value is greater than 0
+      across bootstrap replicates.
 
-For a more detailed description of these importance metrics, see our paper: https://arxiv.org/abs/1810.07287.
+    + `stability` indicates the proportion of times the interaction was recovered by
+      RIT across bootstrap replicates.
 
 ```{r stability}
 head(fit$interaction)
@@ -271,13 +286,17 @@ dotchart(rev(toplot[1:min(20, length(toplot))]),
 ```
 
 ### Visualizing interactions
-Interactions can be visualized using response surfaces, which depict the expected response as a function of interacting features. The `readForest` function uses the argument `get.split` to extract the splitting threshold from decision paths in a fitted random forest.
+Interactions can be visualized using response surfaces, which depict the
+expected response as a function of interacting features. The `readForest`
+function uses the argument `get.split` to extract the splitting threshold from
+decision paths in a fitted random forest.
 
 ```{r readforest_split}
 rforest <- readForest(fit$rf.list, x=X[train.id,], get.split=TRUE)
 ```
 
-We use the output of `readForest` with `get.split = TRUE` to generate response surfaces as follows
+We use the output of `readForest` with `get.split = TRUE` to generate response
+surfaces as follows 
 ```{r response_surface}
 library(rgl)
 plotInt(x=X[test.id,], y=Y[test.id], int='1+_2+_3+', read.forest=rforest,

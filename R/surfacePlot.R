@@ -26,7 +26,8 @@
 #'
 #' @export
 #'
-#' @importFrom rgl open3d persp3d par3d rgl.viewpoint movie3d spin3d mfrow3d
+#' @importFrom rgl open3d persp3d par3d rgl.viewpoint movie3d spin3d mfrow3d 
+#'  title3d
 #' @importFrom dplyr select group_by summarize
 #' @importFrom data.table data.table
 #' @importFrom stringr str_split str_remove_all str_replace_all
@@ -44,8 +45,7 @@ plotInt <- function(x, y, int,
                     min.surface=100,
                     min.nd=5,
                     pred.prob=FALSE,
-                    main=NULL,
-                    plot.dir=NULL) {
+                    main=NULL) {
  #   plot.dir: directory to write plots to
   if (! 'rgl' %in% rownames(installed.packages()))
     stop('Surface map plots require rgl installation')
@@ -87,7 +87,7 @@ plotInt <- function(x, y, int,
   rectangles <- forestHR(read.forest, int.nf, min.nd)
   
   # Generate surface maps for each group of observations
-  ids <- lapply(unique(id), '==', id)
+  ids <- lapply(sort(unique(id)), '==', id)
   surfaces <- lapply(ids, function(ii) {
     if (sum(ii) < min.surface) return(NULL)
     genSurface(x[ii,], y[ii], int.nf[1:2], varnames=varnames, 
@@ -99,14 +99,19 @@ plotInt <- function(x, y, int,
 
   ngroup <- length(unique(id))
   if (ngroup > 4) stop('Surface plots supported for up to order-4 interactions')
-  if (ngroup == 1) open3d()
+  if (ngroup == 1) {
+    open3d()
+    par3d(windowRect = c(0, 0, 1500, 1500))
+  } 
   if (ngroup == 2) {
     open3d()
     mfrow3d(nr=1, nc=2, sharedMouse = T)
+    par3d(windowRect = c(0, 0, 1500, 1500))
   } 
   if (ngroup == 4) {
     open3d()
-    mfrow3d(nr=4, nc=2, sharedMouse = T) 
+    mfrow3d(nr=2, nc=2, sharedMouse = T)
+    par3d(windowRect = c(0, 0, 1500, 1500))
   } 
 
   # Iterate over observation groups to generate response surfaces
@@ -114,28 +119,22 @@ plotInt <- function(x, y, int,
     if (is.null(surfaces[[i]])) next
     
     # Generate title for surface map
-    ii <- unique(id)[i]
+    ii <- sort(unique(id))[i]
     ii <- str_replace_all(ii, 'TRUE', 'High')
     ii <- str_replace_all(ii, 'FALSE', 'Low')
-    if (length(int) > 2 & !is.null(main)) {
-      group <- paste(int.clean[3:length(int)], ii, sep='-')
-      main <- paste0(main, '; ', group)
-    }
-    
+    if (length(int) > 2) {
+      i.split <- str_split(ii, '_')[[1]]
+      xii <- paste(int.clean[3:length(int)], i.split, sep=': ')
+      main.ii <- paste(main, paste(xii, collapse=', '), collapse=' - ')
+    } else {
+      main.ii <- main
+    } 
+
     # Generate response surface for curent group
-    plotInt2(surfaces[[i]], xlab=xlab, ylab=ylab, zlab=zlab, main=main,
+    plotInt2(surfaces[[i]], xlab=xlab, ylab=ylab, zlab=zlab, main=main.ii,
              col.pal=col.pal, range.col=range.col, z.range=z.range)
-    
-    # Write plot to output directory
-    if (!is.null(plot.dir)) {
-      pp <- paste(int.clean[id.plot], collapse='_')
-      sub.dir <- paste0(plot.dir, pp, '-', ii)
-      dir.create(sub.dir, recursive=TRUE, showWarnings=FALSE)
-      par3d(windowRect = c(20, 30, 1000, 1000))
-      rgl.viewpoint(zoom=0.85, theta=0, phi=-75)
-      movie3d(spin3d(axis = c(0,0,1), rpm = 10), duration=6,  type="png", 
-              dir=sub.dir, convert=FALSE, clean=FALSE)
-    }
+    rgl.viewpoint(zoom=0.95, theta=-5, phi=-60)
+  
   }
 }
 
@@ -172,7 +171,8 @@ plotInt2 <- function(surface,
   g1n <- as.numeric(rownames(surface))
   g2n <- as.numeric(colnames(surface))
   persp3d(x=g1n, y=g2n, z=surface, xlab=xlab, ylab=ylab, zlab=zlab, 
-          zlim=z.range, col=colors[facet.col], axes=axes, main=main)
+          zlim=z.range, col=colors[facet.col], axes=axes)
+  if (!is.null(main)) title3d(main, line = 3)
   
 }
 

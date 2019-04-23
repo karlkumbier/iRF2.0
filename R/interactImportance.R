@@ -74,8 +74,9 @@ subsetTest <- function(int, ints, importance) {
   id <- setsEq(int, ints)
   prev <- importance$prev1[id]
   prev.null <- sapply(pairs, function(z) prod(importance$prev1[z]))
+  prev.test <- max(mean(prev - prev.null) / prev, -1)
   prec <- importance$prec[id]
   prec.null <- importance$prec[unlist(lapply(pairs, which))]
-  return(data.table(prev.test=mean(prev - prev.null),
-                    prec.test=mean(prec - prec.null) / prec))
+  prec.test <- max(mean(prec - prec.null) / prec, -1)
+  return(data.table(prev.test=prev.test, prec.test=prec.test))
 }
