@@ -40,9 +40,6 @@ void F77_SUB(rrand)(double *r) { *r = unif_rand(); }
 void classRF(double *x, int *dimx, int *cl, int *ncl, int *cat, int *maxcat,
     int *sampsize, int *strata, int *Options, int *ntree, int *nvar,
     double *selprob,
-    double *obsgini,
-    int *obsnodes,
-    int *tracknodes,
     int *subsetVar,
     int *subsetVarCard,
     int *maxCard,
@@ -364,7 +361,6 @@ void classRF(double *x, int *dimx, int *cl, int *ncl, int *cat, int *maxcat,
           ta, nrnodes, idmove, &ndsize, ncase,
           &mtry, 
           selprob,
-          obsgini,
           subsetVarjb, &subsetCard,
           varUsed, nodeclass + idxByNnode,
           ndbigtree + jb, win, wr, wl, &mdim,
@@ -394,13 +390,6 @@ void classRF(double *x, int *dimx, int *cl, int *ncl, int *cat, int *maxcat,
         bestvar + idxByNnode,
         nodeclass + idxByNnode, ndbigtree[jb],
         cat, nclass, jtr, nodex, *maxcat);
-
-    /* track which leaf node each observation falls into */ 
-    if (*tracknodes == 1) {
-      for (int n = 0; n < nsample; n++) {
-        obsnodes[n + jb * nsample] = nodex[n];
-      }
-    }
 
     zeroInt(nout, nclass);
     noutall = 0;

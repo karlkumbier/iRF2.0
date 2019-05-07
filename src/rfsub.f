@@ -24,9 +24,9 @@ c     SUBROUTINE BUILDTREE
 
       subroutine buildtree(a, b, cl, cat, maxcat, mdim, nsample,
      1     nclass, treemap, bestvar, bestsplit, bestsplitnext, tgini,
-     1     nodestatus,nodepop, nodestart, classpop, tclasspop,
-     1     tclasscat,ta,nrnodes, idmove, ndsize, ncase, mtry,
-     1     selprob, obsgini, subsetvar, mcard,
+     1     nodestatus, nodepop, nodestart, classpop, tclasspop,
+     1     tclasscat, ta, nrnodes, idmove, ndsize, ncase, mtry,
+     1     selprob, subsetvar, mcard,
      1     iv,
      1     nodeclass, ndbigtree, win, wr, wl, mred, nuse, mind,
      1     tmpcheck)
@@ -55,15 +55,12 @@ c     main program.
      1     ncase(nsample), b(mdim,nsample),
      1     iv(mred), nodeclass(nrnodes), mind(mred)
       integer tmpcheck, subsetvar(mcard)
-      double precision selprobloc(mred)
-      double precision selprob(nsample, mdim)
-      double precision obsgini(nsample, mdim)
-      double precision locimp
+      double precision selprob(mred)
+
       double precision tclasspop(nclass), classpop(nclass, nrnodes),
      1     tclasscat(nclass, 53), win(nsample), wr(nclass),
      1     wl(nclass), tgini(mdim), xrand
       integer msplit, ntie
-      double precision sloc
 
       tmpcheck = -73
       msplit = 0
@@ -83,9 +80,17 @@ c     initialize matrices for tracking observations and variables
       nodepop(1) = nuse
       nodestatus(1) = 2
 
+      depth = 0
 c     start main loop
       do 30 kbuild = 1, nrnodes
 
+         if (kbuild .ge. 2 ** depth) then
+          depth = depth + 1
+         end if
+
+         if (depth .gt. mcard) then 
+          mcard = 0
+         end if  
 
 c         call intpr("kbuild", 6, kbuild, 1)
 c         call intpr("ncur", 4, ncur, 1)
@@ -99,21 +104,10 @@ c     initialize for next call to findbestsplit
          end do
          jstat = 0
 
-c     evaluate local sampling probability based on observations in
-c     current node
-      selprobloc(:) = 0
-      do n = ndstart, ndend
-        nc = ncase(n)
-        do j = 1, mdim
-          selprobloc(j) = selprobloc(j) + selprob(nc, j)
-        end do
-      end do
-
-
          call findbestsplit(a,b,cl,mdim,nsample,nclass,cat,maxcat,
-     1        ndstart,ndend,tclasspop,tclasscat,msplit, decsplit,
-     1        best,ncase,jstat,mtry,
-     1        selprobloc,subsetvar,mcard,   
+     1        ndstart, ndend,tclasspop,tclasscat,msplit, decsplit,
+     1        best,ncase, jstat,mtry,
+     1        selprob, subsetvar, mcard,   
      1        win,wr,wl,mred,mind)
 c     If the node is terminal, move on.  Otherwise, split.
          if (jstat .eq. -1) then
@@ -143,26 +137,18 @@ c     If the node is terminal, move on.  Otherwise, split.
          nodestart(ncur+2) = ndendl + 1
 
 c     find class populations in both nodes
-
          do n = ndstart, ndendl
             nc = ncase(n)
-
-            locimp = decsplit / nodepop(kbuild)
-            obsgini(nc, msplit) = obsgini(nc, msplit) + locimp 
             j=cl(nc)
             classpop(j,ncur+1) = classpop(j,ncur+1) + win(nc)
          end do
          do n = ndendl+1, ndend
             nc = ncase(n)
-
-            locimp = decsplit / nodepop(kbuild)
-            obsgini(nc, msplit) = obsgini(nc, msplit) + locimp
             j = cl(nc)
             classpop(j,ncur+2) = classpop(j,ncur+2) + win(nc)
          end do
-
-c        call intpr("nL", 2, nodepop(ncur+1), 1)
-c        call intpr("nR", 2, nodepop(ncur+2), 1)
+c         call intpr("nL", 2, nodepop(ncur+1), 1)
+c         call intpr("nR", 2, nodepop(ncur+2), 1)
 c     check on nodestatus
          nodestatus(ncur+1) = 2
          nodestatus(ncur+2) = 2
@@ -236,7 +222,7 @@ c     the coding into an integer of the categories going left.
       subroutine findbestsplit(a, b, cl, mdim, nsample, nclass, cat,
      1     maxcat, ndstart, ndend, tclasspop, tclasscat, msplit,
      2     decsplit, best, ncase, jstat, mtry,
-     3     selprobloc, subsetvar, mcard,
+     3     selprob, subsetvar, mcard,
      4     win, wr, wl,
      3     mred, mind)
       implicit double precision(a-h,o-z)
@@ -246,15 +232,15 @@ c     the coding into an integer of the categories going left.
      1     win(nsample), wr(nclass), wl(nclass), xrand
       integer mind(mred), ncmax, ncsplit,nhit, ntie
 	  
-      double precision selprobloc(mdim), tselprobloc(mdim), mprob,
+      double precision selprob(mdim), tselprob(mdim), mprob,
      1   totprob
       integer jj, subsetvar(mcard)
 	  
-      totprob = selprobloc(1)
-      tselprobloc(1) = selprobloc(1)
+      totprob = selprob(1)
+      tselprob(1) = selprob(1)
       do j = 2, mdim
-	     totprob=selprobloc(j)+totprob
-         tselprobloc(j) = selprobloc(j)
+	     totprob=selprob(j)+totprob
+         tselprob(j) = selprob(j)
       end do
 	  
 	  
@@ -283,16 +269,16 @@ c     sampling mtry variables w/o replacement.
           j = subsetvar(mt)
       else
          call rrand(xrand)
-         call selectsplit(xrand, tselprobloc, totprob, nn, j, mdim)
+         call selectsplit(xrand, tselprob, totprob, nn, j, mdim)
       end if
 
          mvar=mind(j)
          mind(j) = mind(nn)
          mind(nn) = mvar
          
-         mprob = tselprobloc(j)
-         tselprobloc(j) = tselprobloc(nn)
-         tselprobloc(nn) = mprob
+         mprob = tselprob(j)
+         tselprob(j) = tselprob(nn)
+         tselprob(nn) = mprob
          
          totprob = totprob - mprob	 
          nn = nn-1
@@ -545,27 +531,27 @@ c     -------------------------------
       end
 
 c     select splitting variable using weighted sampling 
-      subroutine selectsplit(xrand, tselprobloc, totprob, nn, j, mdim)
+      subroutine selectsplit(xrand, tselprob, totprob, nn, j, mdim)
       integer ii, tmp, j, nn, dum
-      double precision tselprobloc(mdim), cumselprobloc(mdim),
+      double precision tselprob(mdim), cumselprob(mdim),
      1  txrand, xrand, totprob
       
       tmp = 1
       txrand = xrand * totprob
-      cumselprobloc(1) = tselprobloc(1)
+      cumselprob(1) = tselprob(1)
  
       do 30 ii=2,nn
-         cumselprobloc(ii)=cumselprobloc(ii-1)+tselprobloc(ii)
+         cumselprob(ii)=cumselprob(ii-1)+tselprob(ii)
 30    continue
       
       do 180 ii=1, nn
          if (tmp.eq.0) then
             goto 180
          endif
-         if (txrand.ge.cumselprobloc(ii)) then
+         if (txrand.ge.cumselprob(ii)) then
            goto 180
          endif
-         if (txrand.lt.cumselprobloc(ii)) then
+         if (txrand.lt.cumselprob(ii)) then
                tmp = 0
 			   j = ii
          endif

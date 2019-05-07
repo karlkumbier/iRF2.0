@@ -1,334 +1,235 @@
-# Iteratively grows random forests, finds case specific feature interactions
+#' Iterative random forests (iRF)
+#'
+#' Itaratively grow feature weighted random forests and search for prevalent
+#' interactions on decision paths.
+#' 
+#' @param x numeric feature matrix
+#' @param y response vector. If factor, classification is assumed.
+#' @param xtest numeric feature matrix for test set.
+#' @param ytest response vector for test set.
+#' @param number of iterations to run.
+#' @param ntree number of random forest trees.
+#' @param mtry.select.prob feature weights for first iteration. Defaults to
+#'  equal weights
+#' @param iter.return which iterations should interactions be returned for.
+#'  Defaults to iteration with highest OOB accuracy.
+#' @param select.iter if TRUE, returns interactions from iteration with highest
+#'  OOB accuracy.
+#' @param rit.param named list specifying RIT parameters. Entries include
+#'  \code{depth}: depths of RITs, \code{ntree}: number of RITs, \code{nchild}:
+#'  number of child nodes for each RIT, \code{class.id}: 0-1 indicating which
+#'  leaf nodes RIT should be run over, \code{min.nd}: minimum node size to run
+#'  RIT over, \code{class.cut}: threshold for converting leaf nodes in
+#'  regression to binary classes.
+#' @param varnames.grp grouping "hyper-features" for RIT search. Features with 
+#'  the same name will be treated as identical for interaction search.
+#' @param n.bootstrap number of bootstrap samples to calculate stability scores.
+#' @param bs.sample list of observation indices to use for bootstrap samples. If
+#'  NULL, iRF will take standard bootstrap samples of observations.
+#' @param weights numeric weight for each observation. Leaf nodes will be
+#'  sampled for RIT with probability proprtional to the total weight of
+#'  observations they contain.
+#' @param signed if TRUE, signed interactions will be returned
+#' @param verbose if TRUE, display progress of iRF fit.
+#' @param n.core number of cores to use. If -1, all available cores are used.
+#' @param ... additional arguments passed to iRF::randomForest.
+#'
+#' @return A list containing the following entries:
+#' \itemize{
+#'    \item{rf.list}{a list of randomForest objects}
+#'    \item{interaction}{a data table containing recovered interactions and
+#'      importance scores}
+#'    \item{selected.iter}{iterations returned by iRF}
+#'    \item{weights}{feature weights used to fit each entry of rf.list}
+#'  }
+#'
+#' @export
+#'
+#' @useDynLib iRF, .registration = TRUE
+#' @importFrom Rcpp sourceCpp
+#' @importFrom AUC auc roc
 iRF <- function(x, y, 
-                xtest=NULL, ytest=NULL, 
+                xtest=NULL, 
+                ytest=NULL, 
                 n.iter=5, 
                 ntree=500, 
-                n.core=1, 
-                mtry.select.prob=rep(1/ncol(x), ncol(x)), 
-                interactions.return=NULL, 
-                wt.pred.accuracy=FALSE, 
-                rit.param=list(depth=5, ntree=500, nchild=2, class.id=1, 
-                               min.nd=1, class.cut=NULL, class.qt=0.5), 
-                varnames.grp=NULL, 
-                n.bootstrap=20,
-                bootstrap.forest=TRUE,
-                select.iter=FALSE,
+                mtry.select.prob=rep(1, ncol(x)),
+                iter.return=NULL, 
+                select.iter=ifelse(is.null(iter.return), TRUE, FALSE),
+                rit.param=list(depth=5, ntree=500, 
+                               nchild=2, class.id=1, 
+                               min.nd=1, class.cut=NULL), 
+                varnames.grp=colnames(x), 
+                n.bootstrap=1,
+                bs.sample=NULL,
+                weights=rep(1, nrow(x)),
+                signed=TRUE,
                 verbose=TRUE,
+                n.core=1, 
+                interactions.return=NULL,
+                wt.pred.accuracy=NULL,
                 ...) {
-  
-  
-  if (!is.matrix(x) | (!is.null(xtest) & !is.matrix(xtest)))
-    stop('either x or xtest is not a matrix !')
-  
-  if (!is.numeric(x) | (!is.null(xtest) & !is.numeric(xtest)))
-    stop('either x or xtest is not a numeric matrix!')
-  
-  if (ncol(x) < 2 & !is.null(interactions.return))
-    stop('cannot find interaction - X has less than two columns!')
-  
-  if (any(interactions.return > n.iter))
-    stop('interaction iteration to return greater than n.iter')
-  
-  n <- nrow(x)
-  p <- ncol(x)
-  class.irf <- is.factor(y)
-  imp <- ifelse(class.irf, 'MeanDecreaseGini', 'IncNodePurity')
-  registerDoMC(n.core)  
-  
-  rf.list <- list()
-  if (!is.null(interactions.return) | select.iter) {
-    #interact.list <- list()
-    stability.score <- list()
+ 
+  # Check for depricated arguments
+  if (!is.null(interactions.return)) {
+    warning('interactions.return is depricated, use iter.return instead')
+    iter.return <- interactions.return
+    select.iter <- FALSE
   }
-  
-  if (local) local.list <- list()
 
-  # Set number of trees to grow in each core
-  a <- floor(ntree / n.core) 
-  b <- ntree %% n.core
-  ntree.id <- c(rep(a + 1, b), rep(a, n.core - b))
+  if (!is.null(wt.pred.accuracy))
+    warning('wt.pred.accuracy is depricated')
+
+  # Check input attributes for correct format
+  require(doRNG, quiet=TRUE)
+  if (!class(x) %in% c('data.frame', 'matrix'))
+    stop('x must be matrix or data frame')
+  if (nrow(x) != length(y))
+    stop('x and y must contain the same number of observations')
+  if (ncol(x) < 2 & (!is.null(iter.return) | select.iter))
+    stop('cannot find interaction - x has less than two columns!')
+  if (any(iter.return > n.iter))
+    stop('selected iteration greater than n.iter')
+  if (length(mtry.select.prob) != ncol(x))
+    stop('length mtry.select.prob must equal number of features')
+  if (length(weights) != nrow(x))
+    stop('length weights differs from # training observations')
+  if (!is.null(xtest)) {
+    if (ncol(xtest) != ncol(x)) 
+      stop('training/test data must have same number of features')
+    if (is.null(ytest))
+      stop('test set responses not indicated')
+    if (nrow(xtest) != length(ytest))
+      stop('xtest and ytest must contain the same number of observations')
+  }
+
+  # Check all RIT and set to defaul if missing
+  if (is.null(rit.param$depth)) rit.param$depth <- 5
+  if (is.null(rit.param$ntree)) rit.param$ntree <- 500
+  if (is.null(rit.param$nchild)) rit.param$nchild <- 2
+  if (is.null(rit.param$class.id)) rit.param$class.id <- 1
+  if (is.null(rit.param$min.nd)) rit.param$min.nd <- 1
+  if (is.null(rit.param$class.cut) & is.numeric(y)) 
+    rit.param$class.cut <- median(y)
   
+
+  class.irf <- is.factor(y)
+  importance <- ifelse(class.irf, 'MeanDecreaseGini', 'IncNodePurity')
+  
+  # Fit a series of iteratively re-weighted RFs 
+  rf.list <- list()  
   for (iter in 1:n.iter) {
     
     # Grow Random Forest on full data
-    print(paste('iteration = ', iter))
-    rf.list[[iter]] <- foreach(i=1:length(ntree.id), .combine=combine, 
-                               .multicombine=TRUE, .packages='iRF') %dopar% {
-                                 randomForest(x, y, 
-                                              xtest, ytest, 
-                                              ntree=ntree.id[i], 
-                                              mtry.select.prob=mtry.select.prob, 
-                                              keep.forest=TRUE,
-                                              ...)
-                               }
+    if (verbose) print(paste('iteration = ', iter))
+    rf.list[[iter]] <- parRF(x, y, xtest, ytest, ntree=ntree, n.core=n.core, 
+                             mtry.select.prob=mtry.select.prob, ...)
     
-        mtry.select.prob <- rf.list[[iter]]$importance[,imp]
-    
-    if (!is.null(xtest) & class.irf & verbose){
-      ypred <- predict(rf.list[[iter]], newdata=xtest, type='prob')[,2]
-      auroc <- auc(roc(ypred, ytest))
-      print(paste('AUROC: ', round(auroc, 2)))
-    } else if (!is.null(xtest) & verbose) {
-      ypred <- predict(rf.list[[iter]], newdata=xtest)
-      pct.var <- 1 - mean((ypred - ytest) ^ 2) / var(ytest)
-      pct.var <- max(pct.var, 0)
-      print(paste('% var explained:', pct.var * 100))
-    }
+    # Update feature selection probabilities
+    mtry.select.prob <- rf.list[[iter]]$importance
+
+    # Evaluate test set error if supplied
+    if (!is.null(xtest) & verbose) 
+      print(printAcc(rf.list[[iter]], ytest, class.irf))
+  
   }
   
-  # Select iteration for which to return interactions based on minimizing 
-  # prediction error on OOB samples
-  if (select.iter) interactions.return <- selectIter(rf.list, y=y)
-  
-  for (iter in interactions.return) {
+
+  # Select iteration to return interactions based on OOB error
+  selected.iter <- selectIter(rf.list, y=y)
+  if (select.iter) iter.return <- selected.iter 
+
+  # Generate bootstrap samples for stability analysis
+  if (is.null(bs.sample)) bs.sample <- lreplicate(n.bootstrap, bsSample(y))
     
-    # Find interactions across bootstrap replicates
-    if (verbose) cat('finding interactions ... ')
-    interact.list.b <- list()      
+  importance <- list()
+  for (iter in iter.return) {
     
-    for (i.b in 1:n.bootstrap) { 
-      
-      if (class.irf) {
-        # Take bootstrap sample that maintains class balance in full data
-        n.class <- table(y)
-        class <- as.factor(names(n.class))
-        sample.id <- mapply(function(cc, nn) sampleClass(y, cc, nn), 
-                            class, n.class)
-        sample.id <- unlist(sample.id)
-      } else {
-        sample.id <- sample(n, replace=TRUE)
-      }
-      
-      if (bootstrap.forest) { 
-        
-        # use feature weights from current iteration of full data RF
-        if (iter == 1)
-          mtry.select.prob <- rep(1, p)
-        else
-          mtry.select.prob <- rf.list[[iter - 1]]$importance[,imp]
-        
-        # fit random forest on bootstrap sample
-        rf.b <- foreach(i=1:length(ntree.id), .combine=combine, 
-                        .multicombine=TRUE, .packages='iRF') %dopar% {
-                          randomForest(x[sample.id,], y[sample.id], 
-                                       xtest, ytest, 
-                                       ntree=ntree.id[i], 
-                                       mtry.select.prob=mtry.select.prob, 
-                                       keep.forest=TRUE, 
-                          ...)
-                        }
-      } else {
-        rf.b <- rf.list[[iter]]
-      }
-      
-      # run generalized RIT on rf.b to learn interactions
-      ints <- generalizedRIT(rf=rf.b, x=x[sample.id,], y=y[sample.id],
-                             wt.pred.accuracy=wt.pred.accuracy,
-                             class.irf=class.irf,
-                             imp=imp,
-                             varnames.grp=varnames.grp,
-                             rit.param=rit.param,
-                             local=local,
-                             n.core=n.core)
-      print('backsampling')
-      if (local) ints <- lapply(ints, function(z) unique(sample.id[z]))
-      interact.list.b[[i.b]] <- ints
-      rm(rf.b)       
-    }
-    
-    # calculate stability scores of interactions
-    stability.score[[iter]] <- summarizeInteract(interact.list.b, local=local)
-    if (local) {
-      print('grouping')
-      xx <- unlist(interact.list.b, recursive=FALSE)
-      local.list[[iter]] <- lapply(unique(names(xx)), function(i)
-        unique(unlist(xx[names(xx) == i])))      
-      names(local.list[[iter]]) <- unique(names(xx))
-    }
-  } # end for (iter in ... )
+    # Run gRIT across RF grown on full dataset to extract interactions.
+    if (verbose) cat('finding interactions...\n')
+    rit.param$ntree <- rit.param$ntree * n.bootstrap
+    ints.eval <- gRIT(rf.list[[iter]], x=x, y=y,
+                      weights=weights,
+                      varnames.grp=varnames.grp,
+                      rit.param=rit.param,
+                      signed=signed,
+                      n.core=n.core)
+    ints.eval <- ints.eval$int
+    rit.param$ntree <- rit.param$ntree / n.bootstrap
+
+    # Grow RFs on BS samples to evaluate stability of recovered interacitons.
+    if (verbose) cat('evaluating interactions...\n')
+    if (iter == 1) rf.weight <- rep(1, ncol(x))
+    if (iter > 1) rf.weight <- rf.list[[iter - 1]]$importance
+    importance[[iter]] <- stabilityScore(x, y, 
+                                         ntree=ntree,
+                                         mtry.select.prob=rf.weight,
+                                         ints.eval=ints.eval,
+                                         rit.param=rit.param,
+                                         varnames.grp=varnames.grp,
+                                         bs.sample=bs.sample,
+                                         weights=weights, 
+                                         signed=signed,
+                                         n.core=n.core, 
+                                         ...)
   
+  }
   
+  # Combine reults for return
   out <- list()
   out$rf.list <- rf.list
-  if (!is.null(interactions.return)) out$interaction <- stability.score
-  if (local) out$local <- local.list
+  out$selected.iter <- selected.iter
+  if (!is.null(iter.return)) out$interaction <- importance
 
-  if (select.iter) {
-    out$rf.list <- out$rf.list[[interactions.return]]
-    out$interaction <- out$interaction[[interactions.return]]
-    out$opt.k <- interactions.return
+  if (length(iter.return) == 1) {
+    iter.wt <- iter.return - 1
+    if (iter.return > 1) out$weights <- out$rf.list[[iter.wt]]$importance 
+    out$rf.list <- out$rf.list[[iter.return]]
+    out$interaction <- importance[[iter.return]]
+    out$selected.iter <- iter.return
   }
-  
+
   return(out)
 }
 
-generalizedRIT <- function(rf, x, y, wt.pred.accuracy, class.irf, 
-                           imp, varnames.grp, rit.param, n.core) {
-  
-  class.irf <- is.factor(y)
 
-  # Extract decision paths and tree metadata from random forest
-  rforest <- readForest(rf, x=x, y=y, 
-                        return.node.feature=TRUE,
-                        return.node.obs=local,
-                        wt.pred.accuracy=wt.pred.accuracy, 
-                        n.core=n.core)                                                        
+selectIter <- function(rf.list, y) {
+  # Evaluate optimal iteration based on prediction error in OOB samples.
+  # For classification: accuracy. For regression: MSE.
+  predicted <- lapply(rf.list, function(z) as.numeric(z$predicted))
   
-  # Select class specific leaf nodes
-  select.leaf.id <- rep(TRUE, nrow(rforest$tree.info))
-  
-  if (class.irf) {
-    # classification: subset leaf nodes by class
-    class.id <- rit.param$class.id
-    select.leaf.id <- rforest$tree.info$prediction == as.numeric(class.id) + 1
-  } else if (!is.null(rit.param$class.cut)) {
-    # regression with cutoff: sample all leaf nodes that exceed cutoff
-    select.leaf.id <- rforest$tree.info$prediction > rit.param$class.cut
-  } else if (!is.null(rit.param$class.qt)) {
-    # regression with quantile cutoff: determine cutoff from quantile and 
-    # sample leaf nodes
-    qt.cut <- quantile(y, rit.param$class.qt)
-    select.leaf.id <- rforest$tree.info$prediction > qt.cut
-  }       
-  
-  rforest <- subsetReadForest(rforest, select.leaf.id)
-  nf <- rforest$node.feature
-
-  # Set weights for leaf node sampling using either size or size and accuracy
-  if (wt.pred.accuracy) {
-    wt <- rforest$tree.info$size.node * rforest$tree.info$dec.purity
+  if (is.factor(y)) {
+    predicted <- lapply(predicted, '-', 1)
+    y <- as.numeric(y) - 1
+    eFun <- function(y, yhat) sum(y == 1 & yhat == 0) + sum(y == 0 & yhat == 1)
   } else {
-    wt <- rforest$tree.info$size.node
-  }         
-  
-  if (sum(select.leaf.id) < 2) {
-    return(character(0))
-  } else {  
-    # group features if specified
-    if (!is.null(varnames.grp)) nf <- groupFeature(nf, grp=varnames.grp)
-    interactions <- RIT(nf, weights=wt, depth=rit.param$depth,
-                        n_trees=rit.param$ntree, branch=rit.param$nchild,
-                        n_cores=n.core) 
-    
-    # Group interactions and rename by variable name
-    if (!is.null(varnames.grp))
-      varnames.new <- unique(varnames.grp)
-    else if (!is.null(colnames(x)))
-      varnames.new <- colnames(x)
-    else
-      varnames.new <- 1:ncol(x)
-    
-    if (local) {
-      interactions <- groupLocalInteracts(interactions$Interaction, n, p)
-      names(interactions) <- nameInts(names(interactions), varnames.new)
-    } else {
-      interactions <- gsub(' ', '_', interactions$Interaction)
-      interactions <- nameInts(interactions, varnames.new)
-    }
-    
-    return(interactions)
-  }                   
-}
-
-nameInts <- function(int, varnames) {
-  
-  ints.split <- strsplit(int, '_')
-  varnames.unq <- unique(varnames)
-  ints.name <- lapply(ints.split, function(i) varnames.unq[as.numeric(i)])
-  ints.name <- sapply(ints.name, paste, collapse='_')
-  return(ints.name)
-}
-
-
-groupLocalInteracts <- function(interactions, n, p) {
-  # Aggregate local interactions
-  
-  ints.split <- strsplit(interactions, ' ')
-  ints.split <- sapply(ints.split, as.numeric)
-  
-  # split interactions into feature and observation
-  ints.feat <- sapply(ints.split, function(z) paste(z[z <= p], collapse='_'))
-  ints.obs <- lapply(ints.split, function(z) z[z > p])
-  
-  # remove interactions between only observations
-  id.rm <- ints.feat == ''
-  ints.obs <- ints.obs[!id.rm]
-  ints.feat <- ints.feat[!id.rm]
-  
-  # aggreate observations by interaction
-  agg <- lapply(unique(ints.feat), function(i) 
-    unique(unlist(ints.obs[ints.feat == i])))
-  id.rm <- sapply(agg, function(z) length(z) == 0)
-  agg <- agg[!id.rm]
-  names(agg) <- unique(ints.feat)[!id.rm]
-  agg <- lapply(agg, '-', p)
-  
-  return(agg)
-}
-
-
-subsetReadForest <- function(rforest, subset.idcs) {
-  
-  # Subset nodes from readforest output 
-  if (!is.null(rforest$node.feature)) 
-    rforest$node.feature <- rforest$node.feature[subset.idcs,]
-  
-  if (!is.null(rforest$tree.info))
-    rforest$tree.info <- rforest$tree.info[subset.idcs,]
-  
-  if (!is.null(rforest$node.obs))
-    rforest$node.obs <- rforest$node.obs[subset.idcs,]
-  
-  return(rforest)
-}
-
-groupFeature <- function(node.feature, grp){
-  # Group feature level data in node.feature 
-  sparse.mat <- is(node.feature, 'Matrix')
-  grp.names <- unique(grp)
-  makeGroup <- function(x, g) apply(as.matrix(x[,grp == g]), MAR=1, max) 
-  node.feature.new <- sapply(grp.names, makeGroup, x=node.feature)
-  
-  if (sparse.mat) node.feature.new <- Matrix(node.feature.new, sparse=TRUE)
-  colnames(node.feature.new) <- grp.names
-  
-  return(node.feature.new)
-}
-
-
-
-summarizeInteract <- function(store.out, local=FALSE){
-  # Aggregate interactions across bootstrap samples
-  print('summarizing')
-  if (local) store.out <- lapply(store.out, names)
-
-  n.bootstrap <- length(store.out)
-  store <- unlist(store.out)
-  
-  if (length(store) >= 1){
-    int.tbl <- sort(c(table(store)), decreasing=TRUE)
-    int.tbl <- int.tbl / n.bootstrap
-  } else {
-    return(list(interaction=numeric(0), prevalence=numeric(0)))
+    eFun <- function(y, yhat) mean((yhat - y) ^ 2, na.rm=TRUE)
   }
   
-  out <- int.tbl
-  return(out)
+  error <- sapply(predicted, eFun, y=y)
+  min.err <- min(error)
+  id.select <- max(which(error == min.err))
+  return(id.select)
 }
 
 sampleClass <- function(y, cl, n) {
-  # Sample indices specific to a given class
+  # Take a bootstrap sample from a particular class of observations
   sampled <- sample(which(y == cl), n, replace=TRUE)
   return(sampled)
 }
 
-selectIter <- function(rf.list, y) {
-  # Evaluate optimal iteration based on prediction accuracy on OOB samples
-  predicted <- lapply(rf.list, function(z) z$predicted)
-  predicted <- lapply(predicted, function(z) as.numeric(z) - is.factor(z))
-  if (is.factor(y)) y <- as.numeric(y) - 1
-  
-  mse <- function(y, py) mean((py - y) ^ 2, na.rm=TRUE)
-  error <- sapply(predicted, mse, y=y)
-  return(which.min(error))
-} 
+bsSample <- function(y) {
+  # Generate outer layer bootstrap samples
+  n <- length(y)
+  if (is.factor(y)) {
+    # Take bootstrap sample that maintains class balance of full data
+    ncl <- table(y)
+    class <- as.factor(names(ncl))
+    sample.id <- mapply(function(cc, n) sampleClass(y, cc, n), class, ncl)
+    sample.id <- unlist(sample.id)
+  } else {
+    sample.id <- sample(n, replace=TRUE)
+  }
+  return(sample.id)
+}
+

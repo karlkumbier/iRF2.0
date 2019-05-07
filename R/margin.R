@@ -1,7 +1,12 @@
+#' Margin
+#' @export
 margin <- function(x, ...) {
     UseMethod("margin")
 }
 
+#' Random forest margin
+#' @method margin randomForest
+#' @export
 margin.randomForest <- function(x, ...) {
     if (x$type == "regression") {
         stop("margin not defined for regression Random Forests")
@@ -11,6 +16,7 @@ margin.randomForest <- function(x, ...) {
     }
     margin(x$votes, x$y, ...)
 }
+
 
 margin.default <- function(x, observed, ...) {
     if ( !is.factor(observed) ) {
@@ -33,6 +39,9 @@ margin.default <- function(x, observed, ...) {
     margin
 }
 
+#' Plot margin
+#' @method plot margin
+#' @export
 plot.margin <- function(x, sort=TRUE, ...) {
     if (sort) x <- sort(x)
     nF <- factor(names(x))
