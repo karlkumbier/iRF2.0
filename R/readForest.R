@@ -196,8 +196,8 @@ getParent <- function(tree.info) {
 }
 
 
-ancestorPath <- function(tree.info, varnames.grp, split.pt=FALSE, 
-                         first.split=TRUE) {
+ancestorPath <- function(tree.info, varnames.grp, 
+                         split.pt=FALSE, first.split=TRUE) {
  
   # recursively extract path info for all nodes 
   paths <- getAncestorPath(tree.info, varnames.grp, split.pt=split.pt,
