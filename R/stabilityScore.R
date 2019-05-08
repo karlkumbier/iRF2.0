@@ -98,21 +98,25 @@ summarizeInteract <- function(x) {
   if (nrow(x) > 0) {
     imp <- mutate(x, diff=(prev1-prev0)) %>%
       group_by(int) %>%
-      summarize(prevalence.diff=mean(diff),
-                sta.diff=mean(diff >= 0),
-                independence=mean(prev.test),
-                sta.independence=mean(prev.test >= 0),
+      summarize(prevalence=mean(prev1),
                 precision=mean(prec),
-                sta.precision=mean(prec.test >= 0),
+                cpe=mean(diff),
+                sta.cpe=mean(diff >= 0),
+                fsd=mean(prev.test),
+                sta.fsd=mean(prev.test >= 0),
+                mip=mean(prec.test),
+                sta.mip=mean(prec.test >= 0),
                 stability=mean(recovered)) %>%
-      arrange(desc(prevalence.diff))
+      arrange(desc(cpe))
   } else {
-    imp <- data.table(prevalence.diff=numeric(0),
-                      sta.diff=numeric(0),
-                      independence=numeric(0),
-                      sta.independence=numeric(0),
+    imp <- data.table(prevalence=numeric(0),
                       precision=numeric(0),
-                      sat.precision=numeric(0),
+                      cpe=numeric(0),
+                      sta.cpe=numeric(0),
+                      fsd=numeric(0),
+                      sta.fsd=numeric(0),
+                      mip=numeric(0),
+                      sta.mip=numeric(0),
                       stability=numeric(0))
   }
 
