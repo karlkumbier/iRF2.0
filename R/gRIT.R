@@ -85,24 +85,21 @@ gRIT <- function(x, y,
                               return.node.feature=TRUE,
                               return.node.obs=TRUE,
                               varnames.grp=varnames.grp,
-                              get.split=TRUE,
                               n.core=n.core)
   }
 
-  # Collapse node feature matrix for unsigned iRF
+    # Collapse node feature matrix for unsigned iRF
   if (!signed) read.forest$node.feature <- collapseNF(read.forest$node.feature)
 
-  # Evaluate leaf node attributes: size and proportion of class-1 observations
-  nd.attr <- nodeAttr(read.forest, y, weights)
-  prec.nd <- nd.attr$precision
-  ndcnt <- nd.attr$ndcnt
-  
-  # Subset leaf nodes based on mimimum size
-  idcnt <- ndcnt >= rit.param$min.nd
+  # Evaluate leaf node size and subset forest based on minimum node size
+  count <- nodeCount(read.forest, weights)
+  idcnt <- count >= rit.param$min.nd
   read.forest <- subsetReadForest(read.forest, idcnt)
-  ndcnt <- ndcnt[idcnt]
-  prec.nd <- prec.nd[idcnt]
+  count <- count[idcnt]
 
+  # Evaluate leaf node precision
+  precision <- nodePrecision(read.forest, y, count, weights)
+  
   # Select class specific leaf nodes
   if (class.irf)
     idcl <- read.forest$tree.info$prediction == rit.param$class.id + 1
@@ -114,7 +111,7 @@ gRIT <- function(x, y,
   } else {
   
     # Run RIT on leaf nodes of selected class  
-    ints <- runRIT(subsetReadForest(read.forest, idcl), weights=ndcnt[idcl],
+    ints <- runRIT(subsetReadForest(read.forest, idcl), weights=count[idcl],
                    rit.param=rit.param, n.core=n.core)
     
     if (is.null(ints)) return(nullReturn())
@@ -128,11 +125,12 @@ gRIT <- function(x, y,
     }
    
     # Evaluate importance metrics for interactions and lower order subsets.
+    ints.eval <- lapply(ints.eval, unname)
     ints.sub <- lapply(ints.eval, intSubsets)
     ints.sub <- unique(unlist(ints.sub, recursive=FALSE))
     
     ximp <- lapply(ints.sub, intImportance, nf=read.forest$node.feature,
-                   weight=ndcnt, prec.nd=prec.nd, select.id=idcl)
+                   weight=count, precision=precision, select.id=idcl)
     ximp <- rbindlist(ximp) 
 
     imp.test <- lapply(ints.eval, subsetTest, importance=ximp, ints=ints.sub)
@@ -177,7 +175,7 @@ subsetReadForest <- function(read.forest, subset.idcs) {
     read.forest$tree.info <- read.forest$tree.info[subset.idcs,]
 
   if (!is.null(read.forest$node.obs))
-    read.forest$node.obs <- read.forest$node.obs[subset.idcs,]
+    read.forest$node.obs <- read.forest$node.obs[,subset.idcs]
 
   return(read.forest)
 }
