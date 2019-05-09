@@ -85,6 +85,7 @@ gRIT <- function(x, y,
                               return.node.feature=TRUE,
                               return.node.obs=TRUE,
                               varnames.grp=varnames.grp,
+                              weights=weights,
                               n.core=n.core)
   }
 
@@ -92,7 +93,7 @@ gRIT <- function(x, y,
   if (!signed) read.forest$node.feature <- collapseNF(read.forest$node.feature)
 
   # Evaluate leaf node size and subset forest based on minimum node size
-  count <- nodeCount(read.forest, weights)
+  count <- read.forest$tree.info$size.node
   idcnt <- count >= rit.param$min.nd
   read.forest <- subsetReadForest(read.forest, idcnt)
   count <- count[idcnt]
@@ -128,9 +129,13 @@ gRIT <- function(x, y,
     ints.eval <- lapply(ints.eval, unname)
     ints.sub <- lapply(ints.eval, intSubsets)
     ints.sub <- unique(unlist(ints.sub, recursive=FALSE))
+
+    # Convert node feature matrix to list of active features for fast lookup
+    nf.list <- by(read.forest$node.feature@i,
+                  rep(1:(2 * p), times=diff(read.forest$node.feature@p)), list)
     
-    ximp <- lapply(ints.sub, intImportance, nf=read.forest$node.feature,
-                   weight=count, precision=precision, select.id=idcl)
+    ximp <- lapply(ints.sub, intImportance, nf=nf.list, weight=count, 
+                   precision=precision, select.id=idcl)
     ximp <- rbindlist(ximp) 
 
     imp.test <- lapply(ints.eval, subsetTest, importance=ximp, ints=ints.sub)

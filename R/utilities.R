@@ -105,3 +105,4 @@ lreplicate <- function(n, expr, ...) {
   out <- replicate(n, expr, ..., simplify=FALSE)
   return(out)
 }
+

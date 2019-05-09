@@ -6,7 +6,7 @@
 \usage{
 readForest(rand.forest, x, return.node.feature = TRUE,
   return.node.obs = FALSE, varnames.grp = NULL, first.split = TRUE,
-  n.core = 1)
+  weights = rep(1, nrow(x)), n.core = 1)
 }
 \arguments{
 \item{rand.forest}{an object of class randomForest.}

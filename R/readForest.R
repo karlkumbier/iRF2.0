@@ -31,12 +31,14 @@
 #' @importFrom doParallel registerDoParallel stopImplicitCluster
 #' @importFrom doRNG "%dorng%"
 #' @importFrom parallel detectCores
-#' @importFrom dplyr one_of select "%>%" filter
+#' @importFrom dplyr one_of select filter
+#' @importFrom fastmatch fmatch
 readForest <- function(rand.forest, x, 
                        return.node.feature=TRUE, 
                        return.node.obs=FALSE,
                        varnames.grp=NULL,
                        first.split=TRUE,
+                       weights=rep(1, nrow(x)),
                        n.core=1){
   
   if (is.null(rand.forest$forest))
@@ -51,9 +53,12 @@ readForest <- function(rand.forest, x,
   p <- length(unique(varnames.grp))
   out <- list()
   
-  # Determine leaf nodes that observations fall into
-  prf <- predict(rand.forest, newdata=x, nodes=TRUE)
-  nodes <- attr(prf, 'nodes')
+  # Pass observations through RF to determine leaf node membership
+  nodes <- NULL
+  if (return.node.obs) {
+    pred <- predict(rand.forest, newdata=x, nodes=TRUE)
+    nodes <- attr(pred, 'nodes')
+  }
   
   # Split trees across cores to read forest in parallel
   a <- floor(ntree / n.core)
@@ -69,7 +74,7 @@ readForest <- function(rand.forest, x,
               nodes=nodes, varnames.grp=varnames.grp,
               return.node.feature=return.node.feature, 
               return.node.obs=return.node.obs, 
-              first.split=first.split)
+              first.split=first.split, weights=weights)
   })
   rd.forest <- unlist(rd.forest, recursive=FALSE)
 
@@ -88,7 +93,6 @@ readForest <- function(rand.forest, x,
     out$node.obs <- do.call(cbind, nobs)
   } 
 
-
   stopImplicitCluster()
   return(out)
   
@@ -98,13 +102,14 @@ readTrees <- function(rand.forest, k, x, nodes,
                       varnames.grp=1:ncol(x),
                       return.node.feature=TRUE,
                       return.node.obs=FALSE,
-                      first.split=TRUE) {
+                      first.split=TRUE,
+                      weights=rep(1, nrow(x))) {
 
   out <- lapply(k, readTree, rand.forest=rand.forest, x=x, 
                 nodes=nodes,varnames.grp=varnames.grp,
                 return.node.feature=return.node.feature, 
                 return.node.obs=return.node.obs, 
-                first.split=first.split)
+                first.split=first.split, weights=weights)
   return(out)
 }
 
@@ -112,10 +117,11 @@ readTree <- function(rand.forest, k, x, nodes,
                      varnames.grp=1:ncol(x), 
                      return.node.feature=TRUE,
                      return.node.obs=FALSE,
-                     first.split=TRUE) {
+                     first.split=TRUE,
+                     weights=rep(1, nrow(x))) {
   
-  n <- nrow(x) 
   ntree <- rand.forest$ntree
+  n <- nrow(x) 
 
   # Read tree metadata from forest
   tree.info <- as.data.frame(getTree(rand.forest, k))
@@ -124,55 +130,44 @@ readTree <- function(rand.forest, k, x, nodes,
   tree.info$parent <- getParent(tree.info) %% n.node
   tree.info$tree <- as.integer(k)
   tree.info$size.node <- 0L
-  
-  # replicate each leaf node in node.feature based on specified sampling.
   select.node <- tree.info$status == -1
-  rep.node <- rep(0L, nrow(tree.info))
-  which.leaf <- nodes[,k]
-
+  
+  # Read active features for each decision path
   if (return.node.feature) {
-    node.feature <- ancestorPath(tree.info, varnames.grp=varnames.grp, 
+    node.feature <- readFeatures(tree.info, varnames.grp=varnames.grp, 
                                  first.split=first.split)
   }
 
-  # if specified, set node counts based on observation weights
-  leaf.counts <- table(which.leaf)
-  leaf.idx <- as.integer(names(leaf.counts))
-  tree.info$size.node[leaf.idx] <- leaf.counts
+  tree.info <- filter(tree.info, select.node)
   
+  # Read leaf node membership for each observation
   node.obs <- NULL
   if (return.node.obs) {
+    which.leaf <- nodes[,k]
     unq.leaf <- unique(which.leaf)
-    id <- match(which.leaf, sort(unq.leaf))
+    id <- fmatch(which.leaf, sort(unq.leaf))
     node.obs <- sparseMatrix(i=1:n, j=id, dims=c(n, length(unq.leaf)))
+    tree.info$size.node <- nodeCount(node.obs, weights)
   }
-  
-  
+    
   out <- list()
   col.remove <- c('left daughter', 'right daughter', 'split var',
                   'split point', 'status')
-  out$tree.info <- filter(tree.info, select.node) %>%
-    select(-one_of(col.remove))
+  out$tree.info <- select(tree.info, -one_of(col.remove))
   out$node.feature <- node.feature
   out$node.obs <- node.obs
   return(out)
 }
 
-varNode <- function(x) {
-  var.node <- ifelse(length(x) == 1, 0, var(x))
-  return(var.node)
-}
-
 getParent <- function(tree.info) {
   # Generate a vector of parent node indices from output of getTree
   children <- c(tree.info[,'left daughter'], tree.info[,'right daughter'])
-  parent <- match(1:nrow(tree.info), children)
+  parent <- fmatch(1:nrow(tree.info), children)
   parent[1] <- 0
   return(parent)
 }
 
-
-ancestorPath <- function(tree.info, varnames.grp, 
+readFeatures <- function(tree.info, varnames.grp, 
                          split.pt=FALSE, first.split=TRUE) {
 
   # Pre-allocate variables for path ancestry 
@@ -182,8 +177,8 @@ ancestorPath <- function(tree.info, varnames.grp,
   cur.path <- rep(0L, 2 * p + 1)
 
   # Recursively extract path info for all leaf nodes 
-  paths <- getAncestorPath(tree.info, varnames.grp, varnames.unq, p=p,
-                           cur.path=cur.path, first.split=first.split)
+  paths <- ancestorPath(tree.info, varnames.grp, varnames.unq, p=p,
+                        cur.path=cur.path, first.split=first.split)
   
   # Generate sparse matrix of decision path feature selection
   paths <- Matrix(unlist(paths), nrow=nlf, byrow=TRUE, sparse=TRUE)
@@ -192,14 +187,14 @@ ancestorPath <- function(tree.info, varnames.grp,
 
   # Reorder leaf nodes according to tree.info
   idlf <- tree.info$node.idx[tree.info$status == -1]
-  paths <- paths[match(idlf, rownames(paths)),]
+  paths <- paths[fmatch(idlf, rownames(paths)),]
   return(paths)
 }
 
 
 
-getAncestorPath <- function(tree.info, varnames.grp, varnames.unq, p, 
-                            cur.path, node.idx=1, first.split=TRUE) {
+ancestorPath <- function(tree.info, varnames.grp, varnames.unq, p, 
+                         cur.path, node.idx=1, first.split=TRUE) {
 
   # Return path vector if current node is leaf
   if (tree.info$status[node.idx] == -1) {
@@ -230,11 +225,11 @@ getAncestorPath <- function(tree.info, varnames.grp, varnames.unq, p,
   }
   
   # Get acncestor path info for child nodes and combine
-  lpath <- getAncestorPath(tree.info, varnames.grp, varnames.unq, 
-                           p, left.set, left.child, first.split)
+  lpath <- ancestorPath(tree.info, varnames.grp, varnames.unq, 
+                        p, left.set, left.child, first.split)
     
-  rpath <- getAncestorPath(tree.info, varnames.grp, varnames.unq,
-                           p, right.set, right.child, first.split)
+  rpath <- ancestorPath(tree.info, varnames.grp, varnames.unq,
+                        p, right.set, right.child, first.split)
   return(list(lpath, rpath))
 }
 
