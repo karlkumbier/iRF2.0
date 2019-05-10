@@ -29,12 +29,6 @@ prevalence <- function(weight, idint, idsel) {
   return(sint / s)
 }
 
-nodeCount <- function(node.obs, weight=rep(1, nrow(read.forest$node.obs))) {
-  # Evaluate the number of observations in each leaf node
-  count <- Matrix::colSums(node.obs * weight)
-  return(count)
-}
-
 nodePrecision <- function(read.forest, y, count, weight=rep(1, length(y))) {
   # Evaluate class proportion of class-1 observations in each leaf node.
   if (is.factor(y)) y <- as.numeric(y) - 1

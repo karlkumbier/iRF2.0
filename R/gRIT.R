@@ -108,14 +108,14 @@ gRIT <- function(x, y,
     idcl <- read.forest$tree.info$prediction > rit.param$class.cut
 
   if (sum(idcl) < 2) {
-    return(nullReturn())
+    return(nullReturnGRIT())
   } else {
   
     # Run RIT on leaf nodes of selected class  
     ints <- runRIT(subsetReadForest(read.forest, idcl), weights=count[idcl],
                    rit.param=rit.param, n.core=n.core)
     
-    if (is.null(ints)) return(nullReturn())
+    if (is.null(ints)) return(nullReturnGRIT())
     
     # Set recovered interactions or convert to indices if supplied
     if (is.null(ints.eval)) {
@@ -192,7 +192,7 @@ collapseNF <- function(x) {
   return(x)
 }
 
-nullReturn <- function() {
+nullReturnGRIT <- function() {
   # Return empty interaction and importance
   out <- list()
   out$int <- character(0)

@@ -158,20 +158,24 @@ iRF <- function(x, y,
     rit.param$ntree <- rit.param$ntree / n.bootstrap
 
     # Grow RFs on BS samples to evaluate stability of recovered interacitons.
-    if (verbose) cat('evaluating interactions...\n')
-    if (iter == 1) rf.weight <- rep(1, ncol(x))
-    if (iter > 1) rf.weight <- rf.list[[iter - 1]]$importance
-    importance[[iter]] <- stabilityScore(x, y, 
-                                         ntree=ntree,
-                                         mtry.select.prob=rf.weight,
-                                         ints.eval=ints.eval,
-                                         rit.param=rit.param,
-                                         varnames.grp=varnames.grp,
-                                         bs.sample=bs.sample,
-                                         weights=weights, 
-                                         signed=signed,
-                                         n.core=n.core, 
-                                         ...)
+    if (length(ints.eval) > 0) {
+      if (verbose) cat('evaluating interactions...\n')
+      if (iter == 1) rf.weight <- rep(1, ncol(x))
+      if (iter > 1) rf.weight <- rf.list[[iter - 1]]$importance
+      importance[[iter]] <- stabilityScore(x, y, 
+                                           ntree=ntree,
+                                           mtry.select.prob=rf.weight,
+                                           ints.eval=ints.eval,
+                                           rit.param=rit.param,
+                                           varnames.grp=varnames.grp,
+                                           bs.sample=bs.sample,
+                                           weights=weights, 
+                                           signed=signed,
+                                           n.core=n.core, 
+                                           ...)
+    } else {
+      importance[[iter]] <- nullReturnStab()
+    }
   
   }
   

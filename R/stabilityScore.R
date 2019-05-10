@@ -109,17 +109,22 @@ summarizeInteract <- function(x) {
                 stability=mean(recovered)) %>%
       arrange(desc(cpe))
   } else {
-    imp <- data.table(prevalence=numeric(0),
-                      precision=numeric(0),
-                      cpe=numeric(0),
-                      sta.cpe=numeric(0),
-                      fsd=numeric(0),
-                      sta.fsd=numeric(0),
-                      mip=numeric(0),
-                      sta.mip=numeric(0),
-                      stability=numeric(0))
+    nullReturnStab()
   }
 
   return(data.table(imp))
 }
 
+nullReturnStab <- function() {
+  # Returns empty data table of scored interactions
+  out <- data.table(prevalence=numeric(0),
+                  precision=numeric(0),
+                  cpe=numeric(0),
+                  sta.cpe=numeric(0),
+                  fsd=numeric(0),
+                  sta.fsd=numeric(0),
+                  mip=numeric(0),
+                  sta.mip=numeric(0),
+                  stability=numeric(0))
+  return(out)
+}
