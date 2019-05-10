@@ -90,7 +90,10 @@ readForest <- function(rand.forest, x,
   # Aggregate sparse node level observation matrix
   if (return.node.obs) {
     nobs <- lapply(rd.forest, function(tt) tt$node.obs)
-    out$node.obs <- do.call(cbind, nobs)
+    nobs <- unlist(nobs, recursive=FALSE)
+    col.id <- rep(1:length(nobs), times=out$tree.info$size.node)
+    out$node.obs <- sparseMatrix(i=rep(1:n, times=ntree), j=col.id,
+                                 dims=c(n, nrow(out$tree.info)))
   } 
 
   stopImplicitCluster()
@@ -146,8 +149,8 @@ readTree <- function(rand.forest, k, x, nodes,
     which.leaf <- nodes[,k]
     unq.leaf <- unique(which.leaf)
     id <- fmatch(which.leaf, sort(unq.leaf))
-    node.obs <- sparseMatrix(i=1:n, j=id, dims=c(n, length(unq.leaf)))
-    tree.info$size.node <- nodeCount(node.obs, weights)
+    node.obs <- c(by(1:n, id, list))
+    tree.info$size.node <- sapply(node.obs, length)
   }
     
   out <- list()
