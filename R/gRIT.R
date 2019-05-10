@@ -114,8 +114,8 @@ gRIT <- function(x, y,
     # Run RIT on leaf nodes of selected class  
     ints <- runRIT(subsetReadForest(read.forest, idcl), weights=count[idcl],
                    rit.param=rit.param, n.core=n.core)
-    
-    if (is.null(ints)) return(nullReturnGRIT())
+
+    if (length(ints) == 0) return(nullReturnGRIT())
     
     # Set recovered interactions or convert to indices if supplied
     if (is.null(ints.eval)) {
@@ -159,7 +159,7 @@ gRIT <- function(x, y,
 
 runRIT <- function(read.forest, weights, rit.param, n.core=1) {
   # Run a weighted version of RIT across RF decision paths
-  xrit <- cbind(read.forest$node.feature[weights > 0,])
+  xrit <- read.forest$node.feature[weights > 0,]
   interactions <- RIT(xrit,
                       weights=weights[weights > 0],
                       depth=rit.param$depth,
