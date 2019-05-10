@@ -92,7 +92,7 @@ readForest <- function(rand.forest, x,
     nobs <- lapply(rd.forest, function(tt) tt$node.obs)
     nobs <- unlist(nobs, recursive=FALSE)
     col.id <- rep(1:length(nobs), times=out$tree.info$size.node)
-    out$node.obs <- sparseMatrix(i=rep(1:n, times=ntree), j=col.id,
+    out$node.obs <- sparseMatrix(i=unlist(nobs), j=col.id,
                                  dims=c(n, nrow(out$tree.info)))
   } 
 
