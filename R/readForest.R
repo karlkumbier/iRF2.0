@@ -127,10 +127,9 @@ readTree <- function(rand.forest, k, x, nodes,
   n <- nrow(x) 
 
   # Read tree metadata from forest
-  tree.info <- as.data.frame(getTree(rand.forest, k))
-  n.node <- nrow(tree.info)
+  tree.info <- getTree(rand.forest, k)
   tree.info$node.idx <- 1:nrow(tree.info)
-  tree.info$parent <- getParent(tree.info) %% n.node
+  tree.info$parent <- getParent(tree.info) %% nrow(tree.info)
   tree.info$tree <- as.integer(k)
   tree.info$size.node <- 0L
   select.node <- tree.info$status == -1
@@ -164,7 +163,7 @@ readTree <- function(rand.forest, k, x, nodes,
 
 getParent <- function(tree.info) {
   # Generate a vector of parent node indices from output of getTree
-  children <- c(tree.info[,'left daughter'], tree.info[,'right daughter'])
+  children <- c(tree.info$`left daughter`, tree.info$`right daughter`)
   parent <- fmatch(1:nrow(tree.info), children)
   parent[1] <- 0
   return(parent)
