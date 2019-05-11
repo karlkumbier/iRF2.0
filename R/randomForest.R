@@ -32,10 +32,12 @@ rangerPar <- function(x, y, xtest=NULL, ytest=NULL, ntree=500,
                       ...) {
   
   # Run feature weighted ranger in parallel
-  rf <- ranger(y ~ ., data=data.frame(x, y), num.trees=ntree, 
+  mtry.select.prob <- mtry.select.prob / sum(mtry.select.prob)
+  class.irf <- is.factor(y)
+  rf <- ranger(data=cbind(x, y), num.trees=ntree, verbose=FALSE,
+               dependent.variable.name='y', classification=class.irf,
                num.threads=n.core, importance='impurity', 
                split.select.weights=mtry.select.prob, ...)
-
   return(rf)
 }
 

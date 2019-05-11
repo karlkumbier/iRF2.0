@@ -40,7 +40,7 @@ getTreeRanger <- function(rfobj, k=1, nodes=NULL) {
   predicted[status] <- rfobj$forest$split.values[[k]][status]
   tree.info <- data.frame(rfobj$forest$child.nodeIDs[[k]][[1]] + 1,
                           rfobj$forest$child.nodeIDs[[k]][[2]] + 1,
-                          rfobj$forest$split.varIDs[[k]],
+                          rfobj$forest$split.varIDs[[k]] + 1,
                           rfobj$forest$split.values[[k]],
                           ifelse(status, -1, 1),
                           predicted)

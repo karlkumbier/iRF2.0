@@ -43,7 +43,8 @@ stabilityScore <- function(x, y,
                            n.bootstrap=1,
                            bs.sample=NULL,
                            weights=rep(1, nrow(x)),
-                           signed=TRUE, 
+                           signed=TRUE,
+                           type='randomForest',
                            n.core=1,
                            ...) {
   
@@ -60,7 +61,7 @@ stabilityScore <- function(x, y,
     out[[i]] <- bsgRIT(x, y, mtry.select.prob, sample.id, ints.eval=ints.eval, 
                        ntree=ntree, weights=weights, rit.param=rit.param,
                        varnames.grp=varnames.grp, signed=signed, n.core=n.core,
-                       ...)
+                       type=type, ...)
 
   }
 
@@ -71,11 +72,11 @@ stabilityScore <- function(x, y,
 
 
 bsgRIT <- function(x, y, mtry.select.prob, sample.id, ints.eval, weights, ntree,
-                   varnames.grp, rit.param, signed, n.core, ...) {
+                   varnames.grp, rit.param, signed, type, n.core, ...) {
   
   # Fit random forest on bootstrap sample
   rf <- parRF(x[sample.id,], y[sample.id], ntree=ntree, n.core=n.core, 
-              mtry.select.prob=mtry.select.prob, ...)
+              mtry.select.prob=mtry.select.prob, type=type, ...)
 
   # Run generalized RIT on rf.b to learn interactions
   ints <- gRIT(rand.forest=rf, x=x, y=y,

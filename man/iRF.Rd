@@ -10,7 +10,7 @@ iRF(x, y, xtest = NULL, ytest = NULL, n.iter = 5, ntree = 500,
   rit.param = list(depth = 5, ntree = 500, nchild = 2, class.id = 1,
   min.nd = 1, class.cut = NULL), varnames.grp = colnames(x),
   n.bootstrap = 1, bs.sample = NULL, weights = rep(1, nrow(x)),
-  signed = TRUE, verbose = TRUE, n.core = 1,
+  signed = TRUE, type = "randomForest", verbose = TRUE, n.core = 1,
   interactions.return = NULL, wt.pred.accuracy = NULL, ...)
 }
 \arguments{

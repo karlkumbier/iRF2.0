@@ -64,6 +64,7 @@ iRF <- function(x, y,
                 bs.sample=NULL,
                 weights=rep(1, nrow(x)),
                 signed=TRUE,
+                type='randomForest',
                 verbose=TRUE,
                 n.core=1, 
                 interactions.return=NULL,
@@ -111,10 +112,13 @@ iRF <- function(x, y,
   if (is.null(rit.param$min.nd)) rit.param$min.nd <- 1
   if (is.null(rit.param$class.cut) & is.numeric(y)) 
     rit.param$class.cut <- median(y)
-  
 
   class.irf <- is.factor(y)
-  importance <- ifelse(class.irf, 'MeanDecreaseGini', 'IncNodePurity')
+  if (is.null(colnames(x))) {
+    colnames(x) <- paste0('X', 1:ncol(x))  
+    varnames.grp <- colnames(x)
+  }
+  imp.str <- ifelse(type == 'ranger', 'variable.importance', 'importance')
   
   # Fit a series of iteratively re-weighted RFs 
   rf.list <- list()  
@@ -123,14 +127,14 @@ iRF <- function(x, y,
     # Grow Random Forest on full data
     if (verbose) print(paste('iteration = ', iter))
     rf.list[[iter]] <- parRF(x, y, xtest, ytest, ntree=ntree, n.core=n.core, 
-                             mtry.select.prob=mtry.select.prob, ...)
+                             type=type, mtry.select.prob=mtry.select.prob, ...)
     
     # Update feature selection probabilities
-    mtry.select.prob <- rf.list[[iter]]$importance
+    mtry.select.prob <- rf.list[[iter]][[imp.str]]
 
     # Evaluate test set error if supplied
-    if (!is.null(xtest) & verbose) 
-      print(printAcc(rf.list[[iter]], ytest, class.irf))
+    # if (!is.null(xtest) & verbose) 
+    #  print(printAcc(rf.list[[iter]], ytest, class.irf))
   
   }
   
@@ -161,7 +165,7 @@ iRF <- function(x, y,
     if (length(ints.eval) > 0) {
       if (verbose) cat('evaluating interactions...\n')
       if (iter == 1) rf.weight <- rep(1, ncol(x))
-      if (iter > 1) rf.weight <- rf.list[[iter - 1]]$importance
+      if (iter > 1) rf.weight <- rf.list[[iter - 1]][[imp.str]]
       importance[[iter]] <- stabilityScore(x, y, 
                                            ntree=ntree,
                                            mtry.select.prob=rf.weight,
@@ -171,6 +175,7 @@ iRF <- function(x, y,
                                            bs.sample=bs.sample,
                                            weights=weights, 
                                            signed=signed,
+                                           type=type,
                                            n.core=n.core, 
                                            ...)
     } else {
@@ -187,7 +192,7 @@ iRF <- function(x, y,
 
   if (length(iter.return) == 1) {
     iter.wt <- iter.return - 1
-    if (iter.return > 1) out$weights <- out$rf.list[[iter.wt]]$importance 
+    if (iter.return > 1) out$weights <- out$rf.list[[iter.wt]][[imp.str]] 
     out$rf.list <- out$rf.list[[iter.return]]
     out$interaction <- importance[[iter.return]]
     out$selected.iter <- iter.return

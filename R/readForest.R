@@ -1,4 +1,4 @@
-#' Read forestt
+#' Read forest
 #'
 #' Read out metadata from random forest decision paths
 #'
@@ -42,22 +42,27 @@ readForest <- function(rand.forest, x,
                        n.core=1){
   
   if (is.null(rand.forest$forest))
-    stop('No Forest component in the randomForest object')
+    stop('No Forest component in the random forest object')
   varnames.grp <- groupVars(varnames.grp, x)
 
   if (n.core == -1) n.core <- detectCores()
   if (n.core > 1) registerDoParallel(n.core)
   
-  ntree <- rand.forest$ntree
+  ntree <- ifelse(class(rand.forest) == 'randomForest',
+                  rand.forest$ntree, rand.forest$num.trees)
+  
   n <- nrow(x)
   p <- length(unique(varnames.grp))
   out <- list()
   
   # Pass observations through RF to determine leaf node membership
   nodes <- NULL
-  if (return.node.obs) {
+  if (return.node.obs & class(rand.forest) == 'randomForest') {
     pred <- predict(rand.forest, newdata=x, nodes=TRUE)
     nodes <- attr(pred, 'nodes')
+  } else if (class(rand.forest) == 'ranger') {
+    pred <- predict(rand.forest, data=x, type='terminalNodes')
+    nodes <- pred$predictions
   }
   
   # Split trees across cores to read forest in parallel
@@ -122,12 +127,21 @@ readTree <- function(rand.forest, k, x, nodes,
                      return.node.obs=FALSE,
                      first.split=TRUE,
                      weights=rep(1, nrow(x))) {
-  
-  ntree <- rand.forest$ntree
+ 
   n <- nrow(x) 
+  ntree <- ifelse(class(rand.forest) == 'randomForest',
+                  rand.forest$ntree, rand.forest$num.trees)
 
   # Read tree metadata from forest
-  tree.info <- getTree(rand.forest, k)
+  if (class(rand.forest) == 'randomForest') {
+    tree.info <- getTree(rand.forest, k)
+  } else if (class(rand.forest) == 'ranger') {
+    tree.info <- getTree(rand.forest, k, nodes=nodes)
+  } else {
+      stop(deparse(substitute(rand.forest)), 
+           "is not class ranger of randomForest")
+  }
+
   tree.info$node.idx <- 1:nrow(tree.info)
   tree.info$parent <- getParent(tree.info) %% nrow(tree.info)
   tree.info$tree <- as.integer(k)
