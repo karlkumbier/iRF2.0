@@ -46,21 +46,28 @@ plotInt <- function(x, y, int,
                     min.nd=5,
                     pred.prob=FALSE,
                     main=NULL) {
- #   plot.dir: directory to write plots to
+  
+  # Check whether rgl package is installed
   if (! 'rgl' %in% rownames(installed.packages()))
     stop('Surface map plots require rgl installation')
 
-  if (is.null(varnames)) {
-    if (is.null(colnames(x))) varnames <- 1:ncol(x)
-    else varnames <- colnames(x)
-  }
+  # Check whether read.forest is valid
+  if (is.null(read.forest$node.feature))
+    stop('read.forest missing node.feature')
+  if (is.null(read.forest$node.obs))
+    stop('read.forest missing node.obs')
+
+  # Set feature names and check for replicates
+  varnames <- groupVars(varnames, x)
+  if (any(duplicated(varnames))) 
+    stop('Replicate features not supported')
   
   int <- str_split(int, '_')[[1]]
   int.nf <- int2Id(int, varnames, split=TRUE, signed=TRUE)
   int.x <- int.nf %% ncol(x) + ncol(x) * (int.nf %% ncol(x) == 0)
   
   if (length(int) > 2) {
-    # Evaluate thresholds for high/low levels of additional features
+    # Evaluate thresholds for features beyond order-2
     nf <- read.forest$node.feature
     int.id <- Matrix::rowMeans(nf[,int.nf] != 0) == 1
     qCut <- function(x) quantile(x, probs = qcut)
@@ -83,8 +90,8 @@ plotInt <- function(x, y, int,
   # Generate grid of x/y values for surface maps
   grids <- quantileGrid(x, grid.size, int.x[1:2])
   
-  # Extract hyperrectangles from read forest output
-  rectangles <- forestHR(read.forest, int.nf, min.nd)
+  # Extract hyperrectangles from RF decision paths
+  rectangles <- forestHR(read.forest, int.nf, min.nd, int.id)
   
   # Generate surface maps for each group of observations
   ids <- lapply(sort(unique(id)), '==', id)
@@ -282,45 +289,36 @@ genSurface <- function(x, y, int,
   return(grid)
 }
 
-
-getPathsTree <- function(read.forest, int) {
-  # Extract decision paths across all leaf nodes in a given tree.
-  # args:
-  #   read.forest: list as returned by readForest, including node.feature and
-  #     tree.info entries
-  #   int: a numeric vector indicating interaciton variables
-  nf <- read.forest$node.feature
-  out <- select(read.forest$tree.info, prediction, node.idx, tree, size.node)
-  
-  # Filter nodes to active interactions
-  id <- Matrix::rowMeans(nf[,int] != 0) == 1
-  out <- out[id,]
-  nf <- nf[id,]
-
-  # Extract splitting features and thresholds from decision paths
-  d <- data.table(row=nf@i + 1, thr=nf@x,
-                  col=findInterval(seq(nf@x) - 1, nf@p[-1]) + 1) %>%
-    group_by(row) %>%
-    summarize(vars=list(col), splits=list(thr))
-
-  out$vars <- d$vars
-  out$splits <- d$splits
-  return(out)
-}
-
-forestHR<- function(read.forest, int, min.nd=1) {
+forestHR<- function(read.forest, int, min.nd, int.id=NULL) {
   # Read hyperrectangles from RF for a specified interactin
   # args:
-  #   read.forest: list as returned by readForest, including node.feature and
-  #     tree.info entries
-  #   varnames.group: character vector indicating feature grouping
-  #   int: vector of features for which to generate hyperrectangles
-  #   min.nd: filter all leaf nodes that are not larger than specified 
-  #     value for faster processing
-  idrm <- read.forest$tree.info$size.node < min.nd
-  read.forest <- subsetReadForest(read.forest, !idrm)
-  out <- getPathsTree(read.forest, int) 
+  #   read.forest: list as returned by readForest, including node.feature 
+  #     and tree.info entries
+  #   int: vector of indices specifying features for hyperrectangles
+  #   min.nd: minimum node size to extract hyperrectangles from
+  #   int.nd: vector specifying nodes that contain the interaction
   
+  # Set active nodes for interaction
+  if (is.null(int.id)) {
+    int.id <- Matrix::rowMeans(read.forest$node.feature[,int.nf] != 0) == 1
+  }
+
+  # Subset to active nodes larger than min.nd
+  id.subset <- int.id & read.forest$tree.info$size.node >= min.nd
+  read.forest <- subsetReadForest(read.forest, id.subset) 
+
+  # Extract splitting features and thresholds
+  nf <- read.forest$node.feature
+  idcs <- lapply(int, function(ii) {(nf@p[ii] + 1):nf@p[ii + 1]})
+  row.id <- nf@i[idcs[[1]]] + 1
+  thresh <- nf@x[unlist(idcs)]        
+  idsplit <- rep(1:length(idcs[[1]]), length(int))
+
+  # Group data by leaf node for return
+  out <- select(read.forest$tree.info, prediction, node.idx, tree, size.node)
+  out$vars <- replicate(length(xsplit), int, simplify=FALSE)
+  out$splits <- split(thresh, idsplit)
+
   return(out)
 }
 
