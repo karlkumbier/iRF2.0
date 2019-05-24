@@ -247,24 +247,30 @@ paper: https://arxiv.org/abs/1810.07287.
 
     + `int` indicates the interaction, with $+$ and $-$ describing whether the
       interaction is characterized by high or low levels of the feature. For
-      instance, the interaction `1+_2+_3+` describes an interaction that is
-      defined by high levels of $1, 2,$ and $3$. 
+      instance, the interaction `X1+_X2+_X3+` corresponds to decision rules of
+      the form $1(x_1 > \cdot \& x_2 > \cdot \& x_3 > \cdot).
+    
+    + `prevalence` indicates the proportion of class-1 leaf nodes that contain
+      the interaction, weighted y the size of the leaf nodes.
 
-    + `prevalence.diff` indicates the difference in prevalence between class-$0$ and
-      class-$1$ leaf nodes, `sta.diff` indicates the proportion of times this value
-      is greater than 0 across bootstrap replicates. 
+    + `precision` indicates the proportion of class-1 observations that fall in
+      leaf nodes that contain the innteraction.
 
-    + `independence` indicates the difference between the prevalence of an
-      interaction and the expected prevalence of an interaction if features were
-      selected independently, scaled by the prevalence of the interaction,
-      `sta.independence` indicates the proportion of times this value is greater
-      than 0 across bootstrap replicates. 
-
-    + `precision` indicates the difference between the proportion of class-1
-      observations in leaf nodes containing the interaction and the proportion of
-      class-1 leaf nodes in leaf nodes containing subsets of the interaction,
-      `sta.precision` indicates the proportion of times this value is greater than 0
+    + `cpe` indicates the class prevalence enrichment, which is defined as the
+      difference in prevalence betweenn class-0 and class-1 leaf nodes.
+      `sta.cpe` indicates the proportion of times this value is greater than 0
       across bootstrap replicates.
+
+    + `fsd` indicates the feature selection dependence, which is defined as the
+      difference between the prevalence of an interaction and its expected
+      prevalence if interacting features were selected independently of one
+      another. `sta.fsd` indicates the proportion of times this value is greater
+      than 0 across bootstrap replicates.
+
+    + `mip` indicates the mean increase in precision, which is defined as the
+      difference etween the precision of an interaction and the average
+      precision of lower order subsets. `sta.mip` indicates the proportion of
+      times this value is greater than 0 across bootstrap replicates.
 
     + `stability` indicates the proportion of times the interaction was recovered by
       RIT across bootstrap replicates.
@@ -277,7 +283,7 @@ head(fit$interaction)
 The selected interactions can be visualized using simple R functions like `dotchart`:
 
 ```{r dotchart, fig.height=6, fig.width=6}
-toplot <- fit$interaction$prevalence.diff
+toplot <- fit$interaction$cpe
 names(toplot) <- fit$interaction$int
 
 dotchart(rev(toplot[1:min(20, length(toplot))]), 

@@ -41,10 +41,21 @@ readForest <- function(rand.forest, x,
                        weights=rep(1, nrow(x)),
                        n.core=1){
   
+  # Check for valid input RF
   if (is.null(rand.forest$forest))
     stop('No Forest component in the random forest object')
-  varnames.grp <- groupVars(varnames.grp, x)
 
+  # Set feature names if not supplied
+  varnames.grp <- groupVars(varnames.grp, x)
+  if (is.null(colnames(x)) & class(rand.forest) == 'ranger') {
+    colnames(x) <- names(rand.forest$variale.importance)
+    varnames.grp <- colnames(x)
+  } else if (is.null(colnames(x)) & class(rand.forest) == 'randomForest') {
+    colnames(x) <- rownames(rand.forest$importance)
+    varnames.grp <- colnames(x)
+  }
+
+  # Register cores for parallelization
   if (n.core == -1) n.core <- detectCores()
   if (n.core > 1) registerDoParallel(n.core)
   
