@@ -96,12 +96,16 @@ readForest <- function(rand.forest, x,
 
   # Aggregate node level metadata
   offset <- cumsum(sapply(rd.forest, function(tt) nrow(tt$tree.info)))
+  offset <- c(0, offset[-length(offset)])
   out$tree.info <- rbindlist(lapply(rd.forest, function(tt) tt$tree.info))
   
   # Aggregate sparse node level feature matrix
   if (return.node.feature) {
-    nf <- lapply(rd.forest, function(tt) tt$node.feature)
-    out$node.feature <- do.call(rbind, nf)
+    nf.i <- mapply(function(rf, oo) rf$node.feature@i + 1 + oo, rd.forest, offset)
+    nf.j <- sapply(rd.forest, function(rf) rep(1:(2 * p), times=diff(rf$node.feature@p)))
+    nf.x <- sapply(rd.forest, function(rf) rf$node.feature@x)
+    out$node.feature <- sparseMatrix(i=unlist(nf.i), j=unlist(nf.j), x=unlist(nf.x), 
+                                     dims=c(nrow(out$tree.info), 2 * p))
   }
   
   # Aggregate sparse node level observation matrix
@@ -110,7 +114,7 @@ readForest <- function(rand.forest, x,
       id <- as.numeric(names(rf$node.obs)) + oo
       nrep <- out$tree.info$size.node[id]
       rep(id, times=nrep)
-    }, rd.forest, c(0, offset[-length(offset)]))
+    }, rd.forest, offset)
     
     nobs <- lapply(rd.forest, function(tt) tt$node.obs)
     nobs <- unlist(nobs, recursive=FALSE)
@@ -213,7 +217,7 @@ readFeatures <- function(tree.info, varnames.grp,
   # Recursively extract path info for all leaf nodes 
   paths <- ancestorPath(tree.info, varnames.grp, varnames.unq, p=p,
                         cur.path=cur.path, first.split=first.split)
-  
+
   # Generate sparse matrix of decision path feature selection
   paths <- Matrix(unlist(paths), nrow=nlf, byrow=TRUE, sparse=TRUE)
   rownames(paths) <- paths[,ncol(paths)]
