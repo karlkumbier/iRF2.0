@@ -194,10 +194,9 @@ collapseNF <- function(x) {
 
 nullReturnGRIT <- function() {
   # Return empty interaction and importance
-  out <- list()
-  out$int <- character(0)
-  out$imp <- data.table(prev1=numeric(0), prev0=numeric(0),
-                        prec=numeric(0), prev.test=numeric(0),
-                        prec.test=numeric(0), int=character(0))
+  out <- data.table(prev1=numeric(0), prev0=numeric(0),
+                    prec=numeric(0), int=character(0),
+                    recovered=logical(0), prev.test=numeric(0),
+                    prec.test=numeric(0))
   return(out)
 }
