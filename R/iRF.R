@@ -83,7 +83,8 @@ iRF <- function(x, y,
 
   # Check input attributes for correct format
   require(doRNG, quiet=TRUE)
-  if (!class(x) %in% c('data.frame', 'matrix'))
+  sp.mat <- attr(class(x), 'package') == 'Matrix'
+  if (!class(x) %in% c('data.frame', 'matrix') & !sp.mat)
     stop('x must be matrix or data frame')
   if (nrow(x) != length(y))
     stop('x and y must contain the same number of observations')
@@ -205,7 +206,15 @@ iRF <- function(x, y,
 selectIter <- function(rf.list, y) {
   # Evaluate optimal iteration based on prediction error in OOB samples.
   # For classification: accuracy. For regression: MSE.
-  predicted <- lapply(rf.list, function(z) as.numeric(z$predicted))
+  type <- class(rf.list[[1]])
+
+  if (type == 'randomForest') {
+    predicted <- lapply(rf.list, function(z) as.numeric(z$predicted))
+  } else if (type == 'ranger') {
+    predicted <- lapply(rf.list, function(z) as.numeric(z$predictions))
+  } else {
+    stop('rf.list must contain ranger or randomForest objects')
+  }
   
   if (is.factor(y)) {
     predicted <- lapply(predicted, '-', 1)

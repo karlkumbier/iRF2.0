@@ -34,6 +34,7 @@ rangerPar <- function(x, y, xtest=NULL, ytest=NULL, ntree=500,
   # Run feature weighted ranger in parallel
   mtry.select.prob <- mtry.select.prob / sum(mtry.select.prob)
   class.irf <- is.factor(y)
+  if (class.irf) y <- as.numeric(y) - 1
   rf <- ranger(data=cbind(x, y), num.trees=ntree, verbose=FALSE,
                dependent.variable.name='y', classification=class.irf,
                num.threads=n.core, importance='impurity', 

@@ -149,7 +149,6 @@ readTree <- function(rand.forest, k, x, nodes,
                      first.split=TRUE,
                      weights=rep(1, nrow(x))) {
 
-  print(paste('TREE:', k)) 
   n <- nrow(x) 
   ntree <- ifelse(class(rand.forest) == 'randomForest',
                   rand.forest$ntree, rand.forest$num.trees)
@@ -171,7 +170,6 @@ readTree <- function(rand.forest, k, x, nodes,
   select.node <- tree.info$status == -1
   
   # Read active features for each decision path
-  print(paste('READING FEATURES'))
   if (return.node.feature) {
     node.feature <- readFeatures(tree.info, varnames.grp=varnames.grp, 
                                  first.split=first.split)
@@ -180,7 +178,6 @@ readTree <- function(rand.forest, k, x, nodes,
   tree.info <- filter(tree.info, select.node)
   
   # Read leaf node membership for each observation
-  print(paste('READING OSERVATIONS'))
   node.obs <- NULL
   if (return.node.obs) {
     which.leaf <- nodes[,k]
@@ -237,7 +234,6 @@ readFeatures <- function(tree.info, varnames.grp,
 ancestorPath <- function(tree.info, varnames.grp, varnames.unq, p, 
                          cur.path, node.idx=1, first.split=TRUE) {
 
-  print(node.idx)
   # Return path vector if current node is leaf
   if (tree.info$status[node.idx] == -1) {
     cur.path[length(cur.path)] <- node.idx

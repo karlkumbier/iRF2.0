@@ -92,7 +92,6 @@ bsgRIT <- function(x, y, mtry.select.prob, sample.id, ints.eval, weights, ntree,
 
 summarizeInteract <- function(x) {
   # Summarize interaction importance metrics across bootstrap samples 
-  save(file='~/interact_temp.Rdata', x)
   n.bootstrap <- length(x)
   x <- rbindlist(x)
 
