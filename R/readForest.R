@@ -121,7 +121,12 @@ readForest <- function(rand.forest, x,
     out$node.obs <- sparseMatrix(i=unlist(nobs), j=c(col.id),
                                  dims=c(n, nrow(out$tree.info)))
   } 
-
+  
+  # Adjust predicted value for classification
+  if (class(rand.forest) == 'randomForest')
+    if (rand.forest$type == 'classification') 
+      out$tree.info$predicted <- out$tree.info$predicted - 1
+  
   stopImplicitCluster()
   return(out)
   

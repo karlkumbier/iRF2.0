@@ -83,9 +83,14 @@ iRF <- function(x, y,
 
   # Check input attributes for correct format
   require(doRNG, quiet=TRUE)
-  sp.mat <- attr(class(x), 'package') == 'Matrix'
-  if (!class(x) %in% c('data.frame', 'matrix') & !sp.mat)
-    stop('x must be matrix or data frame')
+  if (!class(x) %in% c('data.frame', 'matrix')) {
+    sp.mat <- attr(class(x), 'package') == 'Matrix'
+    if (!is.null(spmat)) {
+      if (!sp.mat) stop('x must be matrix or data frame')
+    } else {
+      stop('x must be matrix or data frame')
+    }
+  }
   if (nrow(x) != length(y))
     stop('x and y must contain the same number of observations')
   if (ncol(x) < 2 & (!is.null(iter.return) | select.iter))
