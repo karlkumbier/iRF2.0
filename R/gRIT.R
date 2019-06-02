@@ -103,7 +103,7 @@ gRIT <- function(x, y,
   
   # Select class specific leaf nodes
   if (class.irf)
-    idcl <- read.forest$tree.info$prediction == rit.param$class.id + 1
+    idcl <- read.forest$tree.info$prediction == rit.param$class.id
   else
     idcl <- read.forest$tree.info$prediction > rit.param$class.cut
 
