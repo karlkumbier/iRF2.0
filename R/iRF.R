@@ -85,7 +85,7 @@ iRF <- function(x, y,
   require(doRNG, quiet=TRUE)
   if (!class(x) %in% c('data.frame', 'matrix')) {
     sp.mat <- attr(class(x), 'package') == 'Matrix'
-    if (!is.null(spmat)) {
+    if (!is.null(sp.mat)) {
       if (!sp.mat) stop('x must be matrix or data frame')
     } else {
       stop('x must be matrix or data frame')
@@ -249,7 +249,7 @@ bsSample <- function(y) {
     ncl <- table(y)
     class <- as.factor(names(ncl))
     sample.id <- mapply(function(cc, n) sampleClass(y, cc, n), class, ncl)
-    sample.id <- unlist(sample.id)
+    sample.id <- c(unlist(sample.id))
   } else {
     sample.id <- sample(n, replace=TRUE)
   }

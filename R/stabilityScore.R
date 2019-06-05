@@ -56,7 +56,6 @@ stabilityScore <- function(x, y,
 
   out <- list()
   for (i in 1:length(bs.sample)) {
-
     sample.id <- bs.sample[[i]]
     out[[i]] <- bsgRIT(x, y, mtry.select.prob, sample.id, ints.eval=ints.eval, 
                        ntree=ntree, weights=weights, rit.param=rit.param,
