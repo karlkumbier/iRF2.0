@@ -164,8 +164,8 @@ readTree <- function(rand.forest, k, x, nodes,
   } else if (class(rand.forest) == 'ranger') {
     tree.info <- getTree(rand.forest, k, nodes=nodes)
   } else {
-      stop(deparse(substitute(rand.forest)), 
-           "is not class ranger of randomForest")
+    stop(deparse(substitute(rand.forest)), 
+         "is not class ranger of randomForest")
   }
 
   tree.info$node.idx <- 1:nrow(tree.info)
@@ -186,9 +186,24 @@ readTree <- function(rand.forest, k, x, nodes,
   node.obs <- NULL
   if (return.node.obs) {
     which.leaf <- nodes[,k]
+
+    # Only count OOB oservations if tracked
+    if (!is.null(rand.forest$inbag)) {
+      if (class(rand.forest) == 'ranger') {
+        oob.id <- rand.forest$inbag[[k]] == 0
+      } else if (class(rand.forest) == 'randomForest') {
+        oob.id <- rand.forest$inbag[,k] == 0
+      }
+    } else {
+      oob.id <- rep(TRUE, nrow(nodes))
+      warning('keep.inbag = FALSE, using all observations')
+    }
+
+    which.leaf <- which.leaf[oob.id]
     unq.leaf <- sort(unique(which.leaf))
     id <- fmatch(unq.leaf + 1, tree.info$node.idx)
-    node.obs <- c(by(1:n, which.leaf, list))
+    id.obs <- as.numeric(names(which.leaf))
+    node.obs <- c(by(id.obs, which.leaf, list))
     names(node.obs) <- id
     tree.info$size.node[id] <- sapply(node.obs, length)
   }

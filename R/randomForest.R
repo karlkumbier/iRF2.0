@@ -37,7 +37,7 @@ rangerPar <- function(x, y, xtest=NULL, ytest=NULL, ntree=500,
   if (class.irf) y <- as.numeric(y) - 1
   rf <- ranger(data=cbind(x, y), num.trees=ntree, verbose=FALSE,
                dependent.variable.name='y', classification=class.irf,
-               num.threads=n.core, importance='impurity', 
+               num.threads=n.core, importance='impurity', keep.inbag=TRUE, 
                split.select.weights=mtry.select.prob, ...)
   return(rf)
 }
@@ -61,7 +61,7 @@ randomForestPar <- function(x, y, xtest=NULL, ytest=NULL, ntree=500,
                     randomForest(x, y, xtest, ytest,
                                  ntree=ntree.id[i],
                                  mtry.select.prob=mtry.select.prob,
-                                 keep.forest=TRUE,
+                                 keep.forest=TRUE, keep.inbag=TRUE,
                                  ...)                         
     }
   )
