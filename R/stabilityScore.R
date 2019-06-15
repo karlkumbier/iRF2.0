@@ -22,8 +22,6 @@
 #'  sampled for RIT with probability proprtional to the total weight of
 #'  observations they contain.
 #' @param signed if TRUE, signed interactions will be returned
-#' @param oob.importance if TRUE, importance measures are evaluated on OOB
-#'  samples.
 #' @param n.core number of cores to use. If -1, all available cores are used.
 #' @param ... additional arguments passed to iRF::randomForest.
 #'
@@ -34,7 +32,7 @@
 #'
 #' @importFrom dplyr group_by summarize arrange desc '%>%'
 #' @importFrom data.table data.table
-stabilityScore <- function(x, y, 
+stabilityScore <- function(x, y, xtest, ytest,
                            ntree=500,
                            mtry.select.prob=rep(1, ncol(x)), 
                            ints.eval=NULL,
@@ -46,7 +44,6 @@ stabilityScore <- function(x, y,
                            bs.sample=NULL,
                            weights=rep(1, nrow(x)),
                            signed=TRUE,
-                           oob.importance=TRUE,
                            type='randomForest',
                            n.core=1,
                            ...) {
@@ -60,11 +57,10 @@ stabilityScore <- function(x, y,
   out <- list()
   for (i in 1:length(bs.sample)) {
     sample.id <- bs.sample[[i]]
-    out[[i]] <- bsgRIT(x, y, mtry.select.prob, sample.id, ints.eval=ints.eval, 
-                       ntree=ntree, weights=weights, rit.param=rit.param,
-                       varnames.grp=varnames.grp, signed=signed, 
-                       oob.importance=oob.importance, n.core=n.core,
-                       type=type, ...)
+    out[[i]] <- bsgRIT(x, y, xtest, ytest, mtry.select.prob, sample.id, 
+                       ints.eval=ints.eval, ntree=ntree, weights=weights, 
+                       rit.param=rit.param, varnames.grp=varnames.grp, 
+                       signed=signed, n.core=n.core, type=type, ...)
 
   }
 
@@ -74,21 +70,27 @@ stabilityScore <- function(x, y,
 }
 
 
-bsgRIT <- function(x, y, mtry.select.prob, sample.id, ints.eval, weights, ntree,
-                   varnames.grp, rit.param, signed, oob.importance, type, n.core, ...) {
+bsgRIT <- function(x, y, xtest, ytest, mtry.select.prob, sample.id, ints.eval, 
+                   weights, ntree, varnames.grp, rit.param, signed, type, 
+                   n.core, ...) {
   
   # Fit random forest on bootstrap sample
   rf <- parRF(x[sample.id,], y[sample.id], ntree=ntree, n.core=n.core, 
-              mtry.select.prob=mtry.select.prob, type=type, 
-              keep.inbag=oob.importance, ...)
+              mtry.select.prob=mtry.select.prob, type=type, ...)
 
   # Run generalized RIT on rf.b to learn interactions
+  if (!is.null(xtest) & !is.null(ytest)) {
+    x <- xtest
+    y <- ytest
+    # TODO: adjust weights
+    weights <- rep(1, nrow(x))
+  }
+
   ints <- gRIT(rand.forest=rf, x=x, y=y,
                weights=weights,
                varnames.grp=varnames.grp,
                rit.param=rit.param,
                signed=signed,
-               oob.importance=oob.importance,
                ints.eval=ints.eval,
                n.core=n.core)
 

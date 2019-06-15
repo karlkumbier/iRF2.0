@@ -57,7 +57,7 @@ subsetTest <- function(int, ints, importance) {
   id <- sapply(ss, function(ii) fmatch(list(ii), ints))
   prec.null <- importance$prec[id]
   prec <- importance$prec[id.int]
-  prec.test <- mean(prec - prec.null)
+  prec.test <- min(prec - prec.null)
 
   return(data.table(prev.test=prev.test, prec.test=prec.test))
 }
