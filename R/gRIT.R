@@ -19,6 +19,8 @@
 #'  sampled for RIT with probability proprtional to the total weight of
 #'  observations they contain.
 #' @param signed if TRUE, signed interactions will be returned
+#' @param oob.importance if TRUE, importance measures are evaluated on OOB
+#'  samples.
 #' @param ints.eval interactions to evaluate. If specified, importance metrics
 #'  will be evaluated for these interactions instead of those recovered by RIT.
 #' @param n.core number of cores to use. If -1, all available cores are used.
@@ -44,6 +46,7 @@ gRIT <- function(x, y,
                  varnames.grp=colnames(x), 
                  weights=rep(1, nrow(x)),
                  signed=TRUE,
+                 oob.importance=TRUE,
                  ints.eval=NULL,
                  n.core=1) {
 
@@ -82,6 +85,7 @@ gRIT <- function(x, y,
   # Read RF object to extract decision path metadata
   if (is.null(read.forest)) {
     read.forest <- readForest(rand.forest, x=x,
+                              oob.importance=oob.importance,
                               return.node.feature=TRUE,
                               return.node.obs=TRUE,
                               varnames.grp=varnames.grp,
@@ -93,6 +97,7 @@ gRIT <- function(x, y,
   if (!signed) read.forest$node.feature <- collapseNF(read.forest$node.feature)
 
   # Evaluate leaf node size and subset forest based on minimum node size
+  save(file=paste0('~/test_', oob.importance, '.Rdata'), read.forest, y, rit.param)
   count <- read.forest$tree.info$size.node
   idcnt <- count >= rit.param$min.nd
   read.forest <- subsetReadForest(read.forest, idcnt)
