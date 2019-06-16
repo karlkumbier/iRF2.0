@@ -72,8 +72,8 @@ interactPredict <- function(x, int, read.forest, varnames=NULL, min.nd=1) {
   tx <- t(x)
   preds <- numeric(nrow(x))
   for (s in ss) {
-    tlow <- as.matrix(tx[!int.pos,] <= nf[s, !int.pos])
-    thigh <- as.matrix(tx[int.pos,] > nf[s, int.pos])
+    tlow <- matrix(tx[!int.pos,] <= nf[s, !int.pos], ncol=nrow(x))
+    thigh <- matrix(tx[int.pos,] > nf[s, int.pos], ncol=nrow(x))
     int.active <- (colSums(tlow) + colSums(thigh)) == length(int)
     preds <- preds + int.active * y[s]
   }
