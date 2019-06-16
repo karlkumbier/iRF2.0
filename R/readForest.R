@@ -41,29 +41,37 @@ readForest <- function(rand.forest, x,
                        varnames.grp=NULL,
                        oob.importance=TRUE,
                        first.split=TRUE,
-                       weights=rep(1, nrow(x)),
                        n.core=1){
   
   # Check for valid input RF
   if (is.null(rand.forest$forest))
     stop('No Forest component in the random forest object')
 
-  # Set feature names if not supplied
-  varnames.grp <- groupVars(varnames.grp, x)
-  if (is.null(colnames(x)) & class(rand.forest) == 'ranger') {
-    colnames(x) <- names(rand.forest$variable.importance)
-    varnames.grp <- colnames(x)
-  } else if (is.null(colnames(x)) & class(rand.forest) == 'randomForest') {
-    colnames(x) <- rownames(rand.forest$importance)
-    varnames.grp <- colnames(x)
+  # Get variale names from fitted RF 
+  if (class(rand.forest) == 'ranger') {
+    varnames <- names(rand.forest$variable.importance)
+  } else if (class(rand.forest) == 'randomForest') {
+    varnames <- rownames(rand.forest$importance)
   }
+
+  # Check that RF variables match x
+  if (!is.null(colnames(x))) {
+    if (any(colnames(x) != varnames))
+      stop('variable names of x do not match RF variables')
+  } else {
+    colnames(x) <- varnames
+  }
+
+  # Set variable grouping if not specified
+  if (is.null(varnames.grp)) 
+    varnames.grp <- colnames(x)
 
   # Register cores for parallelization
   if (n.core == -1) n.core <- detectCores()
   if (n.core > 1) registerDoParallel(n.core)
   
-  ntree <- ifelse(class(rand.forest) == 'randomForest',
-                  rand.forest$ntree, rand.forest$num.trees)
+  ranger <- rand.forest$type == 'ranger'
+  ntree <- ifelse(ranger, rand.forest$num.trees, rand.forest$ntree)
   
   n <- nrow(x)
   p <- length(unique(varnames.grp))
@@ -71,10 +79,10 @@ readForest <- function(rand.forest, x,
   
   # Pass observations through RF to determine leaf node membership
   nodes <- NULL
-  if (return.node.obs & class(rand.forest) == 'randomForest') {
+  if (return.node.obs & !ranger) {
     pred <- predict(rand.forest, newdata=x, nodes=TRUE)
     nodes <- attr(pred, 'nodes')
-  } else if (class(rand.forest) == 'ranger') {
+  } else if (ranger) {
     pred <- predict(rand.forest, data=x, type='terminalNodes')
     nodes <- pred$predictions
   }
@@ -89,12 +97,12 @@ readForest <- function(rand.forest, x,
   suppressWarnings(
   rd.forest <- foreach(id=1:n.core) %dorng% {
     tree.id <- which(core.id == id)
-    readTrees(k=tree.id, rand.forest=rand.forest, x=x, 
-              nodes=nodes, varnames.grp=varnames.grp,
+    readTrees(k=tree.id, rand.forest=rand.forest, x=x, nodes=nodes, 
+              varnames.grp=varnames.grp,
               oob.importance=oob.importance,
               return.node.feature=return.node.feature, 
               return.node.obs=return.node.obs, 
-              first.split=first.split, weights=weights)
+              first.split=first.split)
   })
   rd.forest <- unlist(rd.forest, recursive=FALSE)
   
@@ -102,32 +110,23 @@ readForest <- function(rand.forest, x,
   offset <- cumsum(sapply(rd.forest, function(tt) nrow(tt$tree.info)))
   offset <- c(0, offset[-length(offset)])
   out$tree.info <- rbindlist(lapply(rd.forest, function(tt) tt$tree.info))
-  
+
   # Aggregate sparse node level feature matrix
   if (return.node.feature) {
-    nf.i <- mapply(function(rf, oo) rf$node.feature@i + 1 + oo, rd.forest, offset)
-    nf.j <- sapply(rd.forest, function(rf) rep(1:(2 * p), times=diff(rf$node.feature@p)))
-    nf.x <- sapply(rd.forest, function(rf) rf$node.feature@x)
-    out$node.feature <- sparseMatrix(i=unlist(nf.i), j=unlist(nf.j), x=unlist(nf.x), 
-                                     dims=c(nrow(out$tree.info), 2 * p))
+    nf <- nfSparse(rd.forest, offset, p)
+    dims <- c(nrow(out$tree.info), 2 * p)
+    out$node.feature <- sparseMatrix(i=nf$i, j=nf$j, x=nf$x, dims=dims)
   }
   
   # Aggregate sparse node level observation matrix
   if (return.node.obs) {
-    col.id <- mapply(function(rf, oo) {
-      id <- as.numeric(names(rf$node.obs)) + oo
-      nrep <- out$tree.info$size.node[id]
-      rep(id, times=nrep)
-    }, rd.forest, offset, SIMPLIFY=FALSE)
-    
-    nobs <- lapply(rd.forest, function(tt) tt$node.obs)
-    nobs <- unlist(nobs, recursive=FALSE)
-    out$node.obs <- sparseMatrix(i=unlist(nobs), j=unlist(col.id),
-                                 dims=c(n, nrow(out$tree.info)))
+    nobs <- nobsSparse(rd.forest, offset, out$tree.info)
+    dims <- c(n, nrow(out$tree.info))
+    out$node.obs <- sparseMatrix(i=nobs$i, j=nobs$j, dims=dims)
   } 
   
-  # Adjust predicted value for classification
-  if (class(rand.forest) == 'randomForest')
+  # Adjust predicted value for randomForest classification
+  if (!ranger)
     if (rand.forest$type == 'classification') 
       out$tree.info$predicted <- out$tree.info$predicted - 1
   
@@ -141,15 +140,14 @@ readTrees <- function(rand.forest, k, x, nodes,
                       oob.importance=TRUE,
                       return.node.feature=TRUE,
                       return.node.obs=FALSE,
-                      first.split=TRUE,
-                      weights=rep(1, nrow(x))) {
+                      first.split=TRUE) {
 
   out <- lapply(k, readTree, rand.forest=rand.forest, x=x, 
                 nodes=nodes,varnames.grp=varnames.grp,
                 oob.importance=oob.importance,
                 return.node.feature=return.node.feature, 
                 return.node.obs=return.node.obs, 
-                first.split=first.split, weights=weights)
+                first.split=first.split)
   return(out)
 }
 
@@ -158,46 +156,46 @@ readTree <- function(rand.forest, k, x, nodes,
                      oob.importance=TRUE,
                      return.node.feature=TRUE,
                      return.node.obs=FALSE,
-                     first.split=TRUE,
-                     weights=rep(1, nrow(x))) {
+                     first.split=TRUE) {
 
   n <- nrow(x) 
-  ntree <- ifelse(class(rand.forest) == 'randomForest',
-                  rand.forest$ntree, rand.forest$num.trees)
+  ranger <- rand.forest$type == 'ranger'
+  ntree <- ifelse(ranger, rand.forest$num.trees, rand.forest$ntree)
 
-  # Read tree metadata from forest
-  if (class(rand.forest) == 'randomForest') {
+  # Read metadata for current tree
+  if (!ranger) {
     tree.info <- getTree(rand.forest, k)
-  } else if (class(rand.forest) == 'ranger') {
+  } else if (ranger) {
     tree.info <- getTree(rand.forest, k, nodes=nodes)
   } else {
-    stop(deparse(substitute(rand.forest)), 
-         "is not class ranger of randomForest")
+    stop(deparse(substitute(rand.forest)), "not class ranger or randomForest")
   }
 
+  # Set additional metadata features for current tree
   tree.info$node.idx <- 1:nrow(tree.info)
   tree.info$parent <- getParent(tree.info) %% nrow(tree.info)
   tree.info$tree <- as.integer(k)
   tree.info$size.node <- 0L
   select.node <- tree.info$status == -1
+  
   # Read active features for each decision path
   if (return.node.feature) {
     node.feature <- readFeatures(tree.info, varnames.grp=varnames.grp, 
                                  first.split=first.split)
   }
+  
   tree.info <- filter(tree.info, select.node)
   
   # Read leaf node membership for each observation
   node.obs <- NULL
   if (return.node.obs) {
-    which.leaf <- nodes[,k]
-    names(which.leaf) <- 1:length(which.leaf)
+    id.leaf <- nodes[,k]
 
-    # Only count OOB oservations if tracked
+    # Get OOB oservations if evaluating importance meausres on OOB
     if (!is.null(rand.forest$inbag) & oob.importance) {
-      if (class(rand.forest) == 'ranger') {
+      if (ranger) {
         oob.id <- rand.forest$inbag[[k]] == 0
-      } else if (class(rand.forest) == 'randomForest') {
+      } else if (!ranger) {
         oob.id <- rand.forest$inbag[,k] == 0
       }
     } else {
@@ -205,12 +203,13 @@ readTree <- function(rand.forest, k, x, nodes,
       if (oob.importance) warning('keep.inbag = FALSE, using all observations')
     }
 
-    which.leaf <- which.leaf[oob.id]
-    unq.leaf <- sort(unique(which.leaf))
-    if (class(rand.forest) == 'ranger') unq.leaf <- unq.leaf + 1
+    # Group oservations by leaf node membership
+    id.obs <- (1:length(id.leaf))[oob.id]
+    id.leaf <- id.leaf[oob.id]
+    unq.leaf <- sort(unique(id.leaf))
+    if (ranger) unq.leaf <- unq.leaf + 1
     id <- fmatch(unq.leaf, tree.info$node.idx)
-    id.obs <- as.numeric(names(which.leaf))
-    node.obs <- c(by(id.obs, which.leaf, list))
+    node.obs <- c(by(id.obs, id.leaf, list))
     names(node.obs) <- id
 
     tree.info$size.node[id] <- sapply(node.obs, length)
@@ -299,3 +298,30 @@ ancestorPath <- function(tree.info, varnames.grp, varnames.unq, p,
   return(list(lpath, rpath))
 }
 
+nfSparse <- function(rd.forest, offset, p) {
+  # Row indices by tree
+  nfRow <- function(rf, oo) rf$node.feature@i + 1 + oo
+  nf.i <- mapply(function(rf, oo) nfRow(rf, oo), rd.forest, offset,
+                 SIMPLIFY=FALSE)
+  # Col indices by tree
+  nfCol <- function(rf, p) rep(1:(2 * p), times=diff(rf$node.feature@p))
+  nf.j <- sapply(rd.forest, nfCol, p=p)
+
+  # X values y tree
+  nfX <- function(rf) rf$node.feature@x
+  nf.x <- sapply(rd.forest, nfX)
+  return(list(i=unlist(nf.i), j=unlist(nf.j), x=unlist(nf.x)))
+}
+
+nobsSparse <- function(rd.forest, offset, tree.info) {
+  # Col indices by tree
+  nobs.j <- mapply(function(rf, oo) {
+    id <- as.numeric(names(rf$node.obs)) + oo
+    nrep <- tree.info$size.node[id]
+    return(rep(id, times=nrep))
+  }, rd.forest, offset)
+  
+  # Row indices by tree
+  nobs.i <- lapply(rd.forest, function(rf) rf$node.obs)
+  return(list(i=unlist(nobs.i), j=unlist(nobs.j)))
+}

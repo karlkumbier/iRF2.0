@@ -50,6 +50,7 @@ gRIT <- function(x, y,
                  ints.eval=NULL,
                  n.core=1) {
 
+
   class.irf <- is.factor(y)
   if (n.core == -1) n.core <- detectCores()  
   if (n.core > 1) registerDoParallel(n.core)
@@ -89,7 +90,6 @@ gRIT <- function(x, y,
                               return.node.feature=TRUE,
                               return.node.obs=TRUE,
                               varnames.grp=varnames.grp,
-                              weights=weights,
                               n.core=n.core)
   }
 
@@ -97,7 +97,6 @@ gRIT <- function(x, y,
   if (!signed) read.forest$node.feature <- collapseNF(read.forest$node.feature)
 
   # Evaluate leaf node size and subset forest based on minimum node size
-  save(file=paste0('~/test_', oob.importance, '.Rdata'), read.forest, y, rit.param)
   count <- read.forest$tree.info$size.node
   idcnt <- count >= rit.param$min.nd
   read.forest <- subsetReadForest(read.forest, idcnt)
@@ -142,7 +141,7 @@ gRIT <- function(x, y,
     ximp <- lapply(ints.sub, intImportance, nf=nf.list, weight=count, 
                    precision=precision, select.id=idcl)
     ximp <- rbindlist(ximp) 
-
+    
     imp.test <- lapply(ints.eval, subsetTest, importance=ximp, ints=ints.sub)
     imp.test <- rbindlist(imp.test)
   }

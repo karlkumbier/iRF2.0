@@ -34,7 +34,7 @@
 #'
 #' @importFrom dplyr group_by summarize arrange desc '%>%'
 #' @importFrom data.table data.table
-stabilityScore <- function(x, y, 
+stabilityScore <- function(x, y,
                            ntree=500,
                            mtry.select.prob=rep(1, ncol(x)), 
                            ints.eval=NULL,
@@ -51,6 +51,23 @@ stabilityScore <- function(x, y,
                            n.core=1,
                            ...) {
   
+  # Check for valid input parameters
+  if (!class(x) %in% c('data.frame', 'matrix')) {
+    sp.mat <- attr(class(x), 'package') == 'Matrix'
+    if (!is.null(sp.mat)) {
+      if (!sp.mat) stop('x must be matrix or data frame')
+    } else {
+      stop('x must be matrix or data frame')
+    }
+  }
+  if (nrow(x) != length(y))
+    stop('x and y must contain the same number of observations')
+  if (length(mtry.select.prob) != ncol(x))
+    stop('length mtry.select.prob must equal number of features')
+  if (length(weights) != nrow(x))
+    stop('length weights differs from # training observations')
+
+
   # Set feature names for grouping interactions
   varnames.grp <- groupVars(varnames.grp, x)
 
@@ -60,11 +77,11 @@ stabilityScore <- function(x, y,
   out <- list()
   for (i in 1:length(bs.sample)) {
     sample.id <- bs.sample[[i]]
-    out[[i]] <- bsgRIT(x, y, mtry.select.prob, sample.id, ints.eval=ints.eval, 
-                       ntree=ntree, weights=weights, rit.param=rit.param,
-                       varnames.grp=varnames.grp, signed=signed, 
-                       oob.importance=oob.importance, n.core=n.core,
-                       type=type, ...)
+    out[[i]] <- bsgRIT(x, y, mtry.select.prob, sample.id, 
+                       ints.eval=ints.eval, ntree=ntree, weights=weights, 
+                       rit.param=rit.param, varnames.grp=varnames.grp, 
+                       signed=signed, oob.importance=oob.importance, 
+                       n.core=n.core, type=type, ...)
 
   }
 
@@ -74,17 +91,26 @@ stabilityScore <- function(x, y,
 }
 
 
-bsgRIT <- function(x, y, mtry.select.prob, sample.id, ints.eval, weights, ntree,
-                   varnames.grp, rit.param, signed, oob.importance, type, n.core, ...) {
-  
+bsgRIT <- function(x, y, mtry.select.prob, sample.id, ints.eval, 
+                   weights, ntree, varnames.grp, rit.param, signed, 
+                   oob.importance, type, n.core, ...) {
+
+  # Remove replicates in bs sample for OOB importance
+  if (oob.importance) 
+    sample.id <- unique(sample.id)
+ 
+  # Generate bootstrap sample for stability analysis
+  x <- x[sample.id,]
+  y <- y[sample.id]
+
   # Fit random forest on bootstrap sample
-  rf <- parRF(x[sample.id,], y[sample.id], ntree=ntree, n.core=n.core, 
+  rf <- parRF(x, y, ntree=ntree, n.core=n.core, 
               mtry.select.prob=mtry.select.prob, type=type, 
               keep.inbag=oob.importance, ...)
-
+  
   # Run generalized RIT on rf.b to learn interactions
   ints <- gRIT(rand.forest=rf, x=x, y=y,
-               weights=weights,
+               weights=weights[sample.id],
                varnames.grp=varnames.grp,
                rit.param=rit.param,
                signed=signed,
