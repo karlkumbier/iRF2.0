@@ -21,28 +21,19 @@ interactPredict <- function(x, int, read.forest, varnames=NULL, min.nd=1) {
   stopifnot(p == ncol(read.forest$node.feature) / 2)
     
   # Set feature names and check for replicates
-  varnames <- groupVars(varnames, x)
-  if (is.null(colnames(x)) & class(rand.forest) == 'ranger') {
-    colnames(x) <- names(rand.forest$variale.importance)
-    varnames.grp <- colnames(x)
-  } else if (is.null(colnames(x)) & class(rand.forest) == 'randomForest') {
-    colnames(x) <- rownames(rand.forest$importance)
-    varnames.grp <- colnames(x)
-  }
+  if (is.null(colnames(x))) colnames(x) <- paste0('X', 1:ncol(x))
+  if (is.null(varnames)) varnames <- colnames(x)
 
   if (any(duplicated(varnames)))
     stop('Replicate features not supported')
   
-  class.rf <- all(read.forest$tree.info$prediction %in% 1:2)
+  class.rf <- all(read.forest$tree.info$prediction %in% 0:1)
 
   # Filter out small leaf nodes, and class-0 nodes if classification
   id.keep <- read.forest$tree.info$size.node >= min.nd
-  if (class.rf) id.keep <- id.keep & read.forest$tree.info$prediction == 2
+  if (class.rf) id.keep <- id.keep & read.forest$tree.info$prediction == 1
   read.forest <- subsetReadForest(read.forest, id.keep)
   
-  # Adjust predicitons if classification
-  read.forest$tree.info$prediction <- read.forest$tree.info$prediction - 1
-
   # Get indices for interaction features in <x> and <nf>
   int <- strsplit(int, '_')[[1]]
   stopifnot(length(int) > 1)
@@ -77,12 +68,12 @@ interactPredict <- function(x, int, read.forest, varnames=NULL, min.nd=1) {
   ss <- sapply(trees, sampleTree, tree=tree.info$tree, size=size)
   nrule <- length(ss)
 
-  # Iterate over sampled leaf nodes and generate predictions. 
+  # Iterate over sampled leaf nodes and generate predictions.
   tx <- t(x)
   preds <- numeric(nrow(x))
   for (s in ss) {
-    tlow <- tx[!int.pos,] <= nf[s, !int.pos]
-    thigh <- tx[int.pos,] > nf[s, int.pos]
+    tlow <- as.matrix(tx[!int.pos,] <= nf[s, !int.pos])
+    thigh <- as.matrix(tx[int.pos,] > nf[s, int.pos])
     int.active <- (colSums(tlow) + colSums(thigh)) == length(int)
     preds <- preds + int.active * y[s]
   }
