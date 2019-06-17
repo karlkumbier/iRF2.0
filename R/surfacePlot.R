@@ -58,12 +58,9 @@ plotInt <- function(x, y, int, read.forest,
 
   # Set feature names and check for replicates
   varnames <- groupVars(varnames, x)
-  if (is.null(colnames(x)) & class(rand.forest) == 'ranger') {
-    colnames(x) <- names(rand.forest$variale.importance)
-    varnames.grp <- colnames(x)
-  } else if (is.null(colnames(x)) & class(rand.forest) == 'randomForest') {
-    colnames(x) <- rownames(rand.forest$importance)
-    varnames.grp <- colnames(x)
+  if (is.null(colnames(x))) {
+    colnames(x) <- paste0('X', 1:ncol(x))
+    varnames <- colnames(x)
   }
   
   if (any(duplicated(varnames))) 
@@ -259,6 +256,7 @@ genSurface <- function(x, y, int, rectangles,
   # Evaluate distriution of responses across each decision rule
   grid <- matrix(0, nrow=grid.size, ncol=grid.size)
   removed <- rep(FALSE, nrow(rectangles))
+  
   for (i in 1:nrow(rectangles)) {
     wt <- rectangles$size.node[i]
     
@@ -275,16 +273,21 @@ genSurface <- function(x, y, int, rectangles,
       grid[idcs1, idcs2] <- grid[idcs1, idcs2] + yy * wt
     } else {
       # If a region contains no observations, move to next hyperrectangle
-      if (!any(x1 & x2) | !any(!x1 & !x2) | !any(x1 & !x2) | !any(!x1 & x2)) {
+      if (!any(x1 & x2)) {
         removed[i] <- TRUE
         next
       }
       
       # Evaluate average response value in regions corresponding to HR
       grid[idcs1, idcs2] <- grid[idcs1, idcs2] +  mean(y[x1 & x2]) * wt
-      grid[!idcs1, idcs2] <- grid[!idcs1, idcs2] +  mean(y[!x1 & x2]) * wt
-      grid[idcs1, !idcs2] <- grid[idcs1, !idcs2] +  mean(y[x1 & !x2]) * wt
-      grid[!idcs1, !idcs2] <- grid[!idcs1, !idcs2] +  mean(y[!x1 & !x2]) * wt
+      
+      # TODO: adjust this weighting
+      if (any(!x1 & x2)) 
+        grid[!idcs1, idcs2] <- grid[!idcs1, idcs2] +  mean(y[!x1 & x2]) * wt
+      if (any(x1 & !x2))
+        grid[idcs1, !idcs2] <- grid[idcs1, !idcs2] +  mean(y[x1 & !x2]) * wt
+      if (any(!x1 & !x2))
+        grid[!idcs1, !idcs2] <- grid[!idcs1, !idcs2] +  mean(y[!x1 & !x2]) * wt
     }
   }
   
