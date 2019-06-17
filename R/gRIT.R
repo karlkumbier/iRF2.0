@@ -136,7 +136,8 @@ gRIT <- function(x, y,
 
     # Convert node feature matrix to list of active features for fast lookup
     nf.list <- by(read.forest$node.feature@i,
-                  rep(1:(2 * p), times=diff(read.forest$node.feature@p)), list)
+                  rep(1:ncol(read.forest$node.feature), 
+                      times=diff(read.forest$node.feature@p)), list)
     
     ximp <- lapply(ints.sub, intImportance, nf=nf.list, weight=count, 
                    precision=precision, select.id=idcl)
