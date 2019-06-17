@@ -44,11 +44,12 @@ readForest <- function(rand.forest, x,
                        n.core=1){
   
   # Check for valid input RF
+  ranger <- class(rand.forest) == 'ranger'
   if (is.null(rand.forest$forest))
     stop('No Forest component in the random forest object')
 
   # Get variale names from fitted RF 
-  if (class(rand.forest) == 'ranger') {
+  if (ranger) {
     varnames <- names(rand.forest$variable.importance)
   } else if (class(rand.forest) == 'randomForest') {
     varnames <- rownames(rand.forest$importance)
@@ -70,7 +71,6 @@ readForest <- function(rand.forest, x,
   if (n.core == -1) n.core <- detectCores()
   if (n.core > 1) registerDoParallel(n.core)
   
-  ranger <- rand.forest$type == 'ranger'
   ntree <- ifelse(ranger, rand.forest$num.trees, rand.forest$ntree)
   
   n <- nrow(x)
@@ -105,7 +105,7 @@ readForest <- function(rand.forest, x,
               first.split=first.split)
   })
   rd.forest <- unlist(rd.forest, recursive=FALSE)
-  
+
   # Aggregate node level metadata
   offset <- cumsum(sapply(rd.forest, function(tt) nrow(tt$tree.info)))
   offset <- c(0, offset[-length(offset)])
@@ -126,10 +126,11 @@ readForest <- function(rand.forest, x,
   } 
   
   # Adjust predicted value for randomForest classification
-  if (!ranger)
+  if (!ranger) {
     if (rand.forest$type == 'classification') 
-      out$tree.info$predicted <- out$tree.info$predicted - 1
-  
+      out$tree.info$prediction <- out$tree.info$prediction - 1
+  }
+
   stopImplicitCluster()
   return(out)
   
@@ -159,7 +160,7 @@ readTree <- function(rand.forest, k, x, nodes,
                      first.split=TRUE) {
 
   n <- nrow(x) 
-  ranger <- rand.forest$type == 'ranger'
+  ranger <- class(rand.forest) == 'ranger'
   ntree <- ifelse(ranger, rand.forest$num.trees, rand.forest$ntree)
 
   # Read metadata for current tree
@@ -214,13 +215,14 @@ readTree <- function(rand.forest, k, x, nodes,
 
     tree.info$size.node[id] <- sapply(node.obs, length)
   }
-    
+
   out <- list()
   col.remove <- c('left daughter', 'right daughter', 'split var',
                   'split point', 'status')
   out$tree.info <- select(tree.info, -one_of(col.remove))
   out$node.feature <- node.feature
   out$node.obs <- node.obs
+
   return(out)
 }
 

@@ -134,6 +134,7 @@ gRIT <- function(x, y,
     ints.sub <- lapply(ints.eval, intSubsets)
     ints.sub <- unique(unlist(ints.sub, recursive=FALSE))
 
+    save(file='~/test.Rdata', read.forest, count, ints.sub, precision, idcl)
     # Convert node feature matrix to list of active features for fast lookup
     nf.list <- by(read.forest$node.feature@i,
                   rep(1:ncol(read.forest$node.feature), 
