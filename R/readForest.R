@@ -10,6 +10,8 @@
 #'  observations in x that fall in each leaf node of rand.forest.
 #' @param varnames.grp grouping "hyper-features" for RIT search. Features with
 #'  the same name will be treated as identical for interaction search.
+#' @param oob.importance if TRUE, importance measures are evaluated on OOB
+#'  samples.
 #' @param first.split if True, splitting threshold will only be evaluated for
 #'  the first time a feature is selected.
 #' @param n.core number of cores to use. If -1, all available cores are used.
@@ -37,6 +39,7 @@ readForest <- function(rand.forest, x,
                        return.node.feature=TRUE, 
                        return.node.obs=TRUE,
                        varnames.grp=NULL,
+                       oob.importance=TRUE,
                        first.split=TRUE,
                        n.core=1){
   
@@ -102,7 +105,7 @@ readForest <- function(rand.forest, x,
               first.split=first.split)
   })
   rd.forest <- unlist(rd.forest, recursive=FALSE)
-
+  
   # Aggregate node level metadata
   offset <- cumsum(sapply(rd.forest, function(tt) nrow(tt$tree.info)))
   offset <- c(0, offset[-length(offset)])
@@ -134,12 +137,14 @@ readForest <- function(rand.forest, x,
 
 readTrees <- function(rand.forest, k, x, nodes,
                       varnames.grp=1:ncol(x),
+                      oob.importance=TRUE,
                       return.node.feature=TRUE,
                       return.node.obs=FALSE,
                       first.split=TRUE) {
 
   out <- lapply(k, readTree, rand.forest=rand.forest, x=x, 
                 nodes=nodes,varnames.grp=varnames.grp,
+                oob.importance=oob.importance,
                 return.node.feature=return.node.feature, 
                 return.node.obs=return.node.obs, 
                 first.split=first.split)
@@ -148,6 +153,7 @@ readTrees <- function(rand.forest, k, x, nodes,
 
 readTree <- function(rand.forest, k, x, nodes,
                      varnames.grp=1:ncol(x), 
+                     oob.importance=TRUE,
                      return.node.feature=TRUE,
                      return.node.obs=FALSE,
                      first.split=TRUE) {
@@ -162,8 +168,7 @@ readTree <- function(rand.forest, k, x, nodes,
   } else if (ranger) {
     tree.info <- getTree(rand.forest, k, nodes=nodes)
   } else {
-      stop(deparse(substitute(rand.forest)), 
-           "is not class ranger of randomForest")
+    stop(deparse(substitute(rand.forest)), "not class ranger or randomForest")
   }
 
   # Set additional metadata features for current tree
@@ -206,6 +211,7 @@ readTree <- function(rand.forest, k, x, nodes,
     id <- fmatch(unq.leaf, tree.info$node.idx)
     node.obs <- c(by(id.obs, id.leaf, list))
     names(node.obs) <- id
+
     tree.info$size.node[id] <- sapply(node.obs, length)
   }
     

@@ -22,6 +22,8 @@
 #'  sampled for RIT with probability proprtional to the total weight of
 #'  observations they contain.
 #' @param signed if TRUE, signed interactions will be returned
+#' @param oob.importance if TRUE, importance measures are evaluated on OOB
+#'  samples.
 #' @param n.core number of cores to use. If -1, all available cores are used.
 #' @param ... additional arguments passed to iRF::randomForest.
 #'
@@ -44,6 +46,7 @@ stabilityScore <- function(x, y,
                            bs.sample=NULL,
                            weights=rep(1, nrow(x)),
                            signed=TRUE,
+                           oob.importance=TRUE,
                            type='randomForest',
                            n.core=1,
                            ...) {
@@ -79,6 +82,7 @@ stabilityScore <- function(x, y,
                        rit.param=rit.param, varnames.grp=varnames.grp, 
                        signed=signed, oob.importance=oob.importance, 
                        n.core=n.core, type=type, ...)
+
   }
 
   # Summarize stability and importance metrics across bootstrap replicates
@@ -104,11 +108,13 @@ bsgRIT <- function(x, y, mtry.select.prob, sample.id, ints.eval,
               mtry.select.prob=mtry.select.prob, type=type, 
               keep.inbag=oob.importance, ...)
   
+  # Run generalized RIT on rf.b to learn interactions
   ints <- gRIT(rand.forest=rf, x=x, y=y,
                weights=weights[sample.id],
                varnames.grp=varnames.grp,
                rit.param=rit.param,
                signed=signed,
+               oob.importance=oob.importance,
                ints.eval=ints.eval,
                n.core=n.core)
 

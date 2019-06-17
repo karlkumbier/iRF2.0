@@ -30,6 +30,8 @@
 #'  sampled for RIT with probability proprtional to the total weight of
 #'  observations they contain.
 #' @param signed if TRUE, signed interactions will be returned
+#' @param oob.importance if TRUE, importance measures are evaluated on OOB
+#'  samples.
 #' @param verbose if TRUE, display progress of iRF fit.
 #' @param n.core number of cores to use. If -1, all available cores are used.
 #' @param ... additional arguments passed to iRF::randomForest.
@@ -64,6 +66,7 @@ iRF <- function(x, y,
                 bs.sample=NULL,
                 weights=rep(1, nrow(x)),
                 signed=TRUE,
+                oob.importance=TRUE,
                 type='randomForest',
                 verbose=TRUE,
                 n.core=1, 
@@ -136,15 +139,11 @@ iRF <- function(x, y,
     # Grow Random Forest on full data
     if (verbose) print(paste('iteration = ', iter))
     rf.list[[iter]] <- parRF(x, y, xtest, ytest, ntree=ntree, n.core=n.core, 
-                             type=type, mtry.select.prob=mtry.select.prob, ...)
+                             type=type, mtry.select.prob=mtry.select.prob, 
+                             keep.inbag=oob.importance, ...)
     
     # Update feature selection probabilities
     mtry.select.prob <- rf.list[[iter]][[imp.str]]
-
-    # Evaluate test set error if supplied
-    # if (!is.null(xtest) & verbose) 
-    #  print(printAcc(rf.list[[iter]], ytest, class.irf))
-  
   }
   
 
@@ -176,8 +175,7 @@ iRF <- function(x, y,
       if (verbose) cat('evaluating interactions...\n')
       if (iter == 1) rf.weight <- rep(1, ncol(x))
       if (iter > 1) rf.weight <- rf.list[[iter - 1]][[imp.str]]
-      
-      importance[[iter]] <- stabilityScore(x, y, xtest, ytest, 
+      importance[[iter]] <- stabilityScore(x, y, 
                                            ntree=ntree,
                                            mtry.select.prob=rf.weight,
                                            ints.eval=ints.eval,
@@ -186,6 +184,7 @@ iRF <- function(x, y,
                                            bs.sample=bs.sample,
                                            weights=weights, 
                                            signed=signed,
+                                           oob.importance=oob.importance,
                                            type=type,
                                            n.core=n.core, 
                                            ...)
