@@ -47,6 +47,7 @@ gRIT <- function(x, y,
                  ints.eval=NULL,
                  n.core=1) {
 
+
   class.irf <- is.factor(y)
   if (n.core == -1) n.core <- detectCores()  
   if (n.core > 1) registerDoParallel(n.core)
@@ -85,7 +86,6 @@ gRIT <- function(x, y,
                               return.node.feature=TRUE,
                               return.node.obs=TRUE,
                               varnames.grp=varnames.grp,
-                              weights=weights,
                               n.core=n.core)
   }
 
@@ -137,7 +137,7 @@ gRIT <- function(x, y,
     ximp <- lapply(ints.sub, intImportance, nf=nf.list, weight=count, 
                    precision=precision, select.id=idcl)
     ximp <- rbindlist(ximp) 
-
+    
     imp.test <- lapply(ints.eval, subsetTest, importance=ximp, ints=ints.sub)
     imp.test <- rbindlist(imp.test)
   }

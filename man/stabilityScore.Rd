@@ -8,7 +8,8 @@ stabilityScore(x, y, ntree = 500, mtry.select.prob = rep(1, ncol(x)),
   ints.eval = NULL, rit.param = list(depth = 5, ntree = 500, nchild =
   2, class.id = 1, min.nd = 1, class.cut = NULL), varnames.grp = NULL,
   n.bootstrap = 1, bs.sample = NULL, weights = rep(1, nrow(x)),
-  signed = TRUE, n.core = 1, ...)
+  signed = TRUE, oob.importance = TRUE, type = "randomForest",
+  n.core = 1, ...)
 }
 \arguments{
 \item{x}{numeric feature matrix}
@@ -40,6 +41,9 @@ sampled for RIT with probability proprtional to the total weight of
 observations they contain.}
 
 \item{signed}{if TRUE, signed interactions will be returned}
+
+\item{oob.importance}{if TRUE, importance measures are evaluated on OOB
+samples.}
 
 \item{n.core}{number of cores to use. If -1, all available cores are used.}
 

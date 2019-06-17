@@ -18,7 +18,7 @@ intImportance <- function(int, nf, precision, select.id, weight) {
   # Compute prevalence and precision for given interaction
   prev1 <- prevalence(weight, int.id, select.id)
   prev0 <- prevalence(weight, int.id, !select.id)
-  prec <- mean(precision[int.id])
+  prec <- sum(precision[int.id] * weight[int.id]) / sum(weight[int.id])
   return(data.table(prev1=prev1, prev0=prev0, prec=prec))
 }
 
@@ -29,10 +29,10 @@ prevalence <- function(weight, idint, idsel) {
   return(sint / s)
 }
 
-nodePrecision <- function(read.forest, y, count, weight=rep(1, length(y))) {
+nodePrecision <- function(read.forest, y, count, weights=rep(1, length(y))) {
   # Evaluate class proportion of class-1 observations in each leaf node.
   if (is.factor(y)) y <- as.numeric(y) - 1
-  count.y <- Matrix::colSums(read.forest$node.obs * y * weight)
+  count.y <- Matrix::colSums(read.forest$node.obs * y * weights)
   precision <- count.y / count
   precision[count == 0] <- 0
   return(precision)
@@ -47,7 +47,7 @@ subsetTest <- function(int, ints, importance) {
   id.int <- fmatch(list(int), ints)
 
   # Evaluate prevalence relative to independent selection
-  id <- sapply(int, match, ints)
+  id <- sapply(int, fmatch, ints)
   prev.null <- prod(importance$prev1[id])
   prev <- importance$prev1[id.int]
   prev.test <- prev - prev.null

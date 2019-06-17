@@ -2,11 +2,11 @@
 % Please edit documentation in R/readForest.R
 \name{readForest}
 \alias{readForest}
-\title{Read forestt}
+\title{Read forest}
 \usage{
 readForest(rand.forest, x, return.node.feature = TRUE,
-  return.node.obs = FALSE, varnames.grp = NULL, first.split = TRUE,
-  weights = rep(1, nrow(x)), n.core = 1)
+  return.node.obs = TRUE, varnames.grp = NULL, oob.importance = TRUE,
+  first.split = TRUE, n.core = 1)
 }
 \arguments{
 \item{rand.forest}{an object of class randomForest.}
@@ -21,6 +21,9 @@ observations in x that fall in each leaf node of rand.forest.}
 
 \item{varnames.grp}{grouping "hyper-features" for RIT search. Features with
 the same name will be treated as identical for interaction search.}
+
+\item{oob.importance}{if TRUE, importance measures are evaluated on OOB
+samples.}
 
 \item{first.split}{if True, splitting threshold will only be evaluated for
 the first time a feature is selected.}

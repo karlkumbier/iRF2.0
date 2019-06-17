@@ -91,6 +91,7 @@ iRF <- function(x, y,
       stop('x must be matrix or data frame')
     }
   }
+
   if (nrow(x) != length(y))
     stop('x and y must contain the same number of observations')
   if (ncol(x) < 2 & (!is.null(iter.return) | select.iter))
@@ -119,11 +120,13 @@ iRF <- function(x, y,
   if (is.null(rit.param$class.cut) & is.numeric(y)) 
     rit.param$class.cut <- median(y)
 
-  class.irf <- is.factor(y)
-  if (is.null(colnames(x))) {
+  # Set variable and grouping names if not supplied
+  if (is.null(colnames(x))) 
     colnames(x) <- paste0('X', 1:ncol(x))  
+  if (is.null(varnames.grp)) 
     varnames.grp <- colnames(x)
-  }
+
+  class.irf <- is.factor(y)
   imp.str <- ifelse(type == 'ranger', 'variable.importance', 'importance')
   
   # Fit a series of iteratively re-weighted RFs 
@@ -164,10 +167,11 @@ iRF <- function(x, y,
                       rit.param=rit.param,
                       signed=signed,
                       n.core=n.core)
+
     ints.eval <- ints.eval$int
     rit.param$ntree <- rit.param$ntree / n.bootstrap
 
-    # Grow RFs on BS samples to evaluate stability of recovered interacitons.
+    # Grow RFs on BS samples to evaluate stability of recovered interactions.
     if (length(ints.eval) > 0) {
       if (verbose) cat('evaluating interactions...\n')
       if (iter == 1) rf.weight <- rep(1, ncol(x))

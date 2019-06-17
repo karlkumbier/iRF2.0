@@ -24,6 +24,7 @@ parRF <- function(x, y, xtest=NULL, ytest=NULL, ntree=500,
     stop('type must be one of "randomForest" or "ranger"')
   }
 
+  rf$type <- type
   return(rf)
 }
 
