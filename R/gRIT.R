@@ -140,7 +140,7 @@ gRIT <- function(x, y,
                       times=diff(read.forest$node.feature@p)), list)
     
     ximp <- lapply(ints.sub, intImportance, nf=nf.list, weight=count, 
-                   precision=precision, select.id=idcl)
+                   precision=precision)
     ximp <- rbindlist(ximp) 
     
     imp.test <- lapply(ints.eval, subsetTest, importance=ximp, ints=ints.sub)
