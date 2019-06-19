@@ -16,8 +16,8 @@ intImportance <- function(int, nf, precision, select.id, weight) {
     return(data.table(prev1=0, prev0=0, prec=0))
 
   # Compute prevalence and precision for given interaction
-  prev1 <- prevalence(weight, int.id, select.id)
-  prev0 <- prevalence(weight, int.id, !select.id)
+  prev1 <- prevalence(weight * precision, int.id, select.id)
+  prev0 <- prevalence(weight * precision, int.id, !select.id)
   prec <- sum(precision[int.id] * weight[int.id]) / sum(weight[int.id])
   return(data.table(prev1=prev1, prev0=prev0, prec=prec))
 }
