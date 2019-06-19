@@ -209,7 +209,7 @@ each leaf node with probability proportional to the number of observations in
 each leaf node:
 
 ```{r rit}
-class1.nodes <- rforest$tree.info$prediction - 1 == 1
+class1.nodes <- rforest$tree.info$prediction == 1
 wt <- rforest$tree.info$size.node[class1.nodes]
 RIT(rforest$node.feature[class1.nodes,], weights=wt,
     depth=5, branch=2, n_trees=100)
@@ -224,13 +224,10 @@ bag samples and searches for interactions in the corresponding random forest.
 
 ```{r irf, message=FALSE}
 fit <- iRF(x=X[train.id,], 
-         y=Y[train.id], 
-         xtest=X[test.id,], 
-         ytest=Y[test.id], 
-         n.iter=5, 
-         n.core=n.cores,
-         select.iter = TRUE,
-         n.bootstrap=10
+           y=Y[train.id], 
+           n.iter=5, 
+           n.core=n.cores,
+           n.bootstrap=10
         )
 ```
 
@@ -293,19 +290,14 @@ dotchart(rev(toplot[1:min(20, length(toplot))]),
 
 ### Visualizing interactions
 Interactions can be visualized using response surfaces, which depict the
-expected response as a function of interacting features. The `readForest`
-function uses the argument `get.split` to extract the splitting threshold from
-decision paths in a fitted random forest.
-
-```{r readforest_split}
-rforest <- readForest(fit$rf.list, x=X[train.id,], get.split=TRUE)
-```
-
-We use the output of `readForest` with `get.split = TRUE` to generate response
-surfaces as follows 
+expected response as a function of interacting features. We use the output of `readForest` 
+to generate response surfaces as follows
 ```{r response_surface}
 library(rgl)
-plotInt(x=X[test.id,], y=Y[test.id], int='1+_2+_3+', read.forest=rforest,
+
+rforest <- readForest(fit$rf.list, x=X[train.id,])
+plotInt(x=X[test.id,], y=Y[test.id], int='X1+_X2+_X3+', 
+        read.forest=rforest,
         xlab='X1', ylab='X2')
 rglwidget()
 ```
