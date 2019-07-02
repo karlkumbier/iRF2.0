@@ -11,10 +11,10 @@ readForest(rand.forest, x, return.node.feature = TRUE,
 \arguments{
 \item{rand.forest}{an object of class randomForest.}
 
-\item{x}{numeric feature matrix}
+\item{x}{numeric feature matrix.}
 
 \item{return.node.feature}{if True, will return sparse matrix indicating
-features used on each decision path of the rand.forest}
+features used on each decision path of the rand.forest.}
 
 \item{return.node.obs}{if True, will return sparse matrix indicating
 observations in x that fall in each leaf node of rand.forest.}

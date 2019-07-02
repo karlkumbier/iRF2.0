@@ -1,16 +1,16 @@
 #' Iterative random forests (iRF)
 #'
-#' Itaratively grow feature weighted random forests and search for prevalent
+#' Iteratively grow feature weighted random forests and search for prevalent
 #' interactions on decision paths.
 #' 
-#' @param x numeric feature matrix
+#' @param x numeric feature matrix.
 #' @param y response vector. If factor, classification is assumed.
 #' @param xtest numeric feature matrix for test set.
 #' @param ytest response vector for test set.
-#' @param number of iterations to run.
+#' @param n.iter number of iterations to run.
 #' @param ntree number of random forest trees.
 #' @param mtry.select.prob feature weights for first iteration. Defaults to
-#'  equal weights
+#'  equal weights.
 #' @param iter.return which iterations should interactions be returned for.
 #'  Defaults to iteration with highest OOB accuracy.
 #' @param select.iter if TRUE, returns interactions from iteration with highest
@@ -23,13 +23,14 @@
 #'  regression to binary classes.
 #' @param varnames.grp grouping "hyper-features" for RIT search. Features with 
 #'  the same name will be treated as identical for interaction search.
-#' @param n.bootstrap number of bootstrap samples to calculate stability scores.
-#' @param bs.sample list of observation indices to use for bootstrap samples. If
-#'  NULL, iRF will take standard bootstrap samples of observations.
+#' @param n.bootstrap number of bootstrap samples to calculate stability
+#'  scores.
+#' @param bs.sample list of observation indices to use for bootstrap samples.
+#'  If NULL, iRF will take standard bootstrap samples of observations.
 #' @param weights numeric weight for each observation. Leaf nodes will be
 #'  sampled for RIT with probability proprtional to the total weight of
 #'  observations they contain.
-#' @param signed if TRUE, signed interactions will be returned
+#' @param signed if TRUE, signed interactions will be returned.
 #' @param oob.importance if TRUE, importance measures are evaluated on OOB
 #'  samples.
 #' @param verbose if TRUE, display progress of iRF fit.
@@ -88,11 +89,8 @@ iRF <- function(x, y,
   require(doRNG, quiet=TRUE)
   if (!class(x) %in% c('data.frame', 'matrix')) {
     sp.mat <- attr(class(x), 'package') == 'Matrix'
-    if (!is.null(sp.mat)) {
-      if (!sp.mat) stop('x must be matrix or data frame')
-    } else {
+    if (is.null(sp.mat) || !sp.mat)
       stop('x must be matrix or data frame')
-    }
   }
 
   if (nrow(x) != length(y))
@@ -228,7 +226,7 @@ selectIter <- function(rf.list, y) {
   if (is.factor(y)) {
     predicted <- lapply(predicted, '-', 1)
     y <- as.numeric(y) - 1
-    eFun <- function(y, yhat) sum(y == 1 & yhat == 0) + sum(y == 0 & yhat == 1)
+    eFun <- function(y, yhat) sum(xor(y, yhat))
   } else {
     eFun <- function(y, yhat) mean((yhat - y) ^ 2, na.rm=TRUE)
   }
