@@ -3,9 +3,9 @@
 #' Read out metadata from random forest decision paths
 #'
 #' @param rand.forest an object of class randomForest.
-#' @param x numeric feature matrix
+#' @param x numeric feature matrix.
 #' @param return.node.feature if True, will return sparse matrix indicating
-#'  features used on each decision path of the rand.forest
+#'  features used on each decision path of the rand.forest.
 #' @param return.node.obs if True, will return sparse matrix indicating
 #'  observations in x that fall in each leaf node of rand.forest.
 #' @param varnames.grp grouping "hyper-features" for RIT search. Features with
@@ -41,7 +41,7 @@ readForest <- function(rand.forest, x,
                        varnames.grp=NULL,
                        oob.importance=TRUE,
                        first.split=TRUE,
-                       n.core=1){
+                       n.core=1) {
   
   # Check for valid input RF
   ranger <- class(rand.forest) == 'ranger'
@@ -79,7 +79,7 @@ readForest <- function(rand.forest, x,
   
   # Pass observations through RF to determine leaf node membership
   nodes <- NULL
-  if (return.node.obs & !ranger) {
+  if (return.node.obs && !ranger) {
     pred <- predict(rand.forest, newdata=x, nodes=TRUE)
     nodes <- attr(pred, 'nodes')
   } else if (ranger) {
@@ -133,7 +133,6 @@ readForest <- function(rand.forest, x,
 
   stopImplicitCluster()
   return(out)
-  
 }
 
 readTrees <- function(rand.forest, k, x, nodes,
@@ -250,7 +249,7 @@ readFeatures <- function(tree.info, varnames.grp,
   # Generate sparse matrix of decision path feature selection
   paths <- Matrix(unlist(paths), nrow=nlf, byrow=TRUE, sparse=TRUE)
   rownames(paths) <- paths[,ncol(paths)]
-  paths <- paths[,1:(2 * p)]
+  paths <- paths[, 1:(2 * p)]
 
   # Reorder leaf nodes according to tree.info
   idlf <- tree.info$node.idx[tree.info$status == -1]
