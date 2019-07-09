@@ -11,8 +11,9 @@
 #' @param ntree number of random forest trees.
 #' @param mtry.select.prob feature weights for first iteration. Defaults to
 #'  equal weights
-#' @param iter.return which iterations should interactions be returned for.
+#' @param iter.return which iterations should the RF be returned for.
 #'  Defaults to iteration with highest OOB accuracy.
+#' @param int.return which iterations should interacitons be returned for.
 #' @param select.iter if TRUE, returns interactions from iteration with highest
 #'  OOB accuracy.
 #' @param rit.param named list specifying RIT parameters. Entries include
@@ -56,8 +57,9 @@ iRF <- function(x, y,
                 n.iter=5, 
                 ntree=500, 
                 mtry.select.prob=rep(1, ncol(x)),
-                iter.return=NULL, 
-                select.iter=ifelse(is.null(iter.return), TRUE, FALSE),
+                iter.return=n.iter, 
+                int.return=NULL,
+                select.iter=FALSE,
                 rit.param=list(depth=5, ntree=500, 
                                nchild=2, class.id=1, 
                                min.nd=1, class.cut=NULL), 
@@ -78,6 +80,7 @@ iRF <- function(x, y,
   if (!is.null(interactions.return)) {
     warning('interactions.return is depricated, use iter.return instead')
     iter.return <- interactions.return
+    int.return <- interactions.return
     select.iter <- FALSE
   }
 
@@ -97,10 +100,10 @@ iRF <- function(x, y,
 
   if (nrow(x) != length(y))
     stop('x and y must contain the same number of observations')
-  if (ncol(x) < 2 & (!is.null(iter.return) | select.iter))
+  if (ncol(x) < 2 & (!is.null(int.return) | select.iter))
     stop('cannot find interaction - x has less than two columns!')
-  if (any(iter.return > n.iter))
-    stop('selected iteration greater than n.iter')
+  if (any(iter.return > n.iter | int.return > n.tier))
+    stop('selected iteration to return greater than n.iter')
   if (length(mtry.select.prob) != ncol(x))
     stop('length mtry.select.prob must equal number of features')
   if (length(weights) != nrow(x))
@@ -148,14 +151,18 @@ iRF <- function(x, y,
   
 
   # Select iteration to return interactions based on OOB error
-  selected.iter <- selectIter(rf.list, y=y)
-  if (select.iter) iter.return <- selected.iter 
+  if (select.iter) {
+    selected.iter <- selectIter(rf.list, y=y)
+    iter.return <- selected.iter 
+    int.return <- selected.iter
+  }
 
   # Generate bootstrap samples for stability analysis
-  if (is.null(bs.sample)) bs.sample <- lreplicate(n.bootstrap, bsSample(y))
+  if (is.null(bs.sample) & !is.null(int.return)) 
+    bs.sample <- lreplicate(n.bootstrap, bsSample(y))
     
   importance <- list()
-  for (iter in iter.return) {
+  for (iter in int.return) {
     
     # Run gRIT across RF grown on full dataset to extract interactions.
     if (verbose) cat('finding interactions...\n')
@@ -198,14 +205,17 @@ iRF <- function(x, y,
   out <- list()
   out$rf.list <- rf.list
   out$selected.iter <- selected.iter
-  if (!is.null(iter.return)) out$interaction <- importance
+  if (!is.null(int.return)) out$interaction <- importance
 
   if (length(iter.return) == 1) {
     iter.wt <- iter.return - 1
     if (iter.return > 1) out$weights <- out$rf.list[[iter.wt]][[imp.str]] 
     out$rf.list <- out$rf.list[[iter.return]]
-    out$interaction <- importance[[iter.return]]
     out$selected.iter <- iter.return
+  }
+
+  if (length(int.return) == 1) {
+    out$interaction <- importance[[int.return]]
   }
 
   return(out)
