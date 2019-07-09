@@ -116,7 +116,8 @@ gRIT <- function(x, y,
   } else {
   
     # Run RIT on leaf nodes of selected class  
-    ints <- runRIT(subsetReadForest(read.forest, idcl), weights=count[idcl],
+    ints <- runRIT(subsetReadForest(read.forest, idcl), 
+                   weights=count[idcl] * precision[idcl],
                    rit.param=rit.param, n.core=n.core)
 
     if (length(ints) == 0) return(nullReturnGRIT())

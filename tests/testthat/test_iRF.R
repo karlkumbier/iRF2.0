@@ -38,7 +38,7 @@ test_that("ranger classification iRF works", {
   expect_error(iRF(x=x[1:10,], y=as.factor(y)),
       regexp='x and y must contain the same number of observations')
   expect_error(iRF(x=as.matrix(x[,1]), y=as.factor(y)),
-      regexp='cannot find interaction - X has less than two columns!')
+      regexp='cannot find interaction - x has less than two columns!')
   expect_error(iRF(x=x, y=as.factor(y), interactions.return=10),
       regexp='selected iteration greater than n.iter')
   expect_error(iRF(x=x, y=as.factor(y), mtry.select.prob=1:2),

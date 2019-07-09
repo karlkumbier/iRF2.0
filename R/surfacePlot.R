@@ -44,6 +44,8 @@ plotInt <- function(x, y, int, read.forest,
                     min.surface=100,
                     min.nd=5,
                     pred.prob=FALSE,
+                    filt.rule=TRUE,
+                    nc=2,
                     main=NULL) {
   
   # Check whether rgl package is installed
@@ -69,21 +71,22 @@ plotInt <- function(x, y, int, read.forest,
   # Get feature indices for interaction in nf, x, and leaf ndoes
   int <- str_split(int, '_')[[1]]
   int.clean <- str_remove_all(int, '[-\\+]')
-  int.nf <- int2Id(int, varnames, split=TRUE, signed=TRUE)
+  int.nf <- int2Id(int.clean, varnames, split=TRUE, signed=FALSE)
   int.x <- int.nf %% ncol(x) + ncol(x) * (int.nf %% ncol(x) == 0)
-  int.lf <- Matrix::rowMeans(read.forest$node.feature[,int.nf] != 0) == 1
+  
+  # Group node feature for interactions of any sign among given features
+  p <- ncol(x)
+  nf <- read.forest$node.feature[,1:p] + read.forest$node.feature[,(p + 1):(2 * p)]
+  int.lf <- Matrix::rowMeans(nf[,int.nf] != 0) == 1
 
   if (length(int) > 2) {
     # Evaluate thresholds for features beyond order-2
     qCut <- function(x) quantile(x, probs = qcut)
-    thr <- apply(read.forest$node.feature[int.lf, int.nf], MAR=2, qCut)
-    sgn <- intSign(int)
+    thr <- apply(nf[int.lf, int.nf], MAR=2, qCut)
     
     # Assign each observation to a unique plot 
     id.plot <- 3:length(int)
-    xx <- t(x[,int.x[id.plot]]) * sgn[id.plot]
-    thr[id.plot] <- thr[id.plot] * sgn[id.plot]
-    id <- apply(xx > thr[id.plot], MAR=2, paste, collapse='_')
+    id <- apply(t(x[,int.x[id.plot]]) > thr[id.plot], MAR=2, paste, collapse='_')
   } else {
     id <- rep(1, nrow(x))
     id.plot <- 1:2
@@ -100,7 +103,8 @@ plotInt <- function(x, y, int, read.forest,
   surfaces <- lapply(ids, function(ii) {
     if (sum(ii) < min.surface) return(NULL)
     genSurface(x[ii,], y[ii], int.nf[1:2], varnames=varnames, 
-               rectangles=rectangles, min.nd=min.nd, grids=grids)
+               rectangles=rectangles, min.nd=min.nd, 
+               filt.rule=filt.rule, grids=grids)
   })
   
   # Set color range for surface map plots
@@ -115,12 +119,14 @@ plotInt <- function(x, y, int, read.forest,
   } 
   if (ngroup == 2) {
     open3d()
-    mfrow3d(nr=1, nc=2, sharedMouse = T)
+    nr <- ngroup / nc
+    mfrow3d(nr=nr, nc=nc, sharedMouse = T)
     par3d(windowRect = c(0, 0, 1500, 1500))
   } 
   if (ngroup == 4) {
     open3d()
-    mfrow3d(nr=2, nc=2, sharedMouse = T)
+    nr <- ngroup / nc
+    mfrow3d(nr=nr, nc=nc, sharedMouse = T)
     par3d(windowRect = c(0, 0, 1500, 1500))
   } 
 
@@ -154,6 +160,7 @@ plotInt2 <- function(surface,
                      xlab=NULL, ylab=NULL, zlab=NULL,
                      main=NULL,
                      range.col=NULL,
+                     filt.rule=TRUE,
                      z.range=c(0,1),
                      n.cols=100, 
                      axes=TRUE) {
@@ -187,7 +194,8 @@ plotInt2 <- function(surface,
 
 genSurface <- function(x, y, int, rectangles, 
                        varnames=NULL,
-                       grid.size=100, 
+                       grid.size=100,
+                       filt.rule=TRUE, 
                        grids=NULL, 
                        pred.prob=FALSE, 
                        min.nd=5) {
@@ -245,13 +253,13 @@ genSurface <- function(x, y, int, rectangles,
   }
 
   # Take largest decision rule from each tree
-  rectangles <- group_by(rectangles, tree) %>%
-    filter(size.node == max(size.node))
+  if (filt.rule) {
+    rectangles <- group_by(rectangles, tree) %>%
+      filter(size.node == max(size.node))
+  }
   
   # Get thresholds and sign for interaction rules
   tt <- do.call(rbind, rectangles$splits)
-  sgn1 <- ifelse(int[1] <= p, -1, 1)
-  sgn2 <- ifelse(int[2] <= p, -1, 1)
   
   # Evaluate distriution of responses across each decision rule
   grid <- matrix(0, nrow=grid.size, ncol=grid.size)
@@ -261,11 +269,11 @@ genSurface <- function(x, y, int, rectangles,
     wt <- rectangles$size.node[i]
     
     # Evalaute which observations/grid elements correspond to current HR
-    idcs1 <- sgn1 * g1 >= sgn1 * tt[i, 1]
-    x1 <- sgn1 * x[,uint[1]] >= sgn1 * tt[i, 1]
+    idcs1 <- g1 >= tt[i, 1]
+    x1 <- x[,uint[1]] >= tt[i, 1]
     
-    idcs2 <- sgn2 * g2 >= sgn2 * tt[i, 2]
-    x2 <- sgn2 * x[,uint[2]] >= sgn2 * tt[i, 2]
+    idcs2 <- g2 >= tt[i, 2]
+    x2 <- x[,uint[2]] >= tt[i, 2]
     
     if (pred.prob) {
       # Evaluate RF predictions for region corresponding to current HR
@@ -318,7 +326,8 @@ forestHR<- function(read.forest, int, min.nd, int.lf=NULL) {
   read.forest <- subsetReadForest(read.forest, id.subset) 
 
   # Extract splitting features and thresholds
-  nf <- read.forest$node.feature
+  p <- ncol(read.forest$node.feature) / 2
+  nf <- read.forest$node.feature[,1:p] + read.forest$node.feature[,(p + 1):(2 * p)]
   idcs <- lapply(int, function(ii) {(nf@p[ii] + 1):nf@p[ii + 1]})
   row.id <- nf@i[idcs[[1]]] + 1
   thresh <- nf@x[unlist(idcs)]        
