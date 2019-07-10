@@ -100,7 +100,7 @@ iRF <- function(x, y,
     stop('x and y must contain the same number of observations')
   if (ncol(x) < 2 & (!is.null(int.return) | select.iter))
     stop('cannot find interaction - x has less than two columns!')
-  if (any(iter.return > n.iter | int.return > n.tier))
+  if (any(iter.return > n.iter | int.return > n.iter))
     stop('selected iteration to return greater than n.iter')
   if (length(mtry.select.prob) != ncol(x))
     stop('length mtry.select.prob must equal number of features')
