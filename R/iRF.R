@@ -204,14 +204,13 @@ iRF <- function(x, y,
   # Combine reults for return
   out <- list()
   out$rf.list <- rf.list
-  out$selected.iter <- selected.iter
+  if (select.iter) out$selected.iter <- selected.iter
   if (!is.null(int.return)) out$interaction <- importance
 
   if (length(iter.return) == 1) {
     iter.wt <- iter.return - 1
     if (iter.return > 1) out$weights <- out$rf.list[[iter.wt]][[imp.str]] 
     out$rf.list <- out$rf.list[[iter.return]]
-    out$selected.iter <- iter.return
   }
 
   if (length(int.return) == 1) {
