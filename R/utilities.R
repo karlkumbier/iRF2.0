@@ -86,13 +86,13 @@ intSign <- function(int, split=TRUE) {
   # Evaluate sign of interactions
   if (!split) int <- str_split(int, '_')[[1]]
   sgn <- rep(-1, length(int))
-  sgn[grep('+', int)] <- 1
+  sgn[grep('\\+', int)] <- 1
   return(sgn)
 }
 
 intSubsets <- function(int, split=TRUE) {
   # Generate order 1, s - 1, and s subsets of an order-s interaction
-  if (!split) int <- strs_plit(as.character(int), '_')[[1]]
+  if (!split) int <- str_split(as.character(int), '_')[[1]]
   if (length(int) == 1) return(int)
   sub.ord <- c(1, length(int) - 1, length(int))
   subs <- lapply(sub.ord, combn, x=int, simplify=FALSE)
