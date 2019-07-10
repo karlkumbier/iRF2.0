@@ -102,6 +102,8 @@ iRF <- function(x, y,
     stop('cannot find interaction - x has less than two columns!')
   if (any(iter.return > n.iter | int.return > n.iter))
     stop('selected iteration to return greater than n.iter')
+  if (length(varnames.grp) != ncol(x))
+    stop('length(varnames.grp) must be equal to ncol(x)')
   if (length(mtry.select.prob) != ncol(x))
     stop('length mtry.select.prob must equal number of features')
   if (length(weights) != nrow(x))
