@@ -1,8 +1,4 @@
-context('test intSubsetss')
-
-test_that('intsSubsets works', {
-  skip('This function is not called anywhere in the current code base.')
-})
+context('test intSubsets')
 
 test_that('intSubsets works', {
   actual <- intSubsets('A+_B-_C+_D-')

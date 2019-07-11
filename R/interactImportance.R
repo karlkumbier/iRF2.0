@@ -3,7 +3,7 @@
 #' @importFrom utils combn
 #' @importFrom fastmatch fmatch
 intImportance <- function(int, nf, precision, weight) {
-  # Calculate importance metrics for an interaction across selected elaf nodes
+  # Calculate importance metrics for an interaction across selected leaf nodes
   # of a fitted random forest.
   #   prev: the prevalence of an interaction across all selected leaf nodes,
   #   weighted by observations in each leaf node.

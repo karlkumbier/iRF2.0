@@ -10,12 +10,12 @@
 #' @importFrom fastmatch "%fin%"
 getTree <- function(rfobj, k=1, nodes=NULL) {
    
-  if (class(rfobj) == 'randomForest') {
+  if ('randomForest' %in% class(rfobj)) {
     out <- getTreeRF(rfobj, k)
-  } else if (class(rfobj) == 'ranger') {
+  } else if ('ranger' %in% class(rfobj)) {
     out <- getTreeRanger(rfobj, k)
   } else {
-    stop(deparse(substitute(rfobj)), "is not class ranger of randomForest")
+    stop(deparse(substitute(rfobj)), "is not of class ranger or randomForest")
   }
 
   return(out)
@@ -47,7 +47,6 @@ getTreeRanger <- function(rfobj, k=1) {
                            "split point", "status", "prediction")
 
   return(tree.info)
-
 }
 
 getTreeRF <- function(rfobj, k=1) {

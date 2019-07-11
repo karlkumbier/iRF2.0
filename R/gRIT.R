@@ -34,8 +34,8 @@
 #' @importFrom parallel detectCores
 #' @importFrom doParallel registerDoParallel stopImplicitCluster
 #' @importFrom data.table data.table
-gRIT <- function(x, y, 
-                 rand.forest=NULL, 
+gRIT <- function(x, y,
+                 rand.forest=NULL,
                  read.forest=NULL,
                  rit.param=list(depth=5,
                          ntree=500,
@@ -43,7 +43,7 @@ gRIT <- function(x, y,
                          class.id=1,
                          min.nd=1,
                          class.cut=NULL),
-                 varnames.grp=colnames(x), 
+                 varnames.grp=colnames(x),
                  weights=rep(1, nrow(x)),
                  signed=TRUE,
                  oob.importance=TRUE,
@@ -52,25 +52,25 @@ gRIT <- function(x, y,
 
 
   class.irf <- is.factor(y)
-  if (n.core == -1) n.core <- detectCores()  
+  if (n.core == -1) n.core <- detectCores()
   if (n.core > 1) registerDoParallel(n.core)
 
   # Check rit parameters and set default values if not specified
   if (is.null(rand.forest) & is.null(read.forest))
     stop('Supply random forest or read forest output')
-  if (is.null(rit.param$depth)) 
+  if (is.null(rit.param$depth))
     rit.param$depth <- 5
-  if (is.null(rit.param$ntree)) 
+  if (is.null(rit.param$ntree))
     rit.param$ntree <- 500
-  if (is.null(rit.param$nchild)) 
+  if (is.null(rit.param$nchild))
     rit.param$nchild <- 2
-  if (is.null(rit.param$class.id) & class.irf) 
+  if (is.null(rit.param$class.id) & class.irf)
     rit.param$class.id <- 1
-  if (is.null(rit.param$min.nd)) 
+  if (is.null(rit.param$min.nd))
     rit.param$min.nd <- 1
-  if (is.null(rit.param$class.cut) & !class.irf) 
+  if (is.null(rit.param$class.cut) & !class.irf)
     rit.param$class.cut <- median(y)
-  if (!class.irf) 
+  if (!class.irf)
     y <- as.numeric(y >= rit.param$class.cut)
 
 
@@ -79,7 +79,7 @@ gRIT <- function(x, y,
     varnames.grp <- colnames(x)
   else if (is.null(varnames.grp))
     varnames.grp <- as.character(1:ncol(x))
-  
+
   varnames.unq <- unique(varnames.grp)
   p <- length(varnames.unq)
 
@@ -104,7 +104,7 @@ gRIT <- function(x, y,
 
   # Evaluate leaf node precision
   precision <- nodePrecision(read.forest, y, count, weights)
-  
+
   # Select class specific leaf nodes
   if (class.irf)
     idcl <- read.forest$tree.info$prediction == rit.param$class.id
@@ -114,14 +114,14 @@ gRIT <- function(x, y,
   if (sum(idcl) < 2) {
     return(nullReturnGRIT())
   } else {
-  
-    # Run RIT on leaf nodes of selected class  
-    ints <- runRIT(subsetReadForest(read.forest, idcl), 
+
+    # Run RIT on leaf nodes of selected class
+    ints <- runRIT(subsetReadForest(read.forest, idcl),
                    weights=count[idcl] * precision[idcl],
                    rit.param=rit.param, n.core=n.core)
 
     if (length(ints) == 0) return(nullReturnGRIT())
-    
+
     # Set recovered interactions or convert to indices if supplied
     if (is.null(ints.eval)) {
       ints.eval <- ints
@@ -129,7 +129,7 @@ gRIT <- function(x, y,
       ints.eval <- lapply(ints.eval, int2Id, signed=signed,
                           varnames.grp=varnames.grp)
     }
-   
+
     # Evaluate importance metrics for interactions and lower order subsets.
     ints.eval <- lapply(ints.eval, unname)
     ints.sub <- lapply(ints.eval, intSubsets)
@@ -137,23 +137,23 @@ gRIT <- function(x, y,
 
     # Convert node feature matrix to list of active features for fast lookup
     nf.list <- by(read.forest$node.feature@i,
-                  rep(1:ncol(read.forest$node.feature), 
+                  rep(1:ncol(read.forest$node.feature),
                       times=diff(read.forest$node.feature@p)), list)
-    
-    ximp <- lapply(ints.sub, intImportance, nf=nf.list, weight=count, 
+
+    ximp <- lapply(ints.sub, intImportance, nf=nf.list, weight=count,
                    precision=precision)
-    ximp <- rbindlist(ximp) 
-    
+    ximp <- rbindlist(ximp)
+
     imp.test <- lapply(ints.eval, subsetTest, importance=ximp, ints=ints.sub)
     imp.test <- rbindlist(imp.test)
   }
 
   # Aggregate evaluated interations for return
   ints.recovered <- nameInts(ints, varnames.unq, signed=signed)
-  
+
   name.full <- nameInts(ints.eval, varnames.unq, signed=signed)
   imp.test <- mutate(imp.test, int=name.full)
-  
+
   name.sub <- nameInts(ints.sub, varnames.unq, signed=signed)
   id.recovered <- name.sub %in% ints.recovered
   ximp <- mutate(ximp, int=name.sub, recovered=id.recovered) %>%
@@ -173,12 +173,12 @@ runRIT <- function(read.forest, weights, rit.param, n.core=1) {
                       branch=rit.param$nchild,
                       output_list=TRUE,
                       n_cores=n.core)$Interaction
-  
+
   return(interactions)
 }
 
 subsetReadForest <- function(read.forest, subset.idcs) {
-  # Subset nodes from readforest output 
+  # Subset nodes from readforest output
   if (!is.null(read.forest$node.feature))
     read.forest$node.feature <- read.forest$node.feature[subset.idcs,]
 
