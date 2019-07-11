@@ -7,7 +7,7 @@ using namespace Rcpp;
 
 // RIT_1class
 SEXP RIT_1class(SEXP z, NumericVector weights, int L, int branch, int depth, int n_trees, int min_inter_sz, int n_cores, bool is_sparse);
-RcppExport SEXP iRF_RIT_1class(SEXP zSEXP, SEXP weightsSEXP, SEXP LSEXP, SEXP branchSEXP, SEXP depthSEXP, SEXP n_treesSEXP, SEXP min_inter_szSEXP, SEXP n_coresSEXP, SEXP is_sparseSEXP) {
+RcppExport SEXP _iRF_RIT_1class(SEXP zSEXP, SEXP weightsSEXP, SEXP LSEXP, SEXP branchSEXP, SEXP depthSEXP, SEXP n_treesSEXP, SEXP min_inter_szSEXP, SEXP n_coresSEXP, SEXP is_sparseSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -26,7 +26,7 @@ END_RCPP
 }
 // RIT_2class
 SEXP RIT_2class(SEXP z, SEXP z0, int L, int branch, int depth, int n_trees, double theta0, double theta1, int min_inter_sz, int n_cores, bool is_sparse);
-RcppExport SEXP iRF_RIT_2class(SEXP zSEXP, SEXP z0SEXP, SEXP LSEXP, SEXP branchSEXP, SEXP depthSEXP, SEXP n_treesSEXP, SEXP theta0SEXP, SEXP theta1SEXP, SEXP min_inter_szSEXP, SEXP n_coresSEXP, SEXP is_sparseSEXP) {
+RcppExport SEXP _iRF_RIT_2class(SEXP zSEXP, SEXP z0SEXP, SEXP LSEXP, SEXP branchSEXP, SEXP depthSEXP, SEXP n_treesSEXP, SEXP theta0SEXP, SEXP theta1SEXP, SEXP min_inter_szSEXP, SEXP n_coresSEXP, SEXP is_sparseSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -44,4 +44,24 @@ BEGIN_RCPP
     rcpp_result_gen = Rcpp::wrap(RIT_2class(z, z0, L, branch, depth, n_trees, theta0, theta1, min_inter_sz, n_cores, is_sparse));
     return rcpp_result_gen;
 END_RCPP
+}
+
+RcppExport void classForest(void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *);
+RcppExport void classRF(void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *);
+RcppExport void regForest(void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *);
+RcppExport void regRF(void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *);
+
+static const R_CallMethodDef CallEntries[] = {
+    {"_iRF_RIT_1class", (DL_FUNC) &_iRF_RIT_1class, 9},
+    {"_iRF_RIT_2class", (DL_FUNC) &_iRF_RIT_2class, 11},
+    {"classForest", (DL_FUNC) &classForest, 24},
+    {"classRF",     (DL_FUNC) &classRF,     43},
+    {"regForest",   (DL_FUNC) &regForest,   21},
+    {"regRF",       (DL_FUNC) &regRF,       44},
+    {NULL, NULL, 0}
+};
+
+RcppExport void R_init_iRF(DllInfo *dll) {
+    R_registerRoutines(dll, NULL, CallEntries, NULL, NULL);
+    R_useDynamicSymbols(dll, FALSE);
 }
