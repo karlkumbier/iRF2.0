@@ -49,7 +49,6 @@ test_that('intSign works', {
 test_that('intSubsets works', {
   actual <- intSubsets(c(2L, 3L, 5L, 7L))
   actual <- lapply(actual, sort)
-  dput(actual)
   expect <- list(2L, 3L, 5L, 7L,
                  c(2L, 3L, 5L),
                  c(2L, 3L, 7L),

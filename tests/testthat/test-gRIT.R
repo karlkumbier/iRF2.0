@@ -10,6 +10,19 @@ test_that("gRIT works for randomForest", {
   expect_true('data.table' %in% class(fit))
 })
 
+test_that("gRIT works for ranger", {
+  x <- iris[, -5]
+  y <- iris[, 5]
+  class.irf <- is.factor(y)
+  if (class.irf)
+      y <- as.numeric(y) - 1
+  rand.forest <- ranger(data=cbind(x, y),
+               dependent.variable.name='y',
+               classification=class.irf)
+  fit <- gRIT(x, y, rand.forest)
+  expect_true('data.table' %in% class(fit))
+})
+
 test_that("runRIT works for randomForest", {
   rand.forest <- randomForest(Species ~ ., iris)
   read.forest <- readForest(rand.forest, x=iris[, -5])
@@ -38,6 +51,6 @@ test_that("runRIT works for ranger", {
 
   interactions <- runRIT(read.forest, weights, rit.param, 1)
   expect_equal(mode(interactions), 'list')
-  expect_gt(length(interactions), 0)
+  expect_gte(length(interactions), 3)
 })
 
