@@ -33,7 +33,7 @@
 #' @importFrom dplyr mutate right_join
 #' @importFrom parallel detectCores
 #' @importFrom doParallel registerDoParallel stopImplicitCluster
-#' @importFrom data.table data.table
+#' @importFrom data.table data.table as.data.table
 gRIT <- function(x, y,
                  rand.forest=NULL,
                  read.forest=NULL,
@@ -160,6 +160,8 @@ gRIT <- function(x, y,
     right_join(imp.test, by='int')
 
   stopImplicitCluster()
+
+  ximp <- as.data.table(ximp)
   return(ximp)
 }
 

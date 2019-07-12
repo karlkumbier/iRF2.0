@@ -4,6 +4,12 @@ library(randomForest)
 library(ranger)
 
 
+test_that("gRIT works for randomForest", {
+  rand.forest <- randomForest(Species ~ ., iris)
+  fit <- gRIT(iris[, -5], iris[, 5], rand.forest)
+  expect_true('data.table' %in% class(fit))
+})
+
 test_that("runRIT works for randomForest", {
   rand.forest <- randomForest(Species ~ ., iris)
   read.forest <- readForest(rand.forest, x=iris[, -5])

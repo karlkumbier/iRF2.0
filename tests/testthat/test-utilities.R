@@ -46,6 +46,21 @@ test_that('intSign works', {
                c(1, -1))
 })
 
+test_that('intSubsets works', {
+  actual <- intSubsets(c(2L, 3L, 5L, 7L))
+  actual <- lapply(actual, sort)
+  dput(actual)
+  expect <- list(2L, 3L, 5L, 7L,
+                 c(2L, 3L, 5L),
+                 c(2L, 3L, 7L),
+                 c(2L, 5L, 7L),
+                 c(3L, 5L, 7L),
+                 c(2L, 3L, 5L, 7L))
+  expect <- lapply(expect, sort)
+  expect_true(all(actual %in% expect) &&
+              all(expect %in% actual))
+})
+
 test_that('lreplicate works', {
   expect_equal(lreplicate(5, exp(0)),
                list(1, 1, 1, 1, 1))

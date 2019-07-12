@@ -90,6 +90,16 @@ intSign <- function(int, split=TRUE) {
   return(sgn)
 }
 
+intSubsets <- function(int, split=TRUE) {
+  # Generate order 1, s - 1, and s subsets of an order-s interaction
+  if (!split) int <- str_split(as.character(int), '_')[[1]]
+  if (length(int) == 1) return(int)
+  sub.ord <- c(1, length(int) - 1, length(int))
+  subs <- lapply(sub.ord, combn, x=int, simplify=FALSE)
+  subs <- unlist(subs, recursive=FALSE)
+  return(subs)
+}
+
 lreplicate <- function(n, expr, ...) {
   # replicate with list return
   out <- replicate(n, expr, ..., simplify=FALSE)
