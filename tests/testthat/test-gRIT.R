@@ -13,7 +13,7 @@ test_that("runRIT works for randomForest", {
 
   interactions <- runRIT(read.forest, weights, rit.param, 1)
   expect_equal(mode(interactions), 'list')
-  expect_gt(length(interactions), 0)
+  expect_gte(length(interactions), 3)
 })
 
 test_that("runRIT works for ranger", {

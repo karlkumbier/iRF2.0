@@ -7,7 +7,6 @@ library(ranger)
 test_that('readForest works for randomForest', {
   rand.forest <- randomForest(Species ~ ., iris)
   read.forest <- readForest(rand.forest, x=iris[, -5])
-  test_readForest(rand.forest, read.forest)
 
   countLeaf <- function(k)
       sum(randomForest::getTree(rand.forest, k)[, 'status'] == -1)
