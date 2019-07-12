@@ -5,14 +5,13 @@
 \title{Iterative random forests (iRF)}
 \usage{
 iRF(x, y, xtest = NULL, ytest = NULL, n.iter = 5, ntree = 500,
-  mtry.select.prob = rep(1, ncol(x)), iter.return = NULL,
-  select.iter = ifelse(is.null(iter.return), TRUE, FALSE),
-  rit.param = list(depth = 5, ntree = 500, nchild = 2, class.id = 1,
-  min.nd = 1, class.cut = NULL), varnames.grp = colnames(x),
-  n.bootstrap = 1, bs.sample = NULL, weights = rep(1, nrow(x)),
-  signed = TRUE, oob.importance = TRUE, type = "randomForest",
-  verbose = TRUE, n.core = 1, interactions.return = NULL,
-  wt.pred.accuracy = NULL, ...)
+  mtry.select.prob = rep(1, ncol(x)), iter.return = n.iter,
+  int.return = NULL, select.iter = FALSE, rit.param = list(depth = 5,
+  ntree = 500, nchild = 2, class.id = 1, min.nd = 1, class.cut = NULL),
+  varnames.grp = colnames(x), n.bootstrap = 1, bs.sample = NULL,
+  weights = rep(1, nrow(x)), signed = TRUE, oob.importance = TRUE,
+  type = "randomForest", verbose = TRUE, n.core = 1,
+  interactions.return = NULL, wt.pred.accuracy = NULL, ...)
 }
 \arguments{
 \item{x}{numeric feature matrix.}
@@ -28,10 +27,12 @@ iRF(x, y, xtest = NULL, ytest = NULL, n.iter = 5, ntree = 500,
 \item{ntree}{number of random forest trees.}
 
 \item{mtry.select.prob}{feature weights for first iteration. Defaults to
-equal weights.}
+equal weights}
 
-\item{iter.return}{which iterations should interactions be returned for.
+\item{iter.return}{which iterations should the RF be returned for.
 Defaults to iteration with highest OOB accuracy.}
+
+\item{int.return}{which iterations should interacitons be returned for.}
 
 \item{select.iter}{if TRUE, returns interactions from iteration with highest
 OOB accuracy.}
