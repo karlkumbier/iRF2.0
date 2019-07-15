@@ -68,13 +68,17 @@ interactPredict <- function(x, int, read.forest, varnames=NULL, min.nd=1) {
   ss <- sapply(trees, sampleTree, tree=tree.info$tree, size=size)
   nrule <- length(ss)
 
+  # Flip sign for negative components of signed interaction
+  if (any(!int.pos)) {
+    x[, !int.pos] <- -x[, !int.pos]
+    nf[, !int.pos] <- -nf[, !int.pos] 
+  }
+
   # Iterate over sampled leaf nodes and generate predictions.
   tx <- t(x)
   preds <- numeric(nrow(x))
   for (s in ss) {
-    tlow <- matrix(tx[!int.pos,] <= nf[s, !int.pos], ncol=nrow(x))
-    thigh <- matrix(tx[int.pos,] > nf[s, int.pos], ncol=nrow(x))
-    int.active <- (colSums(tlow) + colSums(thigh)) == length(int)
+    int.active <- Matrix::colSums(tx > nf[s,]) == length(int)
     preds <- preds + int.active * y[s]
   }
   out <- preds / nrule
