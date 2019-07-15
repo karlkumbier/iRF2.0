@@ -8,7 +8,7 @@ plotInt(x, y, int, read.forest, varnames = NULL, qcut = 0.5,
   col.pal = c("#1c3f66", "#306aab", "#6e96c4", "#ffb003", "#ff8300"),
   xlab = NULL, ylab = NULL, zlab = NULL, range.col = NULL,
   z.range = c(0, 1), grid.size = 50, min.surface = 100, min.nd = 5,
-  pred.prob = FALSE, main = NULL)
+  pred.prob = FALSE, filt.rule = TRUE, nc = 2, main = NULL)
 }
 \arguments{
 \item{x}{numeric feature matrix, with replicate features grouped}
