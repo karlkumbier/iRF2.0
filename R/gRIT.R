@@ -93,7 +93,7 @@ gRIT <- function(x, y,
                               n.core=n.core)
   }
 
-    # Collapse node feature matrix for unsigned iRF
+  # Collapse node feature matrix for unsigned iRF
   if (!signed) read.forest$node.feature <- collapseNF(read.forest$node.feature)
 
   # Evaluate leaf node size and subset forest based on minimum node size

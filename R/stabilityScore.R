@@ -96,8 +96,7 @@ bsgRIT <- function(x, y, mtry.select.prob, sample.id, ints.eval,
                    oob.importance, type, n.core, ...) {
 
   # Remove replicates in bs sample for OOB importance
-  if (oob.importance) 
-    sample.id <- unique(sample.id)
+  if (oob.importance) sample.id <- unique(sample.id)
  
   # Generate bootstrap sample for stability analysis
   x <- x[sample.id,]
@@ -132,11 +131,11 @@ summarizeInteract <- function(x) {
       summarize(prevalence=mean(prev1),
                 precision=mean(prec),
                 cpe=mean(diff),
-                sta.cpe=mean(diff >= 0),
+                sta.cpe=mean(diff > 0),
                 fsd=mean(prev.test),
-                sta.fsd=mean(prev.test >= 0),
+                sta.fsd=mean(prev.test > 0),
                 mip=mean(prec.test),
-                sta.mip=mean(prec.test >= 0),
+                sta.mip=mean(prec.test > 0),
                 stability=mean(recovered)) %>%
       arrange(desc(cpe))
   } else {
@@ -149,13 +148,13 @@ summarizeInteract <- function(x) {
 nullReturnStab <- function() {
   # Returns empty data table of scored interactions
   out <- data.table(prevalence=numeric(0),
-                  precision=numeric(0),
-                  cpe=numeric(0),
-                  sta.cpe=numeric(0),
-                  fsd=numeric(0),
-                  sta.fsd=numeric(0),
-                  mip=numeric(0),
-                  sta.mip=numeric(0),
-                  stability=numeric(0))
+                    precision=numeric(0),
+                    cpe=numeric(0),
+                    sta.cpe=numeric(0),
+                    fsd=numeric(0),
+                    sta.fsd=numeric(0),
+                    mip=numeric(0),
+                    sta.mip=numeric(0),
+                    stability=numeric(0))
   return(out)
 }
