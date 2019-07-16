@@ -8,6 +8,11 @@ test_that("gRIT works for randomForest", {
   rand.forest <- randomForest(Species ~ ., iris)
   fit <- gRIT(iris[, -5], iris[, 5], rand.forest)
   expect_true('data.table' %in% class(fit))
+  expect_equal(names(fit),
+               c("prev1", "prev0", "prec",
+                 "int", "recovered",
+                 "prev.test", "prec.test"))
+  expect_true(all(fit$recovered))
 })
 
 test_that("gRIT works for ranger", {
@@ -21,6 +26,10 @@ test_that("gRIT works for ranger", {
                classification=class.irf)
   fit <- gRIT(x, y, rand.forest)
   expect_true('data.table' %in% class(fit))
+  expect_equal(names(fit),
+               c("prev1", "prev0", "prec",
+                 "int", "recovered",
+                 "prev.test", "prec.test"))
 })
 
 test_that("runRIT works for randomForest", {
