@@ -106,3 +106,30 @@ lreplicate <- function(n, expr, ...) {
   return(out)
 }
 
+makeTarget <- function(name, new.value,
+                       regenerate=NULL, suite=NULL) {
+  if (is.null(regenerate)) {
+    regenerate <- get('REGENERATE', envir=parent.frame())
+  }
+  if (is.null(suite)) {
+    suite <- get('SUITE', envir=parent.frame())
+  }
+
+  filename <- file.path('assets', suite, paste0(name, '.rds'))
+  if (!regenerate && !file.exists(filename)) {
+    warning(paste(filename, 'not accessible, regenerating...'))
+    regenerate <- TRUE
+  }
+
+  if (regenerate) {
+    saveRDS(new.value, filename)
+    assign(name, new.value, envir=parent.frame())
+  } else {
+    old.value <- readRDS(filename)
+    test_that(paste(name, 'has not changed'), {
+      expect_equal(new.value, old.value)
+    })
+    assign(name, old.value, envir=parent.frame())
+  }
+}
+
