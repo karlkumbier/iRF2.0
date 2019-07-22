@@ -106,30 +106,41 @@ lreplicate <- function(n, expr, ...) {
   return(out)
 }
 
-makeTarget <- function(name, new.value,
-                       regenerate=NULL, suite=NULL) {
-  if (is.null(regenerate)) {
-    regenerate <- get('REGENERATE', envir=parent.frame())
-  }
+makeTarget <- function(name, new.value, suite=NULL,
+                       skip=NULL, regenerate=NULL) {
+  pf <- parent.frame()
   if (is.null(suite)) {
-    suite <- get('SUITE', envir=parent.frame())
+    suite <- get('SUITE', envir=pf)
+  }
+  if (is.null(skip)) {
+    skip <- mget('SKIP_ALL', envir=pf, ifnotfound=FALSE)
+    skip <- skip$SKIP_ALL
+  }
+  if (is.null(regenerate)) {
+    regenerate <- mget('REGENERATE_ALL', envir=pf, ifnotfound=FALSE)
+    regenerate <- regenerate$REGENERATE_ALL
   }
 
-  filename <- file.path('assets', suite, paste0(name, '.rds'))
-  if (!regenerate && !file.exists(filename)) {
-    warning(paste(filename, 'not accessible, regenerating...'))
+  name.base <- file.path('assets', suite, name)
+  save.name <- paste0(name.base, '.rds')
+  if (!regenerate && !file.exists(save.name)) {
+    warning(paste(save.name, 'not accessible, regenerating...'))
     regenerate <- TRUE
   }
 
   if (regenerate) {
-    saveRDS(new.value, filename)
-    assign(name, new.value, envir=parent.frame())
-  } else {
-    old.value <- readRDS(filename)
-    test_that(paste(name, 'has not changed'), {
-      expect_equal(new.value, old.value)
+    saveRDS(new.value, save.name)
+    assign(name, new.value, envir=pf)
+    return()
+  }
+
+  old.value <- readRDS(save.name)
+  assign(name, old.value, envir=pf)
+
+  if (!skip) {
+    test_that(paste('test if', name, 'is consistent'), {
+      expect_equal(old.value, new.value)
     })
-    assign(name, old.value, envir=parent.frame())
   }
 }
 

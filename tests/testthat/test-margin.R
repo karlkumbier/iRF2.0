@@ -1,5 +1,4 @@
 SUITE <- 'test-margin'
-REGENERATE <- FALSE
 
 
 ##############
@@ -8,11 +7,11 @@ REGENERATE <- FALSE
 
 makeTarget('randomForest_v', {
   set.seed(0)
-  randomForest(iris[, -5], iris[, 5])
-})
+  rand.forest <- randomForest::randomForest(iris[, -5], iris[, 5])
+}, skip=TRUE)
 
 makeTarget('margin_v', {
-  margin(randomForest_v)
+  margin.obs <- margin(randomForest_v)
 })
 
 makeTarget('plot_margin_v', {
@@ -20,7 +19,7 @@ makeTarget('plot_margin_v', {
   plot(margin_v)
   dev.off()
 
-  tools::md5sum('plot_margin.ps')
+  hash.value <- tools::md5sum('plot_margin.ps')
 })
 
 
