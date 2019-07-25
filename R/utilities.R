@@ -121,20 +121,20 @@ makeTarget <- function(name, new.value, suite=NULL,
     regenerate <- regenerate$REGENERATE_ALL
   }
 
-  name.base <- file.path('assets', suite, name)
-  save.name <- paste0(name.base, '.rds')
-  if (!regenerate && !file.exists(save.name)) {
-    warning(paste(save.name, 'not accessible, regenerating...'))
+  base.path <- file.path('assets', suite, name)
+  save.path <- paste0(base.path, '.rds')
+  if (!regenerate && !file.exists(save.path)) {
+    warning(paste(save.path, 'not accessible, regenerating...'))
     regenerate <- TRUE
   }
 
   if (regenerate) {
-    saveRDS(new.value, save.name)
+    saveRDS(new.value, save.path)
     assign(name, new.value, envir=pf)
     return()
   }
 
-  old.value <- readRDS(save.name)
+  old.value <- readRDS(save.path)
   assign(name, old.value, envir=pf)
 
   if (!skip) {
@@ -142,5 +142,36 @@ makeTarget <- function(name, new.value, suite=NULL,
       expect_equal(old.value, new.value)
     })
   }
+}
+
+`%<-meta.cache%` <- function(suite, RF.type, verify=c(TRUE, FALSE)) {
+
+  operator <- function(x, new.value) {
+    name <- deparse(substitute(x))
+    pf <- parent.frame()
+    directory <- file.path('assets', suite)
+    filename <- paste(name, RF.type, sep='-')
+    base.path <- file.path(directory, filename)
+  
+    save.path <- paste0(base.path, '.rds')
+    if (!file.exists(save.path)) {
+      warning(paste(save.path, 'not accessible, regenerating...'))
+      if (!dir.exists(directory)) {
+        dir.create(directory, recursive=TRUE)
+      }
+      saveRDS(new.value, save.path)
+      assign(name, new.value, inherits=TRUE)
+    } else {
+      old.value <- readRDS(save.path)
+      if (verify) {
+        test_that(paste('test if', name, 'is consistent'), {
+          expect_equal(old.value, new.value)
+        })
+      }
+      assign(name, old.value, inherits=TRUE)
+    }
+  }
+
+  return(operator)
 }
 
