@@ -1,25 +1,28 @@
-context('test interactPredict')
+suite <- 'test-interactPredict'
 
 
-test_that('sampleTree works', {
-  rand.forest <- randomForest(Species ~ ., iris)
-  read.forest <- readForest(rand.forest, x=iris[, -5])
-  info <- read.forest$tree.info
+x <- iris[, -5]
+y <- iris[, 5]
+RF.collection <- make.RF.collection(x, y)
+int <- 'Petal.Length+_Petal.Width+'
 
-  leaf.id <- sampleTree(42, info$tree, info$size.node)
-  expect_equal(length(leaf.id), 1)
-})
+for (RF in names(RF.collection)) {
+  `%<-%` <- `%<-meta.cache%`(suite, RF, TRUE)
 
-test_that('interactPredict works', {
-  set.seed(0)
-  x <- iris[, -5]
-  int <- 'Petal.Length+_Petal.Width+'
-  rand.forest <- randomForest(Species ~ ., iris)
-  read.forest <- readForest(rand.forest, x=iris[, -5])
-  info <- read.forest$tree.info
+  rand.forest <- RF.collection[[RF]]
+  read.forest %<-% readForest(rand.forest, x=x)
+  info %<-% read.forest$tree.info
 
-  ip <- interactPredict(x, int, read.forest)
-  expect_equal(length(ip), nrow(x))
-  expect_equal(sum(ip), 85.920177383592)
-})
+  test_that('sampleTree works', {
+    set.seed(42)
+    leaf.id %<-% sampleTree(42, info$tree, info$size.node)
+    expect_equal(length(leaf.id), 1)
+  })
+
+  test_that('interactPredict works', {
+    set.seed(42)
+    ip %<-% interactPredict(x, int, read.forest)
+    expect_equal(length(ip), nrow(x))
+  })
+}
 

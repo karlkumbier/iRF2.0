@@ -148,9 +148,13 @@ makeTarget <- function(name, new.value, suite=NULL,
 
   operator <- function(x, new.value) {
     name <- deparse(substitute(x))
-    pf <- parent.frame()
+
     directory <- file.path('assets', suite)
-    filename <- paste(name, RF.type, sep='-')
+    if (is.null(RF.type) || RF.type == '') {
+      filename <- name
+    } else {
+      filename <- paste(name, RF.type, sep='-')
+    }
     base.path <- file.path(directory, filename)
   
     save.path <- paste0(base.path, '.rds')
@@ -164,7 +168,8 @@ makeTarget <- function(name, new.value, suite=NULL,
     } else {
       old.value <- readRDS(save.path)
       if (verify) {
-        test_that(paste('test if', name, 'is consistent'), {
+        test_that(paste('test if', name, 'is consistent',
+                        'for', RF.type), {
           expect_equal(old.value, new.value)
         })
       }
@@ -173,5 +178,23 @@ makeTarget <- function(name, new.value, suite=NULL,
   }
 
   return(operator)
+}
+
+make.RF.collection <- function(x, y) {
+  `%<-cache%` <- `%<-meta.cache%`('global', NULL, FALSE)
+
+  rand.forest.randomForest %<-cache%
+      randomForest::randomForest(Species ~ ., iris)
+  
+  class.irf <- is.factor(y)
+  if (class.irf) y <- as.numeric(y) - 1
+  rand.forest.ranger %<-cache%
+      ranger::ranger(data=cbind(x, y),
+                     dependent.variable.name='y',
+                     classification=class.irf)
+  
+  RF.collection <- list(randomForest=rand.forest.randomForest,
+                        ranger=rand.forest.ranger)
+  return(RF.collection)
 }
 
