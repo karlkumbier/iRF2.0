@@ -8,20 +8,12 @@
 #' @param terminal node membership, required for reading ranger
 #'
 #' @importFrom fastmatch "%fin%"
-getTree <- function(rfobj, k=1, nodes=NULL) {
-   
-  if ('randomForest' %in% class(rfobj)) {
-    out <- getTreeRF(rfobj, k)
-  } else if ('ranger' %in% class(rfobj)) {
-    out <- getTreeRanger(rfobj, k)
-  } else {
+getTree <- function(x, ...) UseMethod("getTree")
+
+getTree.default <- function(...)
     stop(deparse(substitute(rfobj)), "is not of class ranger or randomForest")
-  }
 
-  return(out)
-}
-
-getTreeRanger <- function(rfobj, k=1) {
+getTree.ranger <- function(rfobj, k=1) {
   # Check whether current tree can be read
   if (is.null(rfobj$forest)) {
     stop("No forest component in ", deparse(substitute(rfobj)))
@@ -40,7 +32,7 @@ getTreeRanger <- function(rfobj, k=1) {
                           rfobj$forest$child.nodeIDs[[k]][[2]] + 1,
                           rfobj$forest$split.varIDs[[k]] + 1,
                           rfobj$forest$split.values[[k]],
-                          ifelse(status, -1, 1),
+                          status,
                           predicted)
 
   colnames(tree.info) <- c("left daughter", "right daughter", "split var",
@@ -49,7 +41,7 @@ getTreeRanger <- function(rfobj, k=1) {
   return(tree.info)
 }
 
-getTreeRF <- function(rfobj, k=1) {
+getTree.randomForest <- function(rfobj, k=1) {
   # Check whether current tree can be read
   if (is.null(rfobj$forest)) {
     stop("No forest component in ", deparse(substitute(rfobj)))
@@ -64,13 +56,13 @@ getTreeRF <- function(rfobj, k=1) {
                               rfobj$forest$rightDaughter[,k],
                               rfobj$forest$bestvar[,k],
                               rfobj$forest$xbestsplit[,k],
-                              rfobj$forest$nodestatus[,k],
+                              rfobj$forest$nodestatus[,k] == -1,
                               rfobj$forest$nodepred[,k])[1:rfobj$forest$ndbigtree[k],]
   } else {
       tree.info <- data.frame(rfobj$forest$treemap[,,k],
                               rfobj$forest$bestvar[,k],
                               rfobj$forest$xbestsplit[,k],
-                              rfobj$forest$nodestatus[,k],
+                              rfobj$forest$nodestatus[,k] == -1,
                               rfobj$forest$nodepred[,k])[1:rfobj$forest$ndbigtree[k],]
   }
 
