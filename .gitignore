@@ -2,3 +2,5 @@
 *.so
 *Makevars*
 *.swp
+profile.html
+profile_files/**

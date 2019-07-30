@@ -16,7 +16,7 @@
 #'  the first time a feature is selected.
 #' @param n.core number of cores to use. If -1, all available cores are used.
 #'
-#' @return a list containing the follosing entries
+#' @return a list containing the following entries
 #' \itemize{
 #'    \item{tree.info}{data frame of metadata for each leaf node in rand.forest}
 #'    \item{node.feature}{optional sparse matrix indicating feature usage on
@@ -166,7 +166,7 @@ readTree <- function(rand.forest, k, x, nodes,
                                  first.split=first.split)
   }
 
-  tree.info <- filter(tree.info, select.node)
+  tree.info <- tree.info[select.node]
 
   # Read leaf node membership for each observation
   node.obs <- NULL
@@ -194,9 +194,7 @@ readTree <- function(rand.forest, k, x, nodes,
   }
 
   out <- list()
-  col.remove <- c('left daughter', 'right daughter', 'split var',
-                  'split point', 'status')
-  out$tree.info <- select(tree.info, -one_of(col.remove))
+  out$tree.info <- tree.info[, -(1:5)]
   out$node.feature <- node.feature
   out$node.obs <- node.obs
 
@@ -285,17 +283,13 @@ ancestorPath <- function(tree.info, varnames.grp, varnames.unq, p,
   # Generate vector indicating threshold for first variable split
   left.child <- tree.info$`left daughter`[node.idx]
   left.set <- cur.path
-  if (first.split) {
-    if (cur.path[node.var + p] == 0) left.set[node.var] <- sp
-  } else {
+  if (!first.split || cur.path[node.var + p] == 0) {
     left.set[node.var] <- sp
   }
 
   right.child <- tree.info$`right daughter`[node.idx]
   right.set <- cur.path
-  if (first.split) {
-    if (cur.path[node.var] == 0) right.set[node.var + p] <- sp
-  } else {
+  if (!first.split || cur.path[node.var] == 0) {
     right.set[node.var + p] <- sp
   }
 
