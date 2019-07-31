@@ -9,6 +9,8 @@
 #'  equal weights
 #' @param ints.eval interactions to evaluate. If specified, importance metrics
 #'  will be evaluated for these interactions instead of those recovered by RIT.
+#' @param ints.idx.eval like \code{ints.eval}, but specifies the index of the
+#'  interactions.
 #' @param rit.param named list specifying RIT parameters. Entries include
 #'  \code{depth}: depths of RITs, \code{ntree}: number of RITs, \code{nchild}:
 #'  number of child nodes for each RIT, \code{class.id}: 0-1 indicating which
@@ -37,6 +39,7 @@
 stabilityScore <- function(x, y,
                            ntree=500,
                            mtry.select.prob=rep(1, ncol(x)), 
+                           ints.idx.eval=NULL,
                            ints.eval=NULL,
                            rit.param=list(depth=5, ntree=500,
                                           nchild=2, class.id=1,
@@ -78,6 +81,7 @@ stabilityScore <- function(x, y,
   for (i in 1:length(bs.sample)) {
     sample.id <- bs.sample[[i]]
     out[[i]] <- bsgRIT(x, y, mtry.select.prob, sample.id, 
+                       ints.idx.eval=ints.idx.eval,
                        ints.eval=ints.eval, ntree=ntree, weights=weights, 
                        rit.param=rit.param, varnames.grp=varnames.grp, 
                        signed=signed, oob.importance=oob.importance, 
@@ -91,9 +95,9 @@ stabilityScore <- function(x, y,
 }
 
 
-bsgRIT <- function(x, y, mtry.select.prob, sample.id, ints.eval, 
-                   weights, ntree, varnames.grp, rit.param, signed, 
-                   oob.importance, type, n.core, ...) {
+bsgRIT <- function(x, y, mtry.select.prob, sample.id, ints.idx.eval,
+                   ints.eval, weights, ntree, varnames.grp, rit.param,
+                   signed, oob.importance, type, n.core, ...) {
 
   # Remove replicates in bs sample for OOB importance
   if (oob.importance) sample.id <- unique(sample.id)
@@ -114,6 +118,7 @@ bsgRIT <- function(x, y, mtry.select.prob, sample.id, ints.eval,
                rit.param=rit.param,
                signed=signed,
                oob.importance=oob.importance,
+               ints.idx.eval=ints.idx.eval,
                ints.eval=ints.eval,
                n.core=n.core)
 

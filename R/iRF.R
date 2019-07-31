@@ -174,7 +174,7 @@ iRF <- function(x, y,
                       signed=signed,
                       n.core=n.core)
 
-    ints.eval <- ints.eval$int.idx
+    ints.idx.eval <- ints.eval$int.idx
     rit.param$ntree <- rit.param$ntree / n.bootstrap
 
     # Grow RFs on BS samples to evaluate stability of recovered interactions.
@@ -185,7 +185,7 @@ iRF <- function(x, y,
       importance[[iter]] <- stabilityScore(x, y, 
                                            ntree=ntree,
                                            mtry.select.prob=rf.weight,
-                                           ints.eval=ints.eval,
+                                           ints.idx.eval=ints.eval,
                                            rit.param=rit.param,
                                            varnames.grp=varnames.grp,
                                            bs.sample=bs.sample,

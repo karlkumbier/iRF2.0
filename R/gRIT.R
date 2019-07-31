@@ -23,6 +23,8 @@
 #'  samples.
 #' @param ints.eval interactions to evaluate. If specified, importance metrics
 #'  will be evaluated for these interactions instead of those recovered by RIT.
+#' @param ints.idx.eval like \code{ints.eval}, but specifies the index of the
+#'  interactions.
 #' @param n.core number of cores to use. If -1, all available cores are used.
 #'
 #' @return a data table containing the recovered interactions and importance
@@ -47,6 +49,7 @@ gRIT <- function(x, y,
                  weights=rep(1, nrow(x)),
                  signed=TRUE,
                  oob.importance=TRUE,
+                 ints.idx.eval = NULL,
                  ints.eval=NULL,
                  n.core=1) {
 
@@ -123,7 +126,12 @@ gRIT <- function(x, y,
     if (length(ints) == 0) return(nullReturnGRIT())
 
     # Set recovered interactions or convert to indices if supplied
-    if (is.null(ints.eval)) {
+    if (!is.null(ints.eval)) {
+      ints.eval <- lapply(ints.eval, int2Id, signed=signed,
+                          varnames.grp=varnames.grp)
+    } else if (!is.null(ints.idx.eval)) {
+      ints.eval <- ints.idx.eval
+    } else {
       ints.eval <- ints
     }
 
