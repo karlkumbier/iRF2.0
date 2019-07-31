@@ -174,7 +174,7 @@ iRF <- function(x, y,
                       signed=signed,
                       n.core=n.core)
 
-    ints.eval <- ints.eval$int
+    ints.eval <- ints.eval$int.idx
     rit.param$ntree <- rit.param$ntree / n.bootstrap
 
     # Grow RFs on BS samples to evaluate stability of recovered interactions.

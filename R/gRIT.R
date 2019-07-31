@@ -125,9 +125,6 @@ gRIT <- function(x, y,
     # Set recovered interactions or convert to indices if supplied
     if (is.null(ints.eval)) {
       ints.eval <- ints
-    } else {
-      ints.eval <- lapply(ints.eval, int2Id, signed=signed,
-                          varnames.grp=varnames.grp)
     }
 
     # Evaluate importance metrics for interactions and lower order subsets.
@@ -156,8 +153,9 @@ gRIT <- function(x, y,
 
   name.sub <- nameInts(ints.sub, varnames.unq, signed=signed)
   id.recovered <- name.sub %in% ints.recovered
-  ximp <- mutate(ximp, int=name.sub, recovered=id.recovered) %>%
-    right_join(imp.test, by='int')
+  ximp <- mutate(ximp, int.idx=ints.sub, int=name.sub,
+                 recovered=id.recovered) %>%
+          right_join(imp.test, by='int')
 
   stopImplicitCluster()
 
