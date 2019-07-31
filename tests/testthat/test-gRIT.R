@@ -21,12 +21,21 @@ for (RF in names(RF.collection)) {
     expect_gte(length(runRIT.RF), 3)
   })
 
-  test_that(paste('gRIT works for', RF), {
-    gRIT.RF %<-cache% gRIT(x, y, rand.forest)
-    expect_true('data.table' %in% class(gRIT.RF))
-    expect_equal(names(gRIT.RF),
+  test_that(paste('signed gRIT works for', RF), {
+    gRIT.signed %<-cache% gRIT(x, y, rand.forest)
+    expect_true('data.table' %in% class(gRIT.signed))
+    expect_equal(names(gRIT.signed),
                  c('prev1', 'prev0', 'prec',
-                   'int', 'recovered',
+                   'int.idx', 'int', 'recovered',
+                   'prev.test', 'prec.test'))
+  })
+
+  test_that(paste('unsigned gRIT works for', RF), {
+    gRIT.unsigned %<-cache% gRIT(x, y, rand.forest, signed=FALSE)
+    expect_true('data.table' %in% class(gRIT.unsigned))
+    expect_equal(names(gRIT.unsigned),
+                 c('prev1', 'prev0', 'prec',
+                   'int.idx', 'int', 'recovered',
                    'prev.test', 'prec.test'))
   })
 }
