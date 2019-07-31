@@ -14,46 +14,93 @@ for (RF in names(RF.collection)) {
   `%<-cache%` <- `%<-meta.cache%`(suite, RF, FALSE)
   `%<-verify%` <- `%<-meta.cache%`(suite, RF, TRUE)
 
-  test_that('iRF works in the first use case', {
-    fit1 %<-cache% iRF(x=x, y=as.factor(y), select.iter=TRUE, verbose=FALSE)
-    expect_equal(names(fit1),
+  test_that('signed iRF works in the first use case', {
+    fit1.signed %<-cache% iRF(x=x, y=as.factor(y),
+                       select.iter=TRUE, verbose=FALSE)
+    expect_equal(names(fit1.signed),
                  c("rf.list", "selected.iter", "interaction", "weights"))
-    expect_true(class(fit1$rf.list) %in%
+    expect_true(class(fit1.signed$rf.list) %in%
                 c('randomForest', 'ranger'))
-    expect_true(is.numeric(fit1$selected.iter))
-    expect_equal(length(fit1$selected.iter), 1)
+    expect_true(is.numeric(fit1.signed$selected.iter))
+    expect_equal(length(fit1.signed$selected.iter), 1)
     expect_true('data.table' %in%
-                class(fit1$interaction))
-    expect_equal(names(fit1$interaction),
+                class(fit1.signed$interaction))
+    expect_equal(names(fit1.signed$interaction),
                  c("int", "prevalence", "precision", "cpe",
                    "sta.cpe", "fsd", "sta.fsd", "mip",
                    "sta.mip", "stability"))
-    expect_equal(mode(fit1$weights), 'numeric')
-    expect_equal(dim(fit1$weights), c(p, 1))
+    expect_equal(mode(fit1.signed$weights), 'numeric')
+    expect_equal(dim(fit1.signed$weights), c(p, 1))
   })
-  
-  test_that('iRF works in the second use case', {
-    fit2 %<-cache% iRF(x=x, y=as.factor(y), n.iter=5, int.return=5, verbose=FALSE)
-    expect_equal(names(fit2), c("rf.list", "interaction", "weights"))
-    expect_true(class(fit2$rf.list) %in%
+
+  test_that('unsigned iRF works in the first use case', {
+    fit1.unsigned %<-cache% iRF(x=x, y=as.factor(y), select.iter=TRUE,
+                       verbose=FALSE, signed=FALSE)
+    expect_equal(names(fit1.unsigned),
+                 c("rf.list", "selected.iter", "interaction", "weights"))
+    expect_true(class(fit1.unsigned$rf.list) %in%
                 c('randomForest', 'ranger'))
+    expect_true(is.numeric(fit1.unsigned$selected.iter))
+    expect_equal(length(fit1.unsigned$selected.iter), 1)
     expect_true('data.table' %in%
-                class(fit2$interaction))
-    expect_equal(names(fit2$interaction),
+                class(fit1.unsigned$interaction))
+    expect_equal(names(fit1.unsigned$interaction),
                  c("int", "prevalence", "precision", "cpe",
                    "sta.cpe", "fsd", "sta.fsd", "mip",
                    "sta.mip", "stability"))
-    expect_equal(mode(fit2$weights), 'numeric')
-    expect_equal(dim(fit2$weights), c(p, 1))
+    expect_equal(mode(fit1.unsigned$weights), 'numeric')
+    expect_equal(dim(fit1.unsigned$weights), c(p, 1))
   })
   
-  test_that('iRF works in the third use case', {
-    fit3 %<-cache% iRF(x=x, y=as.factor(y), verbose=FALSE)
-    expect_equal(names(fit3), c("rf.list", "weights"))
-    expect_true(class(fit3$rf.list) %in%
+  test_that('signed iRF works in the second use case', {
+    fit2.signed %<-cache% iRF(x=x, y=as.factor(y),
+                       n.iter=5, int.return=5, verbose=FALSE)
+    expect_equal(names(fit2.signed), c("rf.list", "interaction", "weights"))
+    expect_true(class(fit2.signed$rf.list) %in%
                 c('randomForest', 'ranger'))
-    expect_equal(mode(fit3$weights), 'numeric')
-    expect_equal(dim(fit3$weights), c(p, 1))
+    expect_true('data.table' %in%
+                class(fit2.signed$interaction))
+    expect_equal(names(fit2.signed$interaction),
+                 c("int", "prevalence", "precision", "cpe",
+                   "sta.cpe", "fsd", "sta.fsd", "mip",
+                   "sta.mip", "stability"))
+    expect_equal(mode(fit2.signed$weights), 'numeric')
+    expect_equal(dim(fit2.signed$weights), c(p, 1))
+  })
+  
+  test_that('unsigned iRF works in the second use case', {
+    fit2.unsigned %<-cache% iRF(x=x, y=as.factor(y),
+                       n.iter=5, int.return=5, verbose=FALSE, signed=FALSE)
+    expect_equal(names(fit2.unsigned), c("rf.list", "interaction", "weights"))
+    expect_true(class(fit2.unsigned$rf.list) %in%
+                c('randomForest', 'ranger'))
+    expect_true('data.table' %in%
+                class(fit2.unsigned$interaction))
+    expect_equal(names(fit2.unsigned$interaction),
+                 c("int", "prevalence", "precision", "cpe",
+                   "sta.cpe", "fsd", "sta.fsd", "mip",
+                   "sta.mip", "stability"))
+    expect_equal(mode(fit2.unsigned$weights), 'numeric')
+    expect_equal(dim(fit2.unsigned$weights), c(p, 1))
+  })
+  
+  test_that('signed iRF works in the third use case', {
+    fit3.signed %<-cache% iRF(x=x, y=as.factor(y), verbose=FALSE)
+    expect_equal(names(fit3.signed), c("rf.list", "weights"))
+    expect_true(class(fit3.signed$rf.list) %in%
+                c('randomForest', 'ranger'))
+    expect_equal(mode(fit3.signed$weights), 'numeric')
+    expect_equal(dim(fit3.signed$weights), c(p, 1))
+  })
+  
+  test_that('unsigned iRF works in the third use case', {
+    fit3.unsigned %<-cache% iRF(x=x, y=as.factor(y),
+                       verbose=FALSE, signed=FALSE)
+    expect_equal(names(fit3.unsigned), c("rf.list", "weights"))
+    expect_true(class(fit3.unsigned$rf.list) %in%
+                c('randomForest', 'ranger'))
+    expect_equal(mode(fit3.unsigned$weights), 'numeric')
+    expect_equal(dim(fit3.unsigned$weights), c(p, 1))
   })
 
   test_that('stabilityScore works', {
