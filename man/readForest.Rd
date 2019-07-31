@@ -31,7 +31,7 @@ the first time a feature is selected.}
 \item{n.core}{number of cores to use. If -1, all available cores are used.}
 }
 \value{
-a list containing the follosing entries
+a list containing the following entries
 \itemize{
    \item{tree.info}{data frame of metadata for each leaf node in rand.forest}
    \item{node.feature}{optional sparse matrix indicating feature usage on

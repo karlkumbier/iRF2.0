@@ -23,8 +23,8 @@
 #'  samples.
 #' @param ints.eval interactions to evaluate. If specified, importance metrics
 #'  will be evaluated for these interactions instead of those recovered by RIT.
-#' @param ints.idx.eval like \code{ints.eval}, but specifies the index of the
-#'  interactions.
+#' @param ints.idx.eval like \code{ints.eval}, but specifies the indice of the
+#'  interactions instead of their names. Intended for internal use only.
 #' @param n.core number of cores to use. If -1, all available cores are used.
 #'
 #' @return a data table containing the recovered interactions and importance
@@ -76,6 +76,9 @@ gRIT <- function(x, y,
   if (!class.irf)
     y <- as.numeric(y >= rit.param$class.cut)
 
+  if (!is.null(ints.eval) && !is.null(ints.idx.eval))
+    warning(paste('Both ints.eval and ints.idx.eval are specified,',
+                  'ignoring the latter'))
 
   # Set feature names for grouping interactions
   if (is.null(varnames.grp) & !is.null(colnames(x)))

@@ -9,8 +9,8 @@
 #'  equal weights
 #' @param ints.eval interactions to evaluate. If specified, importance metrics
 #'  will be evaluated for these interactions instead of those recovered by RIT.
-#' @param ints.idx.eval like \code{ints.eval}, but specifies the index of the
-#'  interactions.
+#' @param ints.idx.eval like \code{ints.eval}, but specifies the indice of the
+#'  interactions instead of their names. Intended for internal use only.
 #' @param rit.param named list specifying RIT parameters. Entries include
 #'  \code{depth}: depths of RITs, \code{ntree}: number of RITs, \code{nchild}:
 #'  number of child nodes for each RIT, \code{class.id}: 0-1 indicating which
