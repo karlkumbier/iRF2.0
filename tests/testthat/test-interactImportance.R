@@ -28,11 +28,10 @@ for (RF in names(RF.collection)) {
   selected.read.forest %<-% subsetReadForest(read.forest, idcnt)
   selected.count %<-% count[idcnt]
   
-  nf.list %<-% by(selected.read.forest$node.feature@i,
-                  rep(1:ncol(selected.read.forest$node.feature),
-                      times=diff(selected.read.forest$node.feature@p)), list)
-
-  ximp %<-% intImportance(int.eval, nf.list, precision, selected.count)
+  node.feature <- selected.read.forest$node.feature
+  node.feature <- lapply(seq_len(ncol(node.feature)),
+                         function(i) node.feature[,i])
+  ximp %<-% intImportance(int.eval, node.feature, precision, selected.count)
 
   test_that("intImportance works", {
     expect_true('data.frame' %in% class(ximp))
