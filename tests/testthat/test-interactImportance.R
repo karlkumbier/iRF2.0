@@ -35,7 +35,7 @@ for (RF in names(RF.collection)) {
   ximp %<-% intImportance(int.eval, nf.list, precision, selected.count)
 
   test_that("intImportance works", {
-    expect_true('data.table' %in% class(ximp))
+    expect_true('data.frame' %in% class(ximp))
     expect_equal(names(ximp),
                  c("prev1", "prev0", "prec"))
   })

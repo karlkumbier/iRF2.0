@@ -53,7 +53,6 @@ gRIT <- function(x, y,
                  ints.eval=NULL,
                  n.core=1) {
 
-
   class.irf <- is.factor(y)
   if (n.core == -1) n.core <- detectCores()
   if (n.core > 1) registerDoParallel(n.core)
@@ -144,9 +143,8 @@ gRIT <- function(x, y,
     ints.sub <- unique(unlist(ints.sub, recursive=FALSE))
 
     # Convert node feature matrix to list of active features for fast lookup
-    nf.list <- by(read.forest$node.feature@i,
-                  rep(1:ncol(read.forest$node.feature),
-                      times=diff(read.forest$node.feature@p)), list)
+    node.feature <- as(read.forest$node.feature, 'dgTMatrix')
+    nf.list <- split(node.feature@i + 1L, node.feature@j + 1L)
 
     ximp <- lapply(ints.sub, intImportance, nf=nf.list, weight=count,
                    precision=precision)
@@ -170,8 +168,7 @@ gRIT <- function(x, y,
 
   stopImplicitCluster()
 
-  ximp <- as.data.table(ximp)
-  return(ximp)
+  return(as.data.table(ximp))
 }
 
 runRIT <- function(read.forest, weights, rit.param, n.core=1) {

@@ -19,10 +19,10 @@ intImportance <- function(int, nf, precision, weight) {
   prev1 <- prevalence(weight * precision, int.id)
   prev0 <- prevalence(weight * (1 - precision), int.id)
   prec <- sum(precision[int.id] * weight[int.id]) / sum(weight[int.id])
-  return(data.table(prev1=prev1, prev0=prev0, prec=prec))
+  return(data.frame(prev1=prev1, prev0=prev0, prec=prec))
 }
 
-# Faster base::intersect, assuming x and y don't contain duplications.
+# Faster than base::intersect, assuming x and y don't contain duplications.
 fast.intersect <- function(x, y) y[fmatch(x, y, 0L)]
 
 prevalence <- function(weight, idint) {
