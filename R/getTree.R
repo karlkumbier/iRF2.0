@@ -7,7 +7,6 @@
 #' @param labelVar
 #' @param terminal node membership, required for reading ranger
 #'
-#' @importFrom data.table data.table
 #' @importFrom fastmatch "%fin%"
 getTree <- function(x, ...) UseMethod("getTree")
 
@@ -29,7 +28,7 @@ getTree.ranger <- function(rfobj, k=1) {
   status <- rfobj$forest$child.nodeIDs[[k]][[1]] == 0
   predicted <- rep(0L, nnode)
   predicted[status] <- rfobj$forest$split.values[[k]][status]
-  tree.info <- data.table(rfobj$forest$child.nodeIDs[[k]][[1]] + 1,
+  tree.info <- data.frame(rfobj$forest$child.nodeIDs[[k]][[1]] + 1,
                           rfobj$forest$child.nodeIDs[[k]][[2]] + 1,
                           rfobj$forest$split.varIDs[[k]] + 1,
                           rfobj$forest$split.values[[k]],
@@ -53,14 +52,14 @@ getTree.randomForest <- function(rfobj, k=1) {
 
   # Read metadata from forest
   if (rfobj$type == "regression") {
-      tree.info <- data.table(rfobj$forest$leftDaughter[,k],
+      tree.info <- data.frame(rfobj$forest$leftDaughter[,k],
                               rfobj$forest$rightDaughter[,k],
                               rfobj$forest$bestvar[,k],
                               rfobj$forest$xbestsplit[,k],
                               rfobj$forest$nodestatus[,k] == -1,
                               rfobj$forest$nodepred[,k])[1:rfobj$forest$ndbigtree[k],]
   } else {
-      tree.info <- data.table(rfobj$forest$treemap[,,k],
+      tree.info <- data.frame(rfobj$forest$treemap[,,k],
                               rfobj$forest$bestvar[,k],
                               rfobj$forest$xbestsplit[,k],
                               rfobj$forest$nodestatus[,k] == -1,

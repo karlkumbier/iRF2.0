@@ -28,7 +28,7 @@
 #' @export
 #'
 #' @importFrom Matrix Matrix t sparseMatrix rowSums colSums
-#' @importFrom data.table data.table rbindlist
+#' @importFrom data.table rbindlist
 #' @importFrom foreach foreach "%dopar%"
 #' @importFrom doParallel registerDoParallel stopImplicitCluster
 #' @importFrom doRNG "%dorng%"
@@ -166,7 +166,7 @@ readTree <- function(rand.forest, k, x, nodes,
                                  first.split=first.split)
   }
 
-  tree.info <- tree.info[select.node]
+  tree.info <- tree.info[select.node, ]
 
   # Read leaf node membership for each observation
   node.obs <- NULL
