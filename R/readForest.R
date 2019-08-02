@@ -265,7 +265,7 @@ readFeatures <- function(tree.info, varnames.grp,
                         cur.path=cur.path, first.split=first.split)
 
   # Generate sparse matrix of decision path feature selection
-  paths <- Matrix(paths, nrow=nlf, byrow=TRUE, sparse=TRUE)
+  paths <- Matrix(unlist(paths), nrow=nlf, byrow=TRUE, sparse=TRUE)
   rownames(paths) <- paths[,ncol(paths)]
   paths <- paths[, 1:(2 * p)]
 
@@ -309,7 +309,7 @@ ancestorPath <- function(tree.info, varnames.grp, varnames.unq, p,
   rpath <- ancestorPath(tree.info, varnames.grp, varnames.unq,
                         p, right.set, right.child, first.split)
 
-  return(c(lpath, rpath))
+  return(list(lpath, rpath))
 }
 
 nfSparse <- function(rd.forest, offset, p) {
