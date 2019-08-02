@@ -28,10 +28,33 @@ getTree.ranger <- function(rfobj, k=1) {
 }
 
 getTree.randomForest <- function(rfobj, k=1) {
+  # Check whether current tree can be read
+  if (is.null(rfobj$forest)) {
+    stop("No forest component in ", deparse(substitute(rfobj)))
+  }
+  if (k > rfobj$ntree) {
+    stop("There are fewer than ", k, "trees in the forest")
+  }
+
   # Read metadata from forest
-  tree.info <- randomForest::getTree(rfobj, k) %>%
-      as.data.frame %>%
-      mutate(status = status==-1L)
+  if (rfobj$type == "regression") {
+      tree.info <- data.frame(rfobj$forest$leftDaughter[,k],
+                              rfobj$forest$rightDaughter[,k],
+                              rfobj$forest$bestvar[,k],
+                              rfobj$forest$xbestsplit[,k],
+                              rfobj$forest$nodestatus[,k] == -1,
+                              rfobj$forest$nodepred[,k])
+  } else {
+      tree.info <- data.frame(rfobj$forest$treemap[,,k],
+                              rfobj$forest$bestvar[,k],
+                              rfobj$forest$xbestsplit[,k],
+                              rfobj$forest$nodestatus[,k] == -1,
+                              rfobj$forest$nodepred[,k])
+  }
+  tree.info <- tree.info[1:rfobj$forest$ndbigtree[k], ]
+
+  colnames(tree.info) <- c("left daughter", "right daughter", "split var", 
+                           "split point", "status", "prediction")
 
   return(tree.info)
 }
