@@ -29,11 +29,10 @@
 #'
 #' @importFrom Matrix Matrix t sparseMatrix rowSums colSums
 #' @importFrom data.table rbindlist
-#' @importFrom foreach foreach "%dopar%"
+#' @importFrom foreach foreach
 #' @importFrom doParallel registerDoParallel stopImplicitCluster
 #' @importFrom doRNG "%dorng%"
 #' @importFrom parallel detectCores
-#' @importFrom dplyr one_of select filter
 #' @importFrom fastmatch fmatch
 readForest <- function(rand.forest, x,
                        return.node.feature=TRUE,
@@ -76,24 +75,35 @@ readForest <- function(rand.forest, x,
   # Pass observations through RF to determine leaf node membership
   nodes <- readNodes(rand.forest, return.node.obs, x)
 
-  # Split trees across cores to read forest in parallel
-  a <- floor(ntree / n.core)
-  b <- ntree %% n.core
-  ntree.core <- c(rep(a + 1, b), rep(a, n.core - b))
-  core.id <- rep(1:n.core, times=ntree.core)
+  if (n.core == 1) {
+    rd.forest <- readTrees(1:ntree,
+                           rand.forest=rand.forest,
+                           x=x, nodes=nodes,
+                           varnames.grp=varnames.grp,
+                           oob.importance=oob.importance,
+                           return.node.feature=return.node.feature,
+                           return.node.obs=return.node.obs,
+                           first.split=first.split)
+  } else {
+    # Split trees across cores to read forest in parallel
+    a <- floor(ntree / n.core)
+    b <- ntree %% n.core
+    ntree.core <- c(rep(a + 1, b), rep(a, n.core - b))
+    core.id <- rep(1:n.core, times=ntree.core)
 
-  # Read decision paths across each tree in the forest
-  suppressWarnings(
-  rd.forest <- foreach(id=1:n.core) %dorng% {
-    tree.id <- which(core.id == id)
-    readTrees(k=tree.id, rand.forest=rand.forest, x=x, nodes=nodes,
-              varnames.grp=varnames.grp,
-              oob.importance=oob.importance,
-              return.node.feature=return.node.feature,
-              return.node.obs=return.node.obs,
-              first.split=first.split)
-  })
-  rd.forest <- unlist(rd.forest, recursive=FALSE)
+    # Read decision paths across each tree in the forest
+    suppressWarnings(
+    rd.forest <- foreach(id=1:n.core) %dorng% {
+      tree.id <- which(core.id == id)
+      readTrees(k=tree.id, rand.forest=rand.forest, x=x, nodes=nodes,
+                varnames.grp=varnames.grp,
+                oob.importance=oob.importance,
+                return.node.feature=return.node.feature,
+                return.node.obs=return.node.obs,
+                first.split=first.split)
+    })
+    rd.forest <- unlist(rd.forest, recursive=FALSE)
+  }
 
   # Aggregate node level metadata
   offset <- cumsum(sapply(rd.forest, function(tt) nrow(tt$tree.info)))
@@ -296,9 +306,9 @@ ancestorPath <- function(tree.info, varnames.grp, varnames.unq, p,
   # Get acncestor path info for child nodes and combine
   lpath <- ancestorPath(tree.info, varnames.grp, varnames.unq,
                         p, left.set, left.child, first.split)
-
   rpath <- ancestorPath(tree.info, varnames.grp, varnames.unq,
                         p, right.set, right.child, first.split)
+
   return(list(lpath, rpath))
 }
 
