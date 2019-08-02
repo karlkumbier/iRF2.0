@@ -28,10 +28,10 @@ for (RF in names(RF.collection)) {
   selected.read.forest %<-% subsetReadForest(read.forest, idcnt)
   selected.count %<-% count[idcnt]
   
-  node.feature <- selected.read.forest$node.feature
-  node.feature <- lapply(seq_len(ncol(node.feature)),
-                         function(i) node.feature[,i])
-  ximp %<-% intImportance(int.eval, node.feature, precision, selected.count)
+  node.feature <- as(selected.read.forest$node.feature, 'dgTMatrix')
+  nf.list <- split(node.feature@i + 1L, node.feature@j + 1L)
+
+  ximp %<-% intImportance(int.eval, nf.list, precision, selected.count)
 
   test_that("intImportance works", {
     expect_true('data.frame' %in% class(ximp))

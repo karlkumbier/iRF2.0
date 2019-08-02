@@ -2,7 +2,7 @@
 #' @importFrom Matrix colSums rowSums t
 #' @importFrom utils combn
 #' @importFrom fastmatch fmatch
-intImportance <- function(int, node.feature, precision, weight) {
+intImportance <- function(int, nf, precision, weight) {
   # Calculate importance metrics for an interaction across selected leaf nodes
   # of a fitted random forest.
   #   prev: the prevalence of an interaction across all selected leaf nodes,
@@ -11,9 +11,8 @@ intImportance <- function(int, node.feature, precision, weight) {
   #   interaction.
   
   # Determine which leaf nodes contain the given interaction
-  int.id <- Reduce(`&`, node.feature[int])
-
-  if (!any(int.id))
+  int.id <- Reduce(fast.intersect, nf[int])
+  if (length(int.id) == 0)
     return(data.table(prev1=0, prev0=0, prec=0))
 
   # Compute prevalence and precision for given interaction

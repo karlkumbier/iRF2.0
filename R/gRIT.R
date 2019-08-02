@@ -142,11 +142,12 @@ gRIT <- function(x, y,
     ints.sub <- lapply(ints.eval, intSubsets)
     ints.sub <- unique(unlist(ints.sub, recursive=FALSE))
 
-    node.feature <- read.forest$node.feature
-    node.feature <- lapply(seq_len(ncol(node.feature)),
-                           function(i) node.feature[, i])
-    ximp <- lapply(ints.sub, intImportance, node.feature=node.feature,
-                   weight=count, precision=precision)
+    # Convert node feature matrix to list of active features for fast lookup
+    node.feature <- as(read.forest$node.feature, 'dgTMatrix')
+    nf.list <- split(node.feature@i + 1L, node.feature@j + 1L)
+
+    ximp <- lapply(ints.sub, intImportance, nf=nf.list, weight=count,
+                   precision=precision)
     ximp <- rbindlist(ximp)
 
     imp.test <- lapply(ints.eval, subsetTest, importance=ximp, ints=ints.sub)
