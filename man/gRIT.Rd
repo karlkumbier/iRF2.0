@@ -8,7 +8,7 @@ gRIT(x, y, rand.forest = NULL, read.forest = NULL,
   rit.param = list(depth = 5, ntree = 500, nchild = 2, class.id = 1,
   min.nd = 1, class.cut = NULL), varnames.grp = colnames(x),
   weights = rep(1, nrow(x)), signed = TRUE, oob.importance = TRUE,
-  ints.eval = NULL, n.core = 1)
+  ints.idx.eval = NULL, ints.eval = NULL, n.core = 1)
 }
 \arguments{
 \item{x}{numeric feature matrix}
@@ -38,6 +38,9 @@ observations they contain.}
 
 \item{oob.importance}{if TRUE, importance measures are evaluated on OOB
 samples.}
+
+\item{ints.idx.eval}{like \code{ints.eval}, but specifies the indice of the
+interactions instead of their names. Intended for internal use only.}
 
 \item{ints.eval}{interactions to evaluate. If specified, importance metrics
 will be evaluated for these interactions instead of those recovered by RIT.}

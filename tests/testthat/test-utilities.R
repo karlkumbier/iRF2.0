@@ -1,5 +1,3 @@
-context('test utility functions')
-
 varnames.grp <- c('SL', 'SW', 'PL', 'PW')
 varnames <- unique(varnames.grp)
 ints <- data.frame(c(3, 8), c(7, 4), c(3, 4))

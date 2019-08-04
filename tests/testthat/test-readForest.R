@@ -1,11 +1,19 @@
-context('test readForest')
+suite <- 'test-readForest'
 
-library(randomForest)
-library(ranger)
+x <- iris[, -5]
+y <- iris[, 5]
+RF.collection <- make.RF.collection(x, y)
+
+
+for (RF in names(RF.collection)) {
+  `%<-%` <- `%<-meta.cache%`(suite, RF, TRUE)
+  rand.forest <- RF.collection[[RF]]
+  read.forest %<-% readForest(rand.forest, x=x)
+}
 
 
 test_that('readForest works for randomForest', {
-  rand.forest <- randomForest(Species ~ ., iris)
+  rand.forest <- RF.collection[['randomForest']]
   read.forest <- readForest(rand.forest, x=iris[, -5])
 
   countLeaf <- function(k)
@@ -36,15 +44,9 @@ test_that('readForest works for randomForest', {
                rep(rand.forest$ntree, length(rand.forest$predicted)))
 })
 
+
 test_that('readForest works for ranger', {
-  x <- iris[, -5]
-  y <- iris[, 5]
-  class.irf <- is.factor(y)
-  if (class.irf)
-      y <- as.numeric(y) - 1
-  rand.forest <- ranger(data=cbind(x, y),
-               dependent.variable.name='y',
-               classification=class.irf)
+  rand.forest <- RF.collection[['ranger']]
   read.forest <- readForest(rand.forest, x=iris[, -5])
 
   countLeaf <- function(k)

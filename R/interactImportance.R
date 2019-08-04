@@ -11,16 +11,28 @@ intImportance <- function(int, nf, precision, weight) {
   #   interaction.
   
   # Determine which leaf nodes contain the given interaction
-  int.id <- Reduce(intersect, nf[as.character(int)]) + 1
+  int.id <- Reduce(fast.intersect, nf[int])
   if (length(int.id) == 0)
-    return(data.table(prev1=0, prev0=0, prec=0))
+    return(data.frame(prev1=0, prev0=0, prec=0))
 
   # Compute prevalence and precision for given interaction
-  prev1 <- prevalence(weight * precision, int.id)
-  prev0 <- prevalence(weight * (1 - precision), int.id)
-  prec <- sum(precision[int.id] * weight[int.id]) / sum(weight[int.id])
-  return(data.table(prev1=prev1, prev0=prev0, prec=prec))
+  weight1 <- weight * precision
+  sint1 <- sum(weight1[int.id])
+  s1 <- sum(weight1)
+  prev1 <- sint1 / s1
+
+  weight0 <- weight - weight1
+  sint0 <- sum(weight0[int.id])
+  s0 <- sum(weight0)
+  prev0 <- sint0 / s0
+
+  prec <- sint1 / (sint0 + sint1)
+
+  return(data.frame(prev1=prev1, prev0=prev0, prec=prec))
 }
+
+# Faster than base::intersect, assuming x and y don't contain duplications.
+fast.intersect <- function(x, y) y[fmatch(x, y, 0L)]
 
 prevalence <- function(weight, idint) {
   # Computes the prevalence in selected nodes 
