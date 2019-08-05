@@ -23,6 +23,8 @@
 #'  samples.
 #' @param ints.eval interactions to evaluate. If specified, importance metrics
 #'  will be evaluated for these interactions instead of those recovered by RIT.
+#' @param ints.idx.eval like \code{ints.eval}, but specifies the indice of the
+#'  interactions instead of their names. Intended for internal use only.
 #' @param n.core number of cores to use. If -1, all available cores are used.
 #'
 #' @return a data table containing the recovered interactions and importance
@@ -47,9 +49,9 @@ gRIT <- function(x, y,
                  weights=rep(1, nrow(x)),
                  signed=TRUE,
                  oob.importance=TRUE,
+                 ints.idx.eval = NULL,
                  ints.eval=NULL,
                  n.core=1) {
-
 
   class.irf <- is.factor(y)
   if (n.core == -1) n.core <- detectCores()
@@ -73,6 +75,9 @@ gRIT <- function(x, y,
   if (!class.irf)
     y <- as.numeric(y >= rit.param$class.cut)
 
+  if (!is.null(ints.eval) && !is.null(ints.idx.eval))
+    warning(paste('Both ints.eval and ints.idx.eval are specified,',
+                  'ignoring the latter'))
 
   # Set feature names for grouping interactions
   if (is.null(varnames.grp) & !is.null(colnames(x)))
@@ -123,11 +128,13 @@ gRIT <- function(x, y,
     if (length(ints) == 0) return(nullReturnGRIT())
 
     # Set recovered interactions or convert to indices if supplied
-    if (is.null(ints.eval)) {
-      ints.eval <- ints
-    } else {
+    if (!is.null(ints.eval)) {
       ints.eval <- lapply(ints.eval, int2Id, signed=signed,
                           varnames.grp=varnames.grp)
+    } else if (!is.null(ints.idx.eval)) {
+      ints.eval <- ints.idx.eval
+    } else {
+      ints.eval <- ints
     }
 
     # Evaluate importance metrics for interactions and lower order subsets.
@@ -136,9 +143,8 @@ gRIT <- function(x, y,
     ints.sub <- unique(unlist(ints.sub, recursive=FALSE))
 
     # Convert node feature matrix to list of active features for fast lookup
-    nf.list <- by(read.forest$node.feature@i,
-                  rep(1:ncol(read.forest$node.feature),
-                      times=diff(read.forest$node.feature@p)), list)
+    node.feature <- as(read.forest$node.feature, 'dgTMatrix')
+    nf.list <- split(node.feature@i + 1L, node.feature@j + 1L)
 
     ximp <- lapply(ints.sub, intImportance, nf=nf.list, weight=count,
                    precision=precision)
@@ -156,13 +162,13 @@ gRIT <- function(x, y,
 
   name.sub <- nameInts(ints.sub, varnames.unq, signed=signed)
   id.recovered <- name.sub %in% ints.recovered
-  ximp <- mutate(ximp, int=name.sub, recovered=id.recovered) %>%
-    right_join(imp.test, by='int')
+  ximp <- mutate(ximp, int.idx=ints.sub, int=name.sub,
+                 recovered=id.recovered) %>%
+          right_join(imp.test, by='int')
 
   stopImplicitCluster()
 
-  ximp <- as.data.table(ximp)
-  return(ximp)
+  return(as.data.table(ximp))
 }
 
 runRIT <- function(read.forest, weights, rit.param, n.core=1) {

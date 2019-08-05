@@ -70,5 +70,3 @@ randomForestPar <- function(x, y, xtest=NULL, ytest=NULL, ntree=500,
   return(rf)
 }
 
-
-
