@@ -166,7 +166,7 @@ iRF <- function(x, y,
     
     # Run gRIT across RF grown on full dataset to extract interactions.
     if (verbose) cat('finding interactions...\n')
-    rit.param$ntree <- rit.param$ntree * n.bootstrap
+    rit.param$ntree <- rit.param$ntree# * n.bootstrap
     ints.eval <- gRIT(rf.list[[iter]], x=x, y=y,
                       weights=weights,
                       varnames.grp=varnames.grp,
