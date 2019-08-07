@@ -252,20 +252,19 @@ getParent <- function(tree.info) {
 }
 
 readFeatures <- function(tree.info, varnames.grp,
-                         split.pt=FALSE, first.split=TRUE) {
+                         first.split=TRUE) {
 
   # Pre-allocate variables for path ancestry
   varnames.unq <- unique(varnames.grp)
   p <- length(varnames.unq)
   nlf <- sum(tree.info$status)
-  cur.path <- rep(0L, 2 * p + 1)
+  nodeVarIndices <- which(varnames.grp == varnames.unq)
 
-  # Recursively extract path info for all leaf nodes
-  paths <- ancestorPath(tree.info, varnames.grp, varnames.unq, p=p,
-                        cur.path=cur.path, first.split=first.split)
+  paths <- ancestorPath(tree.info, nodeVarIndices,
+                           p, nlf, first.split)
 
   # Generate sparse matrix of decision path feature selection
-  paths <- Matrix(unlist(paths), nrow=nlf, byrow=TRUE, sparse=TRUE)
+  paths <- Matrix(paths, nrow=nlf, byrow=TRUE, sparse=TRUE)
   rownames(paths) <- paths[,ncol(paths)]
   paths <- paths[, 1:(2 * p)]
 
@@ -273,43 +272,6 @@ readFeatures <- function(tree.info, varnames.grp,
   idlf <- tree.info$node.idx[tree.info$status]
   paths <- paths[fmatch(idlf, rownames(paths)),]
   return(paths)
-}
-
-
-ancestorPath <- function(tree.info, varnames.grp, varnames.unq, p,
-                         cur.path, node.idx=1, first.split=TRUE) {
-
-  # Return path vector if current node is leaf
-  if (tree.info$status[node.idx]) {
-    cur.path[length(cur.path)] <- node.idx
-    return(cur.path)
-  }
-
-  # Extract split feature and threshold for current node
-  id <- tree.info$`split var`[node.idx]
-  sp <- tree.info$`split point`[node.idx]
-  node.var <- which(varnames.grp[id] == varnames.unq)
-
-  # Generate vector indicating threshold for first variable split
-  left.child <- tree.info$`left daughter`[node.idx]
-  left.set <- cur.path
-  if (!first.split || cur.path[node.var + p] == 0) {
-    left.set[node.var] <- sp
-  }
-
-  right.child <- tree.info$`right daughter`[node.idx]
-  right.set <- cur.path
-  if (!first.split || cur.path[node.var] == 0) {
-    right.set[node.var + p] <- sp
-  }
-
-  # Get acncestor path info for child nodes and combine
-  lpath <- ancestorPath(tree.info, varnames.grp, varnames.unq,
-                        p, left.set, left.child, first.split)
-  rpath <- ancestorPath(tree.info, varnames.grp, varnames.unq,
-                        p, right.set, right.child, first.split)
-
-  return(list(lpath, rpath))
 }
 
 nfSparse <- function(rd.forest, offset, p) {
