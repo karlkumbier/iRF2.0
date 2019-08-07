@@ -106,44 +106,6 @@ lreplicate <- function(n, expr, ...) {
   return(out)
 }
 
-makeTarget <- function(name, new.value, suite=NULL,
-                       skip=NULL, regenerate=NULL) {
-  pf <- parent.frame()
-  if (is.null(suite)) {
-    suite <- get('SUITE', envir=pf)
-  }
-  if (is.null(skip)) {
-    skip <- mget('SKIP_ALL', envir=pf, ifnotfound=FALSE)
-    skip <- skip$SKIP_ALL
-  }
-  if (is.null(regenerate)) {
-    regenerate <- mget('REGENERATE_ALL', envir=pf, ifnotfound=FALSE)
-    regenerate <- regenerate$REGENERATE_ALL
-  }
-
-  base.path <- file.path('assets', suite, name)
-  save.path <- paste0(base.path, '.rds')
-  if (!regenerate && !file.exists(save.path)) {
-    warning(paste(save.path, 'not accessible, regenerating...'))
-    regenerate <- TRUE
-  }
-
-  if (regenerate) {
-    saveRDS(new.value, save.path)
-    assign(name, new.value, envir=pf)
-    return()
-  }
-
-  old.value <- readRDS(save.path)
-  assign(name, old.value, envir=pf)
-
-  if (!skip) {
-    test_that(paste('test if', name, 'is consistent'), {
-      expect_equal(old.value, new.value)
-    })
-  }
-}
-
 `%<-meta.cache%` <- function(suite, RF.type, verify=c(TRUE, FALSE)) {
 
   operator <- function(x, new.value) {
