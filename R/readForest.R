@@ -258,7 +258,7 @@ readFeatures <- function(tree.info, varnames.grp,
   varnames.unq <- unique(varnames.grp)
   p <- length(varnames.unq)
   nlf <- sum(tree.info$status)
-  nodeVarIndices <- which(varnames.grp == varnames.unq)
+  nodeVarIndices <- fmatch(varnames.grp, varnames.unq)
 
   paths <- ancestorPath(tree.info, nodeVarIndices,
                            p, nlf, first.split)
