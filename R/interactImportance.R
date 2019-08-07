@@ -11,7 +11,7 @@ intImportance <- function(int, nf, precision, weight) {
   #   interaction.
   
   # Determine which leaf nodes contain the given interaction
-  int.id <- Reduce(fast.intersect, nf[int])
+  int.id <- Reduce(fast.intersect, nf[as.character(int)])
   if (length(int.id) == 0)
     return(data.frame(prev1=0, prev0=0, prec=0))
 
