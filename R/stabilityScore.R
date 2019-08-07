@@ -36,6 +36,10 @@
 #'
 #' @importFrom dplyr group_by summarize arrange desc '%>%'
 #' @importFrom data.table data.table
+#' @importFrom foreach foreach
+#' @importFrom doParallel registerDoParallel stopImplicitCluster
+#' @importFrom doRNG "%dorng%"
+#' @importFrom parallel detectCores
 stabilityScore <- function(x, y,
                            ntree=500,
                            mtry.select.prob=rep(1, ncol(x)), 
@@ -74,20 +78,26 @@ stabilityScore <- function(x, y,
   # Set feature names for grouping interactions
   varnames.grp <- groupVars(varnames.grp, x)
 
+  # Register cores for parallelization
+  if (n.core == -1) n.core <- detectCores()
+  if (n.core > 1) registerDoParallel(n.core)
+
   # Generate bootstrap samples for stability analysis
-  if (is.null(bs.sample)) bs.sample <- lreplicate(n.bootstrap, bsSample(y))
+  if (is.null(bs.sample))
+      bs.sample <- lreplicate(n.bootstrap, bsSample(y))
 
-  out <- list()
-  for (i in 1:length(bs.sample)) {
-    sample.id <- bs.sample[[i]]
-    out[[i]] <- bsgRIT(x, y, mtry.select.prob, sample.id, 
-                       ints.idx.eval=ints.idx.eval,
-                       ints.eval=ints.eval, ntree=ntree, weights=weights, 
-                       rit.param=rit.param, varnames.grp=varnames.grp, 
-                       signed=signed, oob.importance=oob.importance, 
-                       n.core=n.core, type=type, ...)
+  suppressWarnings(
+  out <- foreach(sample.id=bs.sample) %dorng% {
+    # Use only 1 core for each bsgRIT, as the loop is already parallelized
+    bsgRIT(x, y, mtry.select.prob, sample.id,
+           ints.idx.eval=ints.idx.eval,
+           ints.eval=ints.eval, ntree=ntree, weights=weights,
+           rit.param=rit.param, varnames.grp=varnames.grp,
+           signed=signed, oob.importance=oob.importance,
+           n.core=1L, type=type, ...)
+  })
 
-  }
+  stopImplicitCluster()
 
   # Summarize stability and importance metrics across bootstrap replicates
   out <- summarizeInteract(out)
