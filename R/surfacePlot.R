@@ -226,13 +226,11 @@ genSurface <- function(x, y, int, rectangles,
   p <- ncol(x)
   
   # Convert signed to unsigned interactions
-  int <- sort(int)
-  uint <- int %% p + p * (int %% p == 0)
   
   # Generate grid to plot surface over either as raw values or quantiles
   if (is.null(grids)) {
-    g1 <- seq(min(x[,uint[1]]), max(x[,uint[1]]), length.out=grid.size)
-    g2 <- seq(min(x[,uint[2]]), max(x[,uint[2]]), length.out=grid.size)
+    g1 <- seq(min(x[,int[1]]), max(x[,int[1]]), length.out=grid.size)
+    g2 <- seq(min(x[,int[2]]), max(x[,int[2]]), length.out=grid.size)
     g1n <- round(g1, 2)
     g2n <- round(g2, 2)
   } else {
@@ -250,6 +248,8 @@ genSurface <- function(x, y, int, rectangles,
   if (is.factor(y)) {
     rectangles <- filter(rectangles, prediction == 1)
     y <- as.numeric(y) - 1
+  } else if (all(y %in% 0:1)) {
+    warning('Two response values detected, set as.factor(y) for classification')
   }
 
   # Take largest decision rule from each tree
@@ -263,33 +263,25 @@ genSurface <- function(x, y, int, rectangles,
   
   # Evaluate distriution of responses across each decision rule
   grid <- matrix(0, nrow=grid.size, ncol=grid.size)
-  removed <- rep(FALSE, nrow(rectangles))
   
   for (i in 1:nrow(rectangles)) {
     wt <- rectangles$size.node[i]
     
     # Evalaute which observations/grid elements correspond to current HR
     idcs1 <- g1 >= tt[i, 1]
-    x1 <- x[,uint[1]] >= tt[i, 1]
+    x1 <- x[,int[1]] >= tt[i, 1]
     
     idcs2 <- g2 >= tt[i, 2]
-    x2 <- x[,uint[2]] >= tt[i, 2]
+    x2 <- x[,int[2]] >= tt[i, 2]
     
     if (pred.prob) {
       # Evaluate RF predictions for region corresponding to current HR
       yy <- rectangles$prediction[i]
       grid[idcs1, idcs2] <- grid[idcs1, idcs2] + yy * wt
-    } else {
-      # If a region contains no observations, move to next hyperrectangle
-      if (!any(x1 & x2)) {
-        removed[i] <- TRUE
-        next
-      }
-      
-      # Evaluate average response value in regions corresponding to HR
-      grid[idcs1, idcs2] <- grid[idcs1, idcs2] +  mean(y[x1 & x2]) * wt
-      
+    } else {      
       # TODO: adjust this weighting
+      if (any(x1 & x2))
+        grid[idcs1, idcs2] <- grid[idcs1, idcs2] +  mean(y[x1 & x2]) * wt
       if (any(!x1 & x2)) 
         grid[!idcs1, idcs2] <- grid[!idcs1, idcs2] +  mean(y[!x1 & x2]) * wt
       if (any(x1 & !x2))
@@ -300,7 +292,8 @@ genSurface <- function(x, y, int, rectangles,
   }
   
   # Rescale surface for node size and generate corresponding color palette
-  grid <- grid / sum(rectangles$size.node[!removed])
+  nsurface <- sum(rectangles$size.node)
+  if (nsurface != 0) grid <- grid / nsurface
   if (all(grid == 0)) grid <- grid + 1e-3
   rownames(grid) <- g1n
   colnames(grid) <- g2n
