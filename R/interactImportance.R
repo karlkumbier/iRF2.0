@@ -32,7 +32,10 @@ intImportance <- function(int, nf, precision, weight) {
 }
 
 # Faster than base::intersect, assuming x and y don't contain duplications.
-fast.intersect <- function(x, y) y[fmatch(x, y, 0L)]
+fast.intersect <- function(x, y) {
+  if (is.null(x) | is.null(y)) return(numeric(0))
+  y[fmatch(x, y, 0L)]
+}
 
 prevalence <- function(weight, idint) {
   # Computes the prevalence in selected nodes 
