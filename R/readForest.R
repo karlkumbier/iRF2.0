@@ -107,7 +107,7 @@ readForest <- function(rand.forest, x,
 
   # Aggregate node level metadata
   offset <- cumsum(sapply(rd.forest, function(tt) nrow(tt$tree.info)))
-  offset <- c(0, offset[-length(offset)])
+  offset <- c(0L, offset[-length(offset)])
   out$tree.info <- rbindlist(lapply(rd.forest, function(tt) tt$tree.info))
 
   # Aggregate sparse node level feature matrix
@@ -276,17 +276,20 @@ readFeatures <- function(tree.info, varnames.grp,
 
 nfSparse <- function(rd.forest, offset, p) {
   # Row indices by tree
-  nfRow <- function(rf, oo) rf$node.feature@i + 1 + oo
-  nf.i <- mapply(function(rf, oo) nfRow(rf, oo), rd.forest, offset,
-                 SIMPLIFY=FALSE)
+  nfRow <- function(rf, offset) rf$node.feature@i + 1L + offset
+  nf.i <- mapply(nfRow, rd.forest, offset, SIMPLIFY=FALSE)
+
   # Col indices by tree
   nfCol <- function(rf, p) rep(1:(2 * p), times=diff(rf$node.feature@p))
-  nf.j <- sapply(rd.forest, nfCol, p=p)
+  nf.j <- lapply(rd.forest, nfCol, p=p)
 
   # X values y tree
   nfX <- function(rf) rf$node.feature@x
-  nf.x <- sapply(rd.forest, nfX)
-  return(list(i=unlist(nf.i), j=unlist(nf.j), x=unlist(nf.x)))
+  nf.x <- lapply(rd.forest, nfX)
+
+  return(list(i=.Internal(unlist(nf.i, FALSE, FALSE)),
+              j=.Internal(unlist(nf.j, FALSE, FALSE)),
+              x=.Internal(unlist(nf.x, FALSE, FALSE))))
 }
 
 nobsSparse <- function(rd.forest, offset, tree.info) {
