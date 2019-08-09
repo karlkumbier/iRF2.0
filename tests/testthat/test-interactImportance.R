@@ -16,22 +16,22 @@ for (RF in names(RF.collection)) {
   rand.forest <- RF.collection[[RF]]
   read.forest %<-% readForest(rand.forest, x=x)
 
-  count %<-% read.forest$tree.info$size.node
-  precision %<-% nodePrecision(read.forest, y, count)
+  cnt %<-% read.forest$tree.info$size.node
+  precision %<-% nodePrecision(read.forest, y, cnt)
 
   test_that("nodePrecision works", {
     expect_equal(length(precision),
                  nrow(read.forest$tree.info))
   })
 
-  idcnt %<-% count >= 1
+  idcnt %<-% cnt >= 1
   selected.read.forest %<-% subsetReadForest(read.forest, idcnt)
-  selected.count %<-% count[idcnt]
+  selected.cnt %<-% cnt[idcnt]
   
   node.feature <- as(selected.read.forest$node.feature, 'dgTMatrix')
   nf.list <- split(node.feature@i + 1L, node.feature@j + 1L)
 
-  ximp %<-% intImportance(int.eval, nf.list, precision, selected.count)
+  ximp %<-% intImportance(int.eval, nf.list, precision, selected.cnt)
 
   test_that("intImportance works", {
     expect_true('data.frame' %in% class(ximp))

@@ -42,7 +42,6 @@ readForest <- function(rand.forest, x,
                        first.split=TRUE,
                        n.core=1) {
 
-  
   # Check for valid input RF
   if (is.null(rand.forest$forest))
     stop('No Forest component in the random forest object')

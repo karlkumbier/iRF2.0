@@ -15,7 +15,7 @@ void writePath(LogicalVector status,
                NumericVector currentPath,
                int *ptr2offset);
 
-// [[Rcpp::export]]
+// We don't use [[Rcpp::export]] since we handcraft the RcppExports files
 NumericVector ancestorPath(DataFrame treeInfo,
                           IntegerVector nodeVarIndices,
                           int p,

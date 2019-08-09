@@ -10,7 +10,7 @@
 using namespace std;
 using namespace Rcpp;
 
-// [[Rcpp::export]]
+// We don't use [[Rcpp::export]] since we handcraft the RcppExports files
 SEXP RIT_1class(SEXP z, NumericVector weights, int L, int branch, int depth, int n_trees, int min_inter_sz, int n_cores, bool is_sparse) {
     //construct RaggedArray
     RaggedArray x;
@@ -60,7 +60,7 @@ SEXP RIT_1class(SEXP z, NumericVector weights, int L, int branch, int depth, int
     return output;
 }
 
-// [[Rcpp::export]]
+// We don't use [[Rcpp::export]] since we handcraft the RcppExports files
 SEXP RIT_2class(SEXP z, SEXP z0, int L, int branch, int depth, int n_trees, double theta0, double theta1,
   int min_inter_sz, int n_cores, bool is_sparse) {
   //construct RaggedArrays
