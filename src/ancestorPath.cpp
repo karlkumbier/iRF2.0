@@ -1,7 +1,4 @@
-.onLoad <- function(libname, pkgname) {
-  message('Compiling Rcpp function...')
-  Rcpp::sourceCpp(code='
-#include <Rcpp.h>
+#include<Rcpp.h>
 
 using namespace Rcpp;
 
@@ -78,5 +75,4 @@ void writePath(LogicalVector status,
             leftChildIndices, rightChildIndices, nodeVarIndices,
             paths, p, firstSplit, rightChild, rightPath, ptr2offset);
 }
-')
-}
+
