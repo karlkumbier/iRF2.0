@@ -2,7 +2,7 @@
 #'
 #' Generate response surface plots for a given interaction.
 #' @param x numeric feature matrix, with replicate features grouped
-#' @param y response vector
+#' @param y response vector.  
 #' @param int signed interaction to plot. Formatted as 'X1+_X2+_X3-_...'
 #' @param varnames character vector indicating feature names. If NULL,
 #'  colnames(x) are used as feature names.
@@ -14,6 +14,7 @@
 #' @param xlab x-axis label
 #' @param ylab y-axis label
 #' @param zlab z-axis label
+#' @param slab label for splitting variable
 #' @param range.col range of response values for color palette
 #' @param z.range z-axiz range
 #' @param grid.surface size of grid to generate response surfaces over.
@@ -22,6 +23,11 @@
 #' @param min.nd minimum leaf node size to extract decision rules from.
 #' @param pred.prob: if TRUE, z-axis indicates predicted probability from the
 #'  random forest. If false, z-axis indicates distribution of responses y
+#' @param plot.enrich: used for classification to plot response surface relative
+#' to proportion of class-1 observation.
+#' @param drop0: if TRUE, class-0 leaf nodes are removed before plotting
+#' response surfaces.
+#' @param nc: number of columns in plot
 #' @param main plot title for response surfaces
 #'
 #' @export
@@ -37,14 +43,16 @@ plotInt <- function(x, y, int, read.forest,
                     qcut=0.5,
                     col.pal=c('#1c3f66', '#306aab', 
                       '#6e96c4', '#ffb003',  '#ff8300'), 
-                    xlab=NULL, ylab=NULL, zlab=NULL,
+                    xlab=NULL, ylab=NULL, zlab=NULL, slab=NULL,
                     range.col=NULL,
                     z.range=c(0, 1),
                     grid.size=50,
                     min.surface=100,
                     min.nd=5,
                     pred.prob=FALSE,
+                    plot.enrich=FALSE,
                     filt.rule=TRUE,
+                    drop0=FALSE,
                     nc=2,
                     main=NULL) {
   
@@ -103,8 +111,8 @@ plotInt <- function(x, y, int, read.forest,
   surfaces <- lapply(ids, function(ii) {
     if (sum(ii) < min.surface) return(NULL)
     genSurface(x[ii,], y[ii], int.nf[1:2], varnames=varnames, 
-               rectangles=rectangles, min.nd=min.nd, 
-               filt.rule=filt.rule, grids=grids)
+               rectangles=rectangles, min.nd=min.nd, plot.enrich=plot.enrich,
+               filt.rule=filt.rule, drop0=drop0, grids=grids)
   })
   
   # Set color range for surface map plots
@@ -140,7 +148,8 @@ plotInt <- function(x, y, int, read.forest,
     ii <- str_replace_all(ii, 'FALSE', 'Low')
     if (length(int) > 2) {
       i.split <- str_split(ii, '_')[[1]]
-      xii <- paste(int.clean[3:length(int)], i.split, sep=': ')
+      if (is.null(slab)) slab <- int.clean[3:length(int)]
+      xii <- paste(slab, i.split, sep=': ')
       main.ii <- paste(main, paste(xii, collapse=', '), collapse=' - ')
     } else {
       main.ii <- main
@@ -198,6 +207,8 @@ genSurface <- function(x, y, int, rectangles,
                        filt.rule=TRUE, 
                        grids=NULL, 
                        pred.prob=FALSE, 
+                       plot.enrich=FALSE,
+                       drop0=FALSE,
                        min.nd=5) {
   # Generates surface map of order-2 interaction
   # args:
@@ -246,12 +257,10 @@ genSurface <- function(x, y, int, rectangles,
   
   # Filter class-0 leaf nodes if classification
   if (is.factor(y)) {
-    rectangles <- filter(rectangles, prediction == 1)
     y <- as.numeric(y) - 1
-  } else if (all(y %in% 0:1)) {
-    warning('Two response values detected, set as.factor(y) for classification')
   }
-
+  
+  if (drop0) rectangles <- filter(rectangles, prediction == 1)
   # Take largest decision rule from each tree
   if (filt.rule) {
     rectangles <- group_by(rectangles, tree) %>%
@@ -295,6 +304,7 @@ genSurface <- function(x, y, int, rectangles,
   nsurface <- sum(rectangles$size.node)
   if (nsurface != 0) grid <- grid / nsurface
   if (all(grid == 0)) grid <- grid + 1e-3
+  if (plot.enrich) grid <- grid / mean(y)
   rownames(grid) <- g1n
   colnames(grid) <- g2n
   return(grid)
