@@ -1,5 +1,5 @@
-#' Plot interaction
-#'
+  #' Plot interaction
+  #'
 #' Generate response surface plots for a given interaction.
 #' @param x numeric feature matrix, with replicate features grouped
 #' @param y response vector.  
@@ -76,6 +76,8 @@ plotInt <- function(x, y, int, read.forest,
   if (any(duplicated(varnames))) 
     stop('Replicate features not supported')
   
+  if (is.factor(y)) 
+    y <- as.numeric(y) - 1
   # Get feature indices for interaction in nf, x, and leaf ndoes
   int <- str_split(int, '_')[[1]]
   int.clean <- str_remove_all(int, '[-\\+]')
@@ -108,10 +110,12 @@ plotInt <- function(x, y, int, read.forest,
   
   # Generate surface maps for each group of observations
   ids <- lapply(sort(unique(id)), '==', id)
+  surf.scale <- ifelse(plot.enrich, mean(y), 1)
+
   surfaces <- lapply(ids, function(ii) {
     if (sum(ii) < min.surface) return(NULL)
     genSurface(x[ii,], y[ii], int.nf[1:2], varnames=varnames, 
-               rectangles=rectangles, min.nd=min.nd, plot.enrich=plot.enrich,
+               rectangles=rectangles, min.nd=min.nd, surf.scale=surf.scale,
                filt.rule=filt.rule, drop0=drop0, grids=grids)
   })
   
@@ -187,8 +191,13 @@ plotInt2 <- function(surface,
   if (length(unique(range.col)) == 1) n.cols <- 1
   
   palette <- colorRampPalette(col.pal)
-  colors <- palette(n.cols)
-  facet.col <- cut(range.col, n.cols)[-seq(2)]
+  if (length(unique(range.col)) == 1) {
+    colors <- palette(1)
+    facet.col <- 1
+  } else {
+    colors <- palette(n.cols)
+    facet.col <- cut(range.col, n.cols)[-seq(2)]
+  }
 
   # Plot interaction response surface
   par3d(cex=1.5)
@@ -207,7 +216,7 @@ genSurface <- function(x, y, int, rectangles,
                        filt.rule=TRUE, 
                        grids=NULL, 
                        pred.prob=FALSE, 
-                       plot.enrich=FALSE,
+                       surf.scale=1,
                        drop0=FALSE,
                        min.nd=5) {
   # Generates surface map of order-2 interaction
@@ -254,13 +263,8 @@ genSurface <- function(x, y, int, rectangles,
   
   # Evaluate responses over grid based on RF hyperrectangles
   if (is.null(rectangles)) rectangles <- forestHR(read.forest, int, min.nd)
-  
-  # Filter class-0 leaf nodes if classification
-  if (is.factor(y)) {
-    y <- as.numeric(y) - 1
-  }
-  
   if (drop0) rectangles <- filter(rectangles, prediction == 1)
+  
   # Take largest decision rule from each tree
   if (filt.rule) {
     rectangles <- group_by(rectangles, tree) %>%
@@ -304,7 +308,7 @@ genSurface <- function(x, y, int, rectangles,
   nsurface <- sum(rectangles$size.node)
   if (nsurface != 0) grid <- grid / nsurface
   if (all(grid == 0)) grid <- grid + 1e-3
-  if (plot.enrich) grid <- grid / mean(y)
+  grid <- grid / surf.scale
   rownames(grid) <- g1n
   colnames(grid) <- g2n
   return(grid)
