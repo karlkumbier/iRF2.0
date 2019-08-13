@@ -3,7 +3,6 @@
 
 #include<vector>
 #include<algorithm>
-#include<random>
 #include<set>
 #include<Rcpp.h>
 #include<chrono>
@@ -28,10 +27,8 @@ set<vector<int> > RIT_basic(RaggedArray &x, NumericVector &weights, const int L,
   int i1, i2, i;
 
   // Set up vector of seeds for RNG
-  vector<unsigned int> seeds(n_cores);
-  for (int i=0; i<n_cores; i++) {
-    seeds[i] = chrono::high_resolution_clock::now().time_since_epoch().count()*(i+1);
-  }
+  IntegerVector seeds(n_cores);
+  seeds = UINT_MAX * runif(n_cores);
   
   // Set up output objects
   set<vector<int> > total_candidate_interactions; //union of candidate interactions for all trees
@@ -119,10 +116,8 @@ set<vector<int> > RIT_minhash(RaggedArray &x, const int L, const double branch, 
   const double branch_diff=branch-fl_branch;
 
   // Set up vector of seeds for RNG
-  vector<unsigned int> seeds(n_cores);
-  for (int i=0; i<n_cores; i++) {
-    seeds[i] = chrono::high_resolution_clock::now().time_since_epoch().count()*(i+1);
-  }
+  IntegerVector seeds(n_cores);
+  seeds = UINT_MAX * runif(n_cores);
   
   // Set up output objects
   set<vector<int> > total_candidate_interactions; //union of candidate interactions for all trees

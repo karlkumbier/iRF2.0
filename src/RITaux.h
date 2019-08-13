@@ -28,19 +28,17 @@ vector<int> binary_intersect(v_iterator large_begin, v_iterator large_end,
   return intersection;
 }
 
+// wrapper around R's RNG such that we get a uniform distribution over
+// [0,n) as required by the STL algorithm
+inline int randWrapper(const int n) { return floor(unif_rand()*n); }
+
 void CreateHt(RaggedArray &x, const int L, int** Ht) {
   // Ht is p by L
-  random_device rd; //seed for Random Number Generator(RNG)
-  mt19937_64 mt(rd()); //Use Mersenne Twister as RNG
-  
   const int n=x.nrow();
   const int p=x.ncol();
-  vector<int> perm(n); //vector perm_i=i
-  for (int k=0; k<n; k++) {
-    perm[k] = k;
-  }
+  IntegerVector perm = Rcpp::seq(0, n-1); //vector perm_i=i
   for (int l=0; l<L; l++) {
-    shuffle(perm.begin(), perm.end(), mt);
+    random_shuffle(perm.begin(), perm.end(), randWrapper);
     for (int k=0;k<p;k++){
       bool T=false;
       int i=0;

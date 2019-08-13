@@ -149,7 +149,8 @@ make.RF.collection <- function(x, y) {
       randomForest::randomForest(Species ~ ., iris)
   
   class.irf <- is.factor(y)
-  if (class.irf) y <- as.numeric(y) - 1
+  if (class.irf)
+      y <- as.numeric(y) - 1
   rand.forest.ranger %<-cache%
       ranger::ranger(data=cbind(x, y),
                      dependent.variable.name='y',

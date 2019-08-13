@@ -14,7 +14,7 @@ for (RF in names(RF.collection)) {
 
 test_that('readForest works for randomForest', {
   rand.forest <- RF.collection[['randomForest']]
-  read.forest <- readForest(rand.forest, x=iris[, -5])
+  read.forest <- readForest(rand.forest, x=iris[, -5], oob.importance=FALSE)
 
   countLeaf <- function(k)
       sum(randomForest::getTree(rand.forest, k)[, 'status'] == -1)
@@ -47,7 +47,7 @@ test_that('readForest works for randomForest', {
 
 test_that('readForest works for ranger', {
   rand.forest <- RF.collection[['ranger']]
-  read.forest <- readForest(rand.forest, x=iris[, -5])
+  read.forest <- readForest(rand.forest, x=iris[, -5], oob.importance=FALSE)
 
   countLeaf <- function(k)
       sum(ranger::treeInfo(rand.forest, k)$terminal)
