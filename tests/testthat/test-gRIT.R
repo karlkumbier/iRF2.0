@@ -11,7 +11,7 @@ for (RF in names(RF.collection)) {
   `%<-%` <- `%<-meta.cache%`(suite, RF, TRUE)
 
   rand.forest <- RF.collection[[RF]]
-  read.forest %<-% readForest(rand.forest, x=x)
+  read.forest %<-% readForest(rand.forest, x=x, oob.importance=FALSE)
   weights <- rep(1, length(read.forest$tree.info$size.node))
 
   test_that(paste('runRIT works for', RF), {
@@ -23,7 +23,8 @@ for (RF in names(RF.collection)) {
 
   test_that(paste('signed gRIT works for', RF), {
     set.seed(42L)
-    gRIT.signed %<-% gRIT(x, y, rand.forest)
+    gRIT.signed %<-% gRIT(x, y, rand.forest,
+                          oob.importance=FALSE)
     expect_true('data.table' %in% class(gRIT.signed))
     expect_equal(names(gRIT.signed),
                  c('prev1', 'prev0', 'prec',
@@ -34,7 +35,8 @@ for (RF in names(RF.collection)) {
 
   test_that(paste('unsigned gRIT works for', RF), {
     set.seed(42L)
-    gRIT.unsigned %<-% gRIT(x, y, rand.forest, signed=FALSE)
+    gRIT.unsigned %<-% gRIT(x, y, rand.forest, signed=FALSE,
+                            oob.importance=FALSE)
     expect_true('data.table' %in% class(gRIT.unsigned))
     expect_equal(names(gRIT.unsigned),
                  c('prev1', 'prev0', 'prec',

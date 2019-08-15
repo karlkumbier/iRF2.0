@@ -58,7 +58,7 @@ gRIT <- function(x, y,
   if (n.core > 1) registerDoParallel(n.core)
 
   # Check rit parameters and set default values if not specified
-  if (is.null(rand.forest) & is.null(read.forest))
+  if (is.null(rand.forest) && is.null(read.forest))
     stop('Supply random forest or read forest output')
   if (is.null(rit.param$depth))
     rit.param$depth <- 5
@@ -66,11 +66,11 @@ gRIT <- function(x, y,
     rit.param$ntree <- 500
   if (is.null(rit.param$nchild))
     rit.param$nchild <- 2
-  if (is.null(rit.param$class.id) & class.irf)
+  if (is.null(rit.param$class.id) && class.irf)
     rit.param$class.id <- 1
   if (is.null(rit.param$min.nd))
     rit.param$min.nd <- 1
-  if (is.null(rit.param$class.cut) & !class.irf)
+  if (is.null(rit.param$class.cut) && !class.irf)
     rit.param$class.cut <- median(y)
   if (!class.irf)
     y <- as.numeric(y >= rit.param$class.cut)
@@ -80,7 +80,7 @@ gRIT <- function(x, y,
                   'ignoring the latter'))
 
   # Set feature names for grouping interactions
-  if (is.null(varnames.grp) & !is.null(colnames(x)))
+  if (is.null(varnames.grp) && !is.null(colnames(x)))
     varnames.grp <- colnames(x)
   else if (is.null(varnames.grp))
     varnames.grp <- as.character(1:ncol(x))

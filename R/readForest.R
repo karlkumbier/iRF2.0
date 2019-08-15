@@ -124,7 +124,7 @@ readForest <- function(rand.forest, x,
   }
 
   # Adjust predicted value for randomForest classification
-  if (class(rand.forest) != 'ranger' &&
+  if (all(class(rand.forest) != 'ranger') &&
       rand.forest$type == 'classification') {
     out$tree.info$prediction <- out$tree.info$prediction - 1
   }
@@ -194,7 +194,7 @@ readTree <- function(rand.forest, k, x, nodes,
     id.obs <- (1:length(id.leaf))[oob.id]
     id.leaf <- id.leaf[oob.id]
     unq.leaf <- sort(unique(id.leaf))
-    if (class(rand.forest) == 'ranger') unq.leaf <- unq.leaf + 1
+    if (any(class(rand.forest) == 'ranger')) unq.leaf <- unq.leaf + 1
     id <- fmatch(unq.leaf, tree.info$node.idx)
     node.obs <- c(by(id.obs, id.leaf, list))
     names(node.obs) <- id

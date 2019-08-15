@@ -4,7 +4,7 @@ conditionalPred <- function(rfobj, rd.forest, x, y, ints,
   # made using only leaf nodes for which the given interaction falls on the 
   # decision path.
   require(parallel)
-  if (is.null(varnames.group) & !is.null(colnames(x)))
+  if (is.null(varnames.group) && !is.null(colnames(x)))
     varnames.group <- colnames(x)
   
   y.hat <- mclapply(ints, predIntForest, rfobj=rfobj, rd.forest=rd.forest, 

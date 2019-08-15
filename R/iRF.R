@@ -98,9 +98,9 @@ iRF <- function(x, y,
 
   if (nrow(x) != length(y))
     stop('x and y must contain the same number of observations')
-  if (ncol(x) < 2 & (!is.null(int.return) | select.iter))
+  if (ncol(x) < 2 && (!is.null(int.return) || select.iter))
     stop('cannot find interaction - x has less than two columns!')
-  if (any(iter.return > n.iter | int.return > n.iter))
+  if (any(iter.return > n.iter) || any(int.return > n.iter))
     stop('selected iteration to return greater than n.iter')
   if (!is.null(varnames.grp) && length(varnames.grp) != ncol(x))
     stop('length(varnames.grp) must be equal to ncol(x)')
@@ -123,7 +123,7 @@ iRF <- function(x, y,
   if (is.null(rit.param$nchild)) rit.param$nchild <- 2
   if (is.null(rit.param$class.id)) rit.param$class.id <- 1
   if (is.null(rit.param$min.nd)) rit.param$min.nd <- 1
-  if (is.null(rit.param$class.cut) & is.numeric(y)) 
+  if (is.null(rit.param$class.cut) && is.numeric(y)) 
     rit.param$class.cut <- median(y)
 
   # Set variable and grouping names if not supplied
@@ -158,7 +158,7 @@ iRF <- function(x, y,
   }
 
   # Generate bootstrap samples for stability analysis
-  if (is.null(bs.sample) & !is.null(int.return)) 
+  if (is.null(bs.sample) && !is.null(int.return)) 
     bs.sample <- lreplicate(n.bootstrap, bsSample(y))
     
   importance <- list()
@@ -169,9 +169,10 @@ iRF <- function(x, y,
     rit.param$ntree <- rit.param$ntree * n.bootstrap
     ints.eval <- gRIT(rf.list[[iter]], x=x, y=y,
                       weights=weights,
-                      varnames.grp=varnames.grp,
                       rit.param=rit.param,
+                      varnames.grp=varnames.grp,
                       signed=signed,
+                      oob.importance=oob.importance,
                       n.core=n.core)
 
     ints.idx.eval <- ints.eval$int.idx
