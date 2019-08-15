@@ -89,6 +89,8 @@ stabilityScore <- function(x, y,
   suppressWarnings(
   out <- foreach(sample.id=bs.sample) %dorng% {
     # Use only 1 core for each bsgRIT, as the loop is already parallelized
+    # Note that reproducibility is guaranteed even with ``n.core=n.core'',
+    # so feel free to use more cores if you benchmark says otherwise.
     bsgRIT(x, y, mtry.select.prob, sample.id,
            ints.idx.eval=ints.idx.eval,
            ints.eval=ints.eval, ntree=ntree, weights=weights,
