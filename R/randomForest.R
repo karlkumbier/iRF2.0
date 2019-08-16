@@ -11,15 +11,15 @@
 
 parRF <- function(x, y, xtest=NULL, ytest=NULL, ntree=500,
                   n.core=1, mtry.select.prob=rep(1, ncol(x)),
-                  mtry=mtry, type='randomForest', keep.inbag=TRUE, ...) {
+                  type='randomForest', keep.inbag=TRUE, ...) {
   
   # Wrapper function to run RF in parallel using randomForest or ranger
   if (type == 'randomForest') {
     rf <- randomForestPar(x, y, xtest, ytest, ntree, n.core, 
-                          mtry.select.prob, mtry, keep.inbag, ...)
+                          mtry.select.prob, keep.inbag, ...)
   } else if (type == 'ranger') {
     rf <- rangerPar(x, y, xtest, ytest, ntree, n.core, 
-                    mtry.select.prob, mtry, keep.inbag, ...)
+                    mtry.select.prob, keep.inbag, ...)
   } else {
     stop('type must be one of "randomForest" or "ranger"')
   }
@@ -29,7 +29,7 @@ parRF <- function(x, y, xtest=NULL, ytest=NULL, ntree=500,
 
 rangerPar <- function(x, y, xtest=NULL, ytest=NULL, ntree=500,
                       n.core=1, mtry.select.prob=rep(1, ncol(x)),
-                      mtry, keep.inbag=TRUE, ...) {
+                      keep.inbag=TRUE, ...) {
   
   # Run feature weighted ranger in parallel
   mtry.select.prob <- mtry.select.prob / sum(mtry.select.prob)
@@ -38,13 +38,13 @@ rangerPar <- function(x, y, xtest=NULL, ytest=NULL, ntree=500,
   rf <- ranger(data=cbind(x, y), num.trees=ntree, verbose=FALSE,
                dependent.variable.name='y', classification=class.irf,
                num.threads=n.core, importance='impurity', keep.inbag=keep.inbag,
-               mtry=mtry, split.select.weights=mtry.select.prob, ...)
+               split.select.weights=mtry.select.prob, ...)
   return(rf)
 }
 
 randomForestPar <- function(x, y, xtest=NULL, ytest=NULL, ntree=500, 
                             n.core=1, mtry.select.prob=rep(1, ncol(x)), 
-                            mtry, keep.inbag=TRUE, ...) {  
+                            keep.inbag=TRUE, ...) {  
   
   # Run randomForest in parallel using foreach and dorng
   if (n.core == -1) n.core <- detectCores()
@@ -60,7 +60,7 @@ randomForestPar <- function(x, y, xtest=NULL, ytest=NULL, ntree=500,
                   .multicombine=TRUE, .packages='iRF') %dorng% {
                     randomForest(x, y, xtest, ytest,
                                  ntree=ntree.id[i],
-                                 mtry.select.prob=mtry.select.prob, mtry=mtry,
+                                 mtry.select.prob=mtry.select.prob,
                                  keep.forest=TRUE, keep.inbag=keep.inbag,
                                  ...)                         
     }

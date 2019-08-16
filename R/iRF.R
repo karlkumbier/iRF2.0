@@ -58,8 +58,6 @@ iRF <- function(x, y,
                 n.iter=5, 
                 ntree=500, 
                 mtry.select.prob=rep(1, ncol(x)),
-                mtry=if (!is.null(y) && !is.factor(y)) max(floor(ncol(x)/3), 1) 
-                     else floor(sqrt(ncol(x))),
                 iter.return=n.iter, 
                 int.return=NULL,
                 select.iter=FALSE,
@@ -145,12 +143,10 @@ iRF <- function(x, y,
     if (verbose) print(paste('iteration = ', iter))
     rf.list[[iter]] <- parRF(x, y, xtest, ytest, ntree=ntree, n.core=n.core, 
                              type=type, mtry.select.prob=mtry.select.prob, 
-                             mtry=mtry, keep.inbag=oob.importance, ...)
+                             keep.inbag=oob.importance, ...)
     
     # Update feature selection probabilities
     mtry.select.prob <- rf.list[[iter]][[imp.str]]
-    mtry <- min(mtry, sum(mtry.select.prob != 0))
-    print(mtry)
   }
   
 
@@ -188,7 +184,6 @@ iRF <- function(x, y,
       importance[[iter]] <- stabilityScore(x, y, 
                                            ntree=ntree,
                                            mtry.select.prob=rf.weight,
-                                           mtry=mtry,
                                            ints.idx.eval=ints.idx.eval,
                                            rit.param=rit.param,
                                            varnames.grp=varnames.grp,
