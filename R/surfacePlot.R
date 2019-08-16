@@ -1,8 +1,8 @@
-#' Plot interaction
-#'
+  #' Plot interaction
+  #'
 #' Generate response surface plots for a given interaction.
 #' @param x numeric feature matrix, with replicate features grouped
-#' @param y response vector
+#' @param y response vector.  
 #' @param int signed interaction to plot. Formatted as 'X1+_X2+_X3-_...'
 #' @param varnames character vector indicating feature names. If NULL,
 #'  colnames(x) are used as feature names.
@@ -14,6 +14,7 @@
 #' @param xlab x-axis label
 #' @param ylab y-axis label
 #' @param zlab z-axis label
+#' @param slab label for splitting variable
 #' @param range.col range of response values for color palette
 #' @param z.range z-axiz range
 #' @param grid.surface size of grid to generate response surfaces over.
@@ -22,6 +23,11 @@
 #' @param min.nd minimum leaf node size to extract decision rules from.
 #' @param pred.prob: if TRUE, z-axis indicates predicted probability from the
 #'  random forest. If false, z-axis indicates distribution of responses y
+#' @param plot.enrich: used for classification to plot response surface relative
+#' to proportion of class-1 observation.
+#' @param drop0: if TRUE, class-0 leaf nodes are removed before plotting
+#' response surfaces.
+#' @param nc: number of columns in plot
 #' @param main plot title for response surfaces
 #'
 #' @export
@@ -37,14 +43,16 @@ plotInt <- function(x, y, int, read.forest,
                     qcut=0.5,
                     col.pal=c('#1c3f66', '#306aab', 
                       '#6e96c4', '#ffb003',  '#ff8300'), 
-                    xlab=NULL, ylab=NULL, zlab=NULL,
+                    xlab=NULL, ylab=NULL, zlab=NULL, slab=NULL,
                     range.col=NULL,
                     z.range=c(0, 1),
                     grid.size=50,
                     min.surface=100,
                     min.nd=5,
                     pred.prob=FALSE,
+                    plot.enrich=FALSE,
                     filt.rule=TRUE,
+                    drop0=FALSE,
                     nc=2,
                     main=NULL) {
   
@@ -68,6 +76,8 @@ plotInt <- function(x, y, int, read.forest,
   if (any(duplicated(varnames))) 
     stop('Replicate features not supported')
   
+  if (is.factor(y)) 
+    y <- as.numeric(y) - 1
   # Get feature indices for interaction in nf, x, and leaf ndoes
   int <- str_split(int, '_')[[1]]
   int.clean <- str_remove_all(int, '[-\\+]')
@@ -100,11 +110,13 @@ plotInt <- function(x, y, int, read.forest,
   
   # Generate surface maps for each group of observations
   ids <- lapply(sort(unique(id)), '==', id)
+  surf.scale <- ifelse(plot.enrich, mean(y), 1)
+
   surfaces <- lapply(ids, function(ii) {
     if (sum(ii) < min.surface) return(NULL)
     genSurface(x[ii,], y[ii], int.nf[1:2], varnames=varnames, 
-               rectangles=rectangles, min.nd=min.nd, 
-               filt.rule=filt.rule, grids=grids)
+               rectangles=rectangles, min.nd=min.nd, surf.scale=surf.scale,
+               filt.rule=filt.rule, drop0=drop0, grids=grids)
   })
   
   # Set color range for surface map plots
@@ -140,7 +152,8 @@ plotInt <- function(x, y, int, read.forest,
     ii <- str_replace_all(ii, 'FALSE', 'Low')
     if (length(int) > 2) {
       i.split <- str_split(ii, '_')[[1]]
-      xii <- paste(int.clean[3:length(int)], i.split, sep=': ')
+      if (is.null(slab)) slab <- int.clean[3:length(int)]
+      xii <- paste(slab, i.split, sep=': ')
       main.ii <- paste(main, paste(xii, collapse=', '), collapse=' - ')
     } else {
       main.ii <- main
@@ -178,8 +191,13 @@ plotInt2 <- function(surface,
   if (length(unique(range.col)) == 1) n.cols <- 1
   
   palette <- colorRampPalette(col.pal)
-  colors <- palette(n.cols)
-  facet.col <- cut(range.col, n.cols)[-seq(2)]
+  if (length(unique(range.col)) == 1) {
+    colors <- palette(1)
+    facet.col <- 1
+  } else {
+    colors <- palette(n.cols)
+    facet.col <- cut(range.col, n.cols)[-seq(2)]
+  }
 
   # Plot interaction response surface
   par3d(cex=1.5)
@@ -198,6 +216,8 @@ genSurface <- function(x, y, int, rectangles,
                        filt.rule=TRUE, 
                        grids=NULL, 
                        pred.prob=FALSE, 
+                       surf.scale=1,
+                       drop0=FALSE,
                        min.nd=5) {
   # Generates surface map of order-2 interaction
   # args:
@@ -226,13 +246,11 @@ genSurface <- function(x, y, int, rectangles,
   p <- ncol(x)
   
   # Convert signed to unsigned interactions
-  int <- sort(int)
-  uint <- int %% p + p * (int %% p == 0)
   
   # Generate grid to plot surface over either as raw values or quantiles
   if (is.null(grids)) {
-    g1 <- seq(min(x[,uint[1]]), max(x[,uint[1]]), length.out=grid.size)
-    g2 <- seq(min(x[,uint[2]]), max(x[,uint[2]]), length.out=grid.size)
+    g1 <- seq(min(x[,int[1]]), max(x[,int[1]]), length.out=grid.size)
+    g2 <- seq(min(x[,int[2]]), max(x[,int[2]]), length.out=grid.size)
     g1n <- round(g1, 2)
     g2n <- round(g2, 2)
   } else {
@@ -245,13 +263,8 @@ genSurface <- function(x, y, int, rectangles,
   
   # Evaluate responses over grid based on RF hyperrectangles
   if (is.null(rectangles)) rectangles <- forestHR(read.forest, int, min.nd)
+  if (drop0) rectangles <- filter(rectangles, prediction == 1)
   
-  # Filter class-0 leaf nodes if classification
-  if (is.factor(y)) {
-    rectangles <- filter(rectangles, prediction == 1)
-    y <- as.numeric(y) - 1
-  }
-
   # Take largest decision rule from each tree
   if (filt.rule) {
     rectangles <- group_by(rectangles, tree) %>%
@@ -263,33 +276,25 @@ genSurface <- function(x, y, int, rectangles,
   
   # Evaluate distriution of responses across each decision rule
   grid <- matrix(0, nrow=grid.size, ncol=grid.size)
-  removed <- rep(FALSE, nrow(rectangles))
   
   for (i in 1:nrow(rectangles)) {
     wt <- rectangles$size.node[i]
     
     # Evalaute which observations/grid elements correspond to current HR
     idcs1 <- g1 >= tt[i, 1]
-    x1 <- x[,uint[1]] >= tt[i, 1]
+    x1 <- x[,int[1]] >= tt[i, 1]
     
     idcs2 <- g2 >= tt[i, 2]
-    x2 <- x[,uint[2]] >= tt[i, 2]
+    x2 <- x[,int[2]] >= tt[i, 2]
     
     if (pred.prob) {
       # Evaluate RF predictions for region corresponding to current HR
       yy <- rectangles$prediction[i]
       grid[idcs1, idcs2] <- grid[idcs1, idcs2] + yy * wt
-    } else {
-      # If a region contains no observations, move to next hyperrectangle
-      if (!any(x1 & x2)) {
-        removed[i] <- TRUE
-        next
-      }
-      
-      # Evaluate average response value in regions corresponding to HR
-      grid[idcs1, idcs2] <- grid[idcs1, idcs2] +  mean(y[x1 & x2]) * wt
-      
+    } else {      
       # TODO: adjust this weighting
+      if (any(x1 & x2))
+        grid[idcs1, idcs2] <- grid[idcs1, idcs2] +  mean(y[x1 & x2]) * wt
       if (any(!x1 & x2)) 
         grid[!idcs1, idcs2] <- grid[!idcs1, idcs2] +  mean(y[!x1 & x2]) * wt
       if (any(x1 & !x2))
@@ -300,8 +305,10 @@ genSurface <- function(x, y, int, rectangles,
   }
   
   # Rescale surface for node size and generate corresponding color palette
-  grid <- grid / sum(rectangles$size.node[!removed])
+  nsurface <- sum(rectangles$size.node)
+  if (nsurface != 0) grid <- grid / nsurface
   if (all(grid == 0)) grid <- grid + 1e-3
+  grid <- grid / surf.scale
   rownames(grid) <- g1n
   colnames(grid) <- g2n
   return(grid)
