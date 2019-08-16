@@ -38,7 +38,9 @@
 #' @importFrom data.table data.table
 stabilityScore <- function(x, y,
                            ntree=500,
-                           mtry.select.prob=rep(1, ncol(x)), 
+                           mtry.select.prob=rep(1, ncol(x)),
+                           mtry=if (!is.null(y) && !is.factor(y)) 
+                             max(floor(ncol(x)/3), 1) else floor(sqrt(ncol(x))),
                            ints.idx.eval=NULL,
                            ints.eval=NULL,
                            rit.param=list(depth=5, ntree=500,
@@ -80,7 +82,7 @@ stabilityScore <- function(x, y,
   out <- list()
   for (i in 1:length(bs.sample)) {
     sample.id <- bs.sample[[i]]
-    out[[i]] <- bsgRIT(x, y, mtry.select.prob, sample.id, 
+    out[[i]] <- bsgRIT(x, y, mtry.select.prob, mtry, sample.id, 
                        ints.idx.eval=ints.idx.eval,
                        ints.eval=ints.eval, ntree=ntree, weights=weights, 
                        rit.param=rit.param, varnames.grp=varnames.grp, 
@@ -95,7 +97,7 @@ stabilityScore <- function(x, y,
 }
 
 
-bsgRIT <- function(x, y, mtry.select.prob, sample.id, ints.idx.eval,
+bsgRIT <- function(x, y, mtry.select.prob, mtry, sample.id, ints.idx.eval,
                    ints.eval, weights, ntree, varnames.grp, rit.param,
                    signed, oob.importance, type, n.core, ...) {
 
@@ -108,8 +110,8 @@ bsgRIT <- function(x, y, mtry.select.prob, sample.id, ints.idx.eval,
 
   # Fit random forest on bootstrap sample
   rf <- parRF(x, y, ntree=ntree, n.core=n.core, 
-              mtry.select.prob=mtry.select.prob, type=type, 
-              keep.inbag=oob.importance, ...)
+              mtry.select.prob=mtry.select.prob, mtry=mtry, 
+              type=type, keep.inbag=oob.importance, ...)
   
   # Run generalized RIT on rf.b to learn interactions
   ints <- gRIT(rand.forest=rf, x=x, y=y,
