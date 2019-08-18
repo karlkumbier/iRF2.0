@@ -18,6 +18,7 @@ Imports:
     stringr,
     ranger,
     fastmatch,
+    memoise,
     RColorBrewer,
     rgl
 Suggests:

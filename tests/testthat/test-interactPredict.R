@@ -10,7 +10,7 @@ for (RF in names(RF.collection)) {
   `%<-%` <- `%<-meta.cache%`(suite, RF, TRUE)
 
   rand.forest <- RF.collection[[RF]]
-  read.forest %<-% readForest(rand.forest, x=x)
+  read.forest %<-% readForest(rand.forest, x=x, oob.importance=FALSE)
   info %<-% read.forest$tree.info
 
   test_that('sampleTree works', {

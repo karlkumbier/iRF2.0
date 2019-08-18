@@ -11,12 +11,13 @@ cls <- structure(2L, .Label = c("setosa", "versicolor", "virginica"),
 num <- 50
 
 for (RF in names(RF.collection)) {
-  `%<-cache%` <- `%<-meta.cache%`(suite, RF, FALSE)
-  `%<-verify%` <- `%<-meta.cache%`(suite, RF, TRUE)
+  `%<-%` <- `%<-meta.cache%`(suite, RF, TRUE)
 
   test_that('signed iRF works in the first use case', {
-    fit1.signed %<-cache% iRF(x=x, y=as.factor(y),
-                       select.iter=TRUE, verbose=FALSE)
+    set.seed(42L)
+    fit1.signed %<-% iRF(x=x, y=as.factor(y),
+                         select.iter=TRUE, verbose=FALSE,
+                         oob.importance=FALSE)
     expect_equal(names(fit1.signed),
                  c("rf.list", "selected.iter", "interaction", "weights"))
     expect_true(class(fit1.signed$rf.list) %in%
@@ -34,8 +35,10 @@ for (RF in names(RF.collection)) {
   })
 
   test_that('unsigned iRF works in the first use case', {
-    fit1.unsigned %<-cache% iRF(x=x, y=as.factor(y), select.iter=TRUE,
-                       verbose=FALSE, signed=FALSE)
+    set.seed(42L)
+    fit1.unsigned %<-% iRF(x=x, y=as.factor(y), select.iter=TRUE,
+                           verbose=FALSE, signed=FALSE,
+                           oob.importance=FALSE)
     expect_equal(names(fit1.unsigned),
                  c("rf.list", "selected.iter", "interaction", "weights"))
     expect_true(class(fit1.unsigned$rf.list) %in%
@@ -53,8 +56,10 @@ for (RF in names(RF.collection)) {
   })
   
   test_that('signed iRF works in the second use case', {
-    fit2.signed %<-cache% iRF(x=x, y=as.factor(y),
-                       n.iter=5, int.return=5, verbose=FALSE)
+    set.seed(42L)
+    fit2.signed %<-% iRF(x=x, y=as.factor(y),
+                         n.iter=5, int.return=5, verbose=FALSE,
+                         oob.importance=FALSE)
     expect_equal(names(fit2.signed), c("rf.list", "interaction", "weights"))
     expect_true(class(fit2.signed$rf.list) %in%
                 c('randomForest', 'ranger'))
@@ -69,8 +74,10 @@ for (RF in names(RF.collection)) {
   })
   
   test_that('unsigned iRF works in the second use case', {
-    fit2.unsigned %<-cache% iRF(x=x, y=as.factor(y),
-                       n.iter=5, int.return=5, verbose=FALSE, signed=FALSE)
+    set.seed(42L)
+    fit2.unsigned %<-% iRF(x=x, y=as.factor(y),
+                          n.iter=5, int.return=5, verbose=FALSE, signed=FALSE,
+                          oob.importance=FALSE)
     expect_equal(names(fit2.unsigned), c("rf.list", "interaction", "weights"))
     expect_true(class(fit2.unsigned$rf.list) %in%
                 c('randomForest', 'ranger'))
@@ -85,7 +92,9 @@ for (RF in names(RF.collection)) {
   })
   
   test_that('signed iRF works in the third use case', {
-    fit3.signed %<-cache% iRF(x=x, y=as.factor(y), verbose=FALSE)
+    set.seed(42L)
+    fit3.signed %<-% iRF(x=x, y=as.factor(y), verbose=FALSE,
+                         oob.importance=FALSE)
     expect_equal(names(fit3.signed), c("rf.list", "weights"))
     expect_true(class(fit3.signed$rf.list) %in%
                 c('randomForest', 'ranger'))
@@ -94,8 +103,10 @@ for (RF in names(RF.collection)) {
   })
   
   test_that('unsigned iRF works in the third use case', {
-    fit3.unsigned %<-cache% iRF(x=x, y=as.factor(y),
-                       verbose=FALSE, signed=FALSE)
+    set.seed(42L)
+    fit3.unsigned %<-% iRF(x=x, y=as.factor(y),
+                           verbose=FALSE, signed=FALSE,
+                           oob.importance=FALSE)
     expect_equal(names(fit3.unsigned), c("rf.list", "weights"))
     expect_true(class(fit3.unsigned$rf.list) %in%
                 c('randomForest', 'ranger'))
@@ -104,7 +115,8 @@ for (RF in names(RF.collection)) {
   })
 
   test_that('stabilityScore works', {
-    ss %<-cache% stabilityScore(x, y)
+    set.seed(42L)
+    ss %<-% stabilityScore(x, y, oob.importance=FALSE)
     expect_equal(names(ss),
                  c("int", "prevalence", "precision",
                    "cpe", "sta.cpe", "fsd",
@@ -113,23 +125,23 @@ for (RF in names(RF.collection)) {
   })
   
   test_that('sampleClass works', {
-    set.seed(42)
-    class.labels %<-verify% iris$Species
-    sampled %<-verify% sampleClass(class.labels, cls, num)
+    set.seed(42L)
+    class.labels %<-% iris$Species
+    sampled %<-% sampleClass(class.labels, cls, num)
     expect_equal(length(sampled), num)
     expect_equal(class.labels[sampled], rep(cls, num))
   }) 
   
   test_that('bsSample works for classification', {
-    set.seed(42)
-    bsCls %<-verify% bsSample(iris$Species)
-    sampledCls %<-verify% table(iris[bsCls, 5])
+    set.seed(42L)
+    bsCls %<-% bsSample(iris$Species)
+    sampledCls %<-% table(iris[bsCls, 5])
     expect_equal(as.vector(sampledCls), rep(50L, 3))
   })
   
   test_that('bsSample works for regression', {
-    set.seed(42)
-    bsReg %<-verify% bsSample(mtcars$mpg)
+    set.seed(42L)
+    bsReg %<-% bsSample(mtcars$mpg)
     expect_equal(length(bsReg), nrow(mtcars))
   })
 }

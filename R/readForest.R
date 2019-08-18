@@ -42,7 +42,6 @@ readForest <- function(rand.forest, x,
                        first.split=TRUE,
                        n.core=1) {
 
-  
   # Check for valid input RF
   if (is.null(rand.forest$forest))
     stop('No Forest component in the random forest object')
@@ -107,7 +106,7 @@ readForest <- function(rand.forest, x,
 
   # Aggregate node level metadata
   offset <- cumsum(sapply(rd.forest, function(tt) nrow(tt$tree.info)))
-  offset <- c(0, offset[-length(offset)])
+  offset <- c(0L, offset[-length(offset)])
   out$tree.info <- rbindlist(lapply(rd.forest, function(tt) tt$tree.info))
 
   # Aggregate sparse node level feature matrix
@@ -125,7 +124,7 @@ readForest <- function(rand.forest, x,
   }
 
   # Adjust predicted value for randomForest classification
-  if (class(rand.forest) != 'ranger' &&
+  if (all(class(rand.forest) != 'ranger') &&
       rand.forest$type == 'classification') {
     out$tree.info$prediction <- out$tree.info$prediction - 1
   }
@@ -195,7 +194,7 @@ readTree <- function(rand.forest, k, x, nodes,
     id.obs <- (1:length(id.leaf))[oob.id]
     id.leaf <- id.leaf[oob.id]
     unq.leaf <- sort(unique(id.leaf))
-    if (class(rand.forest) == 'ranger') unq.leaf <- unq.leaf + 1
+    if (any(class(rand.forest) == 'ranger')) unq.leaf <- unq.leaf + 1
     id <- fmatch(unq.leaf, tree.info$node.idx)
     node.obs <- c(by(id.obs, id.leaf, list))
     names(node.obs) <- id
@@ -252,20 +251,19 @@ getParent <- function(tree.info) {
 }
 
 readFeatures <- function(tree.info, varnames.grp,
-                         split.pt=FALSE, first.split=TRUE) {
+                         first.split=TRUE) {
 
   # Pre-allocate variables for path ancestry
   varnames.unq <- unique(varnames.grp)
   p <- length(varnames.unq)
   nlf <- sum(tree.info$status)
-  cur.path <- rep(0L, 2 * p + 1)
+  nodeVarIndices <- fmatch(varnames.grp, varnames.unq)
 
-  # Recursively extract path info for all leaf nodes
-  paths <- ancestorPath(tree.info, varnames.grp, varnames.unq, p=p,
-                        cur.path=cur.path, first.split=first.split)
+  paths <- ancestorPath(tree.info, nodeVarIndices,
+                           p, nlf, first.split)
 
   # Generate sparse matrix of decision path feature selection
-  paths <- Matrix(unlist(paths), nrow=nlf, byrow=TRUE, sparse=TRUE)
+  paths <- Matrix(paths, nrow=nlf, byrow=TRUE, sparse=TRUE)
   rownames(paths) <- paths[,ncol(paths)]
   paths <- paths[, 1:(2 * p)]
 
@@ -275,56 +273,22 @@ readFeatures <- function(tree.info, varnames.grp,
   return(paths)
 }
 
-
-ancestorPath <- function(tree.info, varnames.grp, varnames.unq, p,
-                         cur.path, node.idx=1, first.split=TRUE) {
-
-  # Return path vector if current node is leaf
-  if (tree.info$status[node.idx]) {
-    cur.path[length(cur.path)] <- node.idx
-    return(cur.path)
-  }
-
-  # Extract split feature and threshold for current node
-  id <- tree.info$`split var`[node.idx]
-  sp <- tree.info$`split point`[node.idx]
-  node.var <- which(varnames.grp[id] == varnames.unq)
-
-  # Generate vector indicating threshold for first variable split
-  left.child <- tree.info$`left daughter`[node.idx]
-  left.set <- cur.path
-  if (!first.split || cur.path[node.var + p] == 0) {
-    left.set[node.var] <- sp
-  }
-
-  right.child <- tree.info$`right daughter`[node.idx]
-  right.set <- cur.path
-  if (!first.split || cur.path[node.var] == 0) {
-    right.set[node.var + p] <- sp
-  }
-
-  # Get acncestor path info for child nodes and combine
-  lpath <- ancestorPath(tree.info, varnames.grp, varnames.unq,
-                        p, left.set, left.child, first.split)
-  rpath <- ancestorPath(tree.info, varnames.grp, varnames.unq,
-                        p, right.set, right.child, first.split)
-
-  return(list(lpath, rpath))
-}
-
 nfSparse <- function(rd.forest, offset, p) {
   # Row indices by tree
-  nfRow <- function(rf, oo) rf$node.feature@i + 1 + oo
-  nf.i <- mapply(function(rf, oo) nfRow(rf, oo), rd.forest, offset,
-                 SIMPLIFY=FALSE)
+  nfRow <- function(rf, offset) rf$node.feature@i + 1L + offset
+  nf.i <- mapply(nfRow, rd.forest, offset, SIMPLIFY=FALSE)
+
   # Col indices by tree
   nfCol <- function(rf, p) rep(1:(2 * p), times=diff(rf$node.feature@p))
-  nf.j <- sapply(rd.forest, nfCol, p=p)
+  nf.j <- lapply(rd.forest, nfCol, p=p)
 
   # X values y tree
   nfX <- function(rf) rf$node.feature@x
-  nf.x <- sapply(rd.forest, nfX)
-  return(list(i=unlist(nf.i), j=unlist(nf.j), x=unlist(nf.x)))
+  nf.x <- lapply(rd.forest, nfX)
+
+  return(list(i=.Internal(unlist(nf.i, FALSE, FALSE)),
+              j=.Internal(unlist(nf.j, FALSE, FALSE)),
+              x=.Internal(unlist(nf.x, FALSE, FALSE))))
 }
 
 nobsSparse <- function(rd.forest, offset, tree.info) {
