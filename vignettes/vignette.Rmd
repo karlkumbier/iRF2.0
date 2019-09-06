@@ -156,7 +156,8 @@ features and their interactions.
 
 ### Feature usage on decision paths of large leaf nodes
 Consider a classification example as before. We iteratively grow weighted random
-forests, but save the forest components for further processing.
+forests, but save the forest components and in bag samples for further 
+processing.
 
 ```{r fit_irf2}
 sel.prob <- rep(1/p, p)
@@ -167,7 +168,7 @@ for (iter in 1:4){
   rf[[iter]] <- randomForest(x=X[train.id,], y=Y[train.id], 
                              xtest=X[test.id,], ytest=Y[test.id], 
                              mtry.select.prob=sel.prob, 
-                             keep.forest=TRUE)
+                             keep.forest=TRUE, keep.inbag=TRUE)
 
   # update selection probabilities for next iteration
   sel.prob <- rf[[iter]]$importance / sum(rf[[iter]]$importance)
@@ -227,7 +228,8 @@ fit <- iRF(x=X[train.id,],
            y=Y[train.id], 
            n.iter=5, 
            n.core=n.cores,
-           n.bootstrap=10
+           n.bootstrap=10,
+           int.return=5
         )
 ```
 
