@@ -30,7 +30,7 @@ OSX users may need to intall gfortran to compile. This can be done with the
 following commands:
 
 ```r
-curl -O http://r.research.att.com/libs/gfortran-4.8.2-darwin13.tar.bz2
+curl -OL http://r.research.att.com/libs/gfortran-4.8.2-darwin13.tar.bz2
 sudo tar fvxz gfortran-4.8.2-darwin13.tar.bz2 -C /
 ```
 
