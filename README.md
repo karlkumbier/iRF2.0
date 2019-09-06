@@ -11,7 +11,7 @@ To download and install the package, use `devtools`
 
 ```r
 library(devtools)
-devtools::install_github("sumbose/iRF")
+devtools::install_github("karlkumbier/iRF")
 ```
 Alternatively, the package can be installed by downloading this repository and
 using the command:
