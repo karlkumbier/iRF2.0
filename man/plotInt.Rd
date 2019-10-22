@@ -6,14 +6,16 @@
 \usage{
 plotInt(x, y, int, read.forest, varnames = NULL, qcut = 0.5,
   col.pal = c("#1c3f66", "#306aab", "#6e96c4", "#ffb003", "#ff8300"),
-  xlab = NULL, ylab = NULL, zlab = NULL, range.col = NULL,
-  z.range = c(0, 1), grid.size = 50, min.surface = 100, min.nd = 5,
-  pred.prob = FALSE, filt.rule = TRUE, nc = 2, main = NULL)
+  xlab = NULL, ylab = NULL, zlab = NULL, slab = NULL,
+  range.col = NULL, z.range = c(0, 1), grid.size = 50,
+  min.surface = 100, min.nd = 5, pred.prob = FALSE,
+  plot.enrich = FALSE, filt.rule = TRUE, drop0 = FALSE, nc = 2,
+  main = NULL)
 }
 \arguments{
 \item{x}{numeric feature matrix, with replicate features grouped}
 
-\item{y}{response vector}
+\item{y}{response vector.}
 
 \item{int}{signed interaction to plot. Formatted as 'X1+_X2+_X3-_...'}
 
@@ -29,6 +31,8 @@ colnames(x) are used as feature names.}
 \item{ylab}{y-axis label}
 
 \item{zlab}{z-axis label}
+
+\item{slab}{label for splitting variable}
 
 \item{range.col}{range of response values for color palette}
 
@@ -49,6 +53,14 @@ of random forest thresholds for corresponding features.}
 
 \item{pred.prob:}{if TRUE, z-axis indicates predicted probability from the
 random forest. If false, z-axis indicates distribution of responses y}
+
+\item{plot.enrich:}{used for classification to plot response surface relative
+to proportion of class-1 observation.}
+
+\item{drop0:}{if TRUE, class-0 leaf nodes are removed before plotting
+response surfaces.}
+
+\item{nc:}{number of columns in plot}
 }
 \description{
 Generate response surface plots for a given interaction.

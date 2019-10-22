@@ -52,6 +52,7 @@
 #' @useDynLib iRF, .registration = TRUE
 #' @importFrom Rcpp sourceCpp
 #' @importFrom AUC auc roc
+#' @importFrom tree.interpreter tidyRF MDIoob
 iRF <- function(x, y, 
                 xtest=NULL, 
                 ytest=NULL, 
@@ -134,6 +135,7 @@ iRF <- function(x, y,
 
   class.irf <- is.factor(y)
   imp.str <- ifelse(type == 'ranger', 'variable.importance', 'importance')
+  inbag.str <- ifelse(type == 'ranger', 'inbag.counts', 'inbag')
   
   # Fit a series of iteratively re-weighted RFs 
   rf.list <- list()  
@@ -144,9 +146,15 @@ iRF <- function(x, y,
     rf.list[[iter]] <- parRF(x, y, xtest, ytest, ntree=ntree, n.core=n.core, 
                              type=type, mtry.select.prob=mtry.select.prob, 
                              keep.inbag=oob.importance, ...)
-    
-    # Update feature selection probabilities
-    mtry.select.prob <- rf.list[[iter]][[imp.str]]
+
+    # Update feature selection probabilities with MDI-oob
+    if (is.null(rf.list[[iter]][[inbag.str]])) {
+        warning('keep.inbag = FALSE; failing back to MDI')
+        mtry.select.prob <- rf.list[[iter]][[imp.str]]
+    } else {
+        tidy.RF <- tidyRF(rf.list[[iter]], x, y)
+        mtry.select.prob <- rowSums(MDIoob(tidy.RF, x, y))
+    }
   }
   
 
