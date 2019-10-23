@@ -34,6 +34,27 @@ for (RF in names(RF.collection)) {
     expect_equal(dim(fit1.signed$weights), c(p, 1))
   })
 
+  test_that('signed iRF works in the first use case with oob.importance', {
+    set.seed(42L)
+    fit1.signed.oob %<-% iRF(x=x, y=as.factor(y),
+                         select.iter=TRUE, verbose=FALSE,
+                         oob.importance=TRUE)
+    expect_equal(names(fit1.signed.oob),
+                 c("rf.list", "selected.iter", "interaction", "weights"))
+    expect_true(class(fit1.signed.oob$rf.list) %in%
+                c('randomForest', 'ranger'))
+    expect_true(is.numeric(fit1.signed.oob$selected.iter))
+    expect_equal(length(fit1.signed.oob$selected.iter), 1)
+    expect_true('data.table' %in%
+                class(fit1.signed.oob$interaction))
+    expect_equal(names(fit1.signed.oob$interaction),
+                 c("int", "prevalence", "precision", "cpe",
+                   "sta.cpe", "fsd", "sta.fsd", "mip",
+                   "sta.mip", "stability"))
+    expect_equal(mode(fit1.signed.oob$weights), 'numeric')
+    expect_equal(dim(fit1.signed.oob$weights), c(p, 1))
+  })
+
   test_that('unsigned iRF works in the first use case', {
     set.seed(42L)
     fit1.unsigned %<-% iRF(x=x, y=as.factor(y), select.iter=TRUE,
@@ -53,6 +74,27 @@ for (RF in names(RF.collection)) {
                    "sta.mip", "stability"))
     expect_equal(mode(fit1.unsigned$weights), 'numeric')
     expect_equal(dim(fit1.unsigned$weights), c(p, 1))
+  })
+
+  test_that('unsigned iRF works in the first use case with oob.importance', {
+    set.seed(42L)
+    fit1.unsigned.oob %<-% iRF(x=x, y=as.factor(y), select.iter=TRUE,
+                           verbose=FALSE, signed=FALSE,
+                           oob.importance=TRUE)
+    expect_equal(names(fit1.unsigned.oob),
+                 c("rf.list", "selected.iter", "interaction", "weights"))
+    expect_true(class(fit1.unsigned.oob$rf.list) %in%
+                c('randomForest', 'ranger'))
+    expect_true(is.numeric(fit1.unsigned.oob$selected.iter))
+    expect_equal(length(fit1.unsigned.oob$selected.iter), 1)
+    expect_true('data.table' %in%
+                class(fit1.unsigned.oob$interaction))
+    expect_equal(names(fit1.unsigned.oob$interaction),
+                 c("int", "prevalence", "precision", "cpe",
+                   "sta.cpe", "fsd", "sta.fsd", "mip",
+                   "sta.mip", "stability"))
+    expect_equal(mode(fit1.unsigned.oob$weights), 'numeric')
+    expect_equal(dim(fit1.unsigned.oob$weights), c(p, 1))
   })
   
   test_that('signed iRF works in the second use case', {

@@ -148,12 +148,11 @@ iRF <- function(x, y,
                              keep.inbag=oob.importance, ...)
 
     # Update feature selection probabilities with MDI-oob
-    if (is.null(rf.list[[iter]][[inbag.str]])) {
-        warning('keep.inbag = FALSE; failing back to MDI')
-        mtry.select.prob <- rf.list[[iter]][[imp.str]]
-    } else {
+    if (oob.importance) {
         tidy.RF <- tidyRF(rf.list[[iter]], x, y)
         mtry.select.prob <- rowSums(MDIoob(tidy.RF, x, y))
+    } else {
+        mtry.select.prob <- rf.list[[iter]][[imp.str]]
     }
   }
   
