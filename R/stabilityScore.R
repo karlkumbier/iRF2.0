@@ -139,8 +139,9 @@ bsgRIT <- function(x, y, mtry.select.prob, sample.id, ints.idx.eval,
 
 summarizeInteract <- function(x) {
   # Summarize interaction importance metrics across bootstrap samples 
+  
   n.bootstrap <- length(x)
-  x <- rbindlist(x)
+  x <- rbindlist(cleanIntList(x))
 
   if (nrow(x) > 0) {
     imp <- mutate(x, diff=(prev1-prev0)) %>%
@@ -156,7 +157,7 @@ summarizeInteract <- function(x) {
                 stability=mean(recovered)) %>%
       arrange(desc(cpe))
   } else {
-    nullReturnStab()
+    imp <- nullReturnStab()
   }
 
   return(data.table(imp))
@@ -174,4 +175,11 @@ nullReturnStab <- function() {
                     sta.mip=numeric(0),
                     stability=numeric(0))
   return(out)
+}
+
+cleanIntList <- function(x) {
+  # Drop any empty data frames from interaction list
+  id.drop <- sapply(x, nrow) == 0
+  x <- x[!id.drop]
+  return(x)
 }
