@@ -12,7 +12,10 @@
 parRF <- function(x, y, xtest=NULL, ytest=NULL, ntree=500,
                   n.core=1, mtry.select.prob=rep(1, ncol(x)),
                   type='randomForest', keep.inbag=TRUE, ...) {
-  
+
+  mtry.select.prob <- pmax(mtry.select.prob, 0)  
+  mtry.select.prob <- mtry.select.prob / sum(mtry.seelct.prob)
+
   # Wrapper function to run RF in parallel using randomForest or ranger
   if (type == 'randomForest') {
     rf <- randomForestPar(x, y, xtest, ytest, ntree, n.core, 

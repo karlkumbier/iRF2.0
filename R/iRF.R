@@ -147,7 +147,6 @@ iRF <- function(x, y,
     
     # Update feature selection probabilities
     mtry.select.prob <- rf.list[[iter]][[imp.str]]
-    mtry.select.prob <- mtry.select.prob / sum(mtry.select.prob)
   }
   
 
