@@ -37,7 +37,7 @@ rangerPar <- function(x, y, xtest=NULL, ytest=NULL, ntree=500,
   if (class.irf) y <- as.numeric(y) - 1
   rf <- ranger(data=cbind(x, y), num.trees=ntree, verbose=FALSE,
                dependent.variable.name='y', classification=class.irf,
-               num.threads=n.core, importance='impurity', keep.inbag=keep.inbag,
+               num.threads=n.core, keep.inbag=keep.inbag,
                split.select.weights=mtry.select.prob, ...)
   return(rf)
 }
