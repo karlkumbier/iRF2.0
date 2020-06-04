@@ -42,7 +42,7 @@
 #' @importFrom parallel detectCores
 stabilityScore <- function(x, y,
                            ntree=500,
-                           mtry=int(sqrt(ncol(x))),
+                           mtry=floor(sqrt(ncol(x))),
                            mtry.select.prob=rep(1, ncol(x)), 
                            ints.idx.eval=NULL,
                            ints.eval=NULL,
