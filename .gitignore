@@ -1,6 +1,6 @@
 *.o
 *.so
-*Makevars*
 *.swp
 profile.html
 profile_files/**
+.Rproj.user
