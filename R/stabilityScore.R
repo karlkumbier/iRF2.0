@@ -42,6 +42,7 @@
 #' @importFrom parallel detectCores
 stabilityScore <- function(x, y,
                            ntree=500,
+                           mtry=floor(sqrt(ncol(x))),
                            mtry.select.prob=rep(1, ncol(x)), 
                            ints.idx.eval=NULL,
                            ints.eval=NULL,
@@ -91,12 +92,18 @@ stabilityScore <- function(x, y,
     # Use only 1 core for each bsgRIT, as the loop is already parallelized
     # Note that reproducibility is guaranteed even with ``n.core=n.core'',
     # so feel free to use more cores if you benchmark says otherwise.
-    bsgRIT(x, y, mtry.select.prob, sample.id,
+    bsgRIT(x, y, mtry, mtry.select.prob, sample.id,
            ints.idx.eval=ints.idx.eval,
-           ints.eval=ints.eval, ntree=ntree, weights=weights,
-           rit.param=rit.param, varnames.grp=varnames.grp,
-           signed=signed, oob.importance=oob.importance,
-           n.core=1L, type=type, ...)
+           ints.eval=ints.eval, 
+           ntree=ntree, 
+           weights=weights,
+           rit.param=rit.param, 
+           varnames.grp=varnames.grp,
+           signed=signed, 
+           oob.importance=oob.importance,
+           n.core=1L, 
+           type=type, 
+           ...)
   })
 
   stopImplicitCluster()
@@ -107,7 +114,7 @@ stabilityScore <- function(x, y,
 }
 
 
-bsgRIT <- function(x, y, mtry.select.prob, sample.id, ints.idx.eval,
+bsgRIT <- function(x, y, mtry, mtry.select.prob, sample.id, ints.idx.eval,
                    ints.eval, weights, ntree, varnames.grp, rit.param,
                    signed, oob.importance, type, n.core, ...) {
 
@@ -119,7 +126,7 @@ bsgRIT <- function(x, y, mtry.select.prob, sample.id, ints.idx.eval,
   y <- y[sample.id]
 
   # Fit random forest on bootstrap sample
-  rf <- parRF(x, y, ntree=ntree, n.core=n.core, 
+  rf <- parRF(x, y, ntree=ntree, n.core=n.core, mtry=mtry,
               mtry.select.prob=mtry.select.prob, type=type, 
               keep.inbag=oob.importance, ...)
   
