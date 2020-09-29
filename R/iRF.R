@@ -78,6 +78,8 @@ iRF <- function(x, y,
                 wt.pred.accuracy=NULL,
                 ...) {
  
+  require(doRNG, quiet=TRUE)
+  
   # Check for depricated arguments
   if (!is.null(interactions.return)) {
     warning('interactions.return is depricated, use iter.return instead')
@@ -90,8 +92,7 @@ iRF <- function(x, y,
     warning('wt.pred.accuracy is depricated')
 
   # Check input attributes for correct format
-  require(doRNG, quiet=TRUE)
-  if (!class(x) %in% c('data.frame', 'matrix')) {
+  if (length(intersect(class(x), c('data.frame', 'matrix'))) == 0) {
     sp.mat <- attr(class(x), 'package') == 'Matrix'
     if (is.null(sp.mat) || !sp.mat)
       stop('x must be matrix or data frame')
