@@ -71,8 +71,6 @@ rangerPar <- function(x, y,
 
   dot.args[['importance']] <- NULL
 
-  save(file='~/test.Rdata', x, y, ntree, class.irf, n.core, keep.inbag, mtry, mtry.select.prob, importance, dot.args)
-
   # Run ranger
   rf <- ranger(data=cbind(x, y), 
                num.trees=ntree, 
