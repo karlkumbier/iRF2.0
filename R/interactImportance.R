@@ -64,16 +64,26 @@ subsetTest <- function(int, ints, importance) {
 
   # Evaluate prevalence relative to independent selection
   id <- sapply(int, fmatch, ints)
-  prev.null <- prod(importance$prev1[id])
-  prev <- importance$prev1[id.int]
+  prev.null <- sum(log(importance$prev1[id])) #prod(importance$prev1[id])
+  prev <- log(importance$prev1[id.int])
   prev.test <- prev - prev.null
+  #if (is.infinite(prev.test)) prev.test <- 0
 
   # Determine all s-1 order interactions to evaluate
   ss <- combn(int, length(int) - 1, simplify=FALSE)
   id <- sapply(ss, function(ii) fmatch(list(ii), ints))
-  prec.null <- importance$prec[id]
-  prec <- importance$prec[id.int]
+  prec.null <- log(importance$prec[id])
+  prec <- log(importance$prec[id.int])
   prec.test <- min(prec - prec.null)
+  #if (is.infinite(prec.test)) prec.test <- 0
+
+  # Get prevalence of s-1 subsets
+  #prev.s <-  log(importance$prev1[id])
+  #ss1 <- lapply(ss, function(ii) setdiff(int, ii))
+  #id1 <- sapply(ss1, function(ii) fmatch(list(ii), ints))
+  #prev.1 <- log(importance$prev1[id1])
+  #prev.null <- prev.s + prev.1
+  #prev.test <- min(prev - prev.null)
 
   return(data.table(prev.test=prev.test, prec.test=prec.test))
 }
