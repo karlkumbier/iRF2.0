@@ -148,7 +148,10 @@ summarizeInteract <- function(x) {
   x <- rbindlist(cleanIntList(x))
 
   if (nrow(x) > 0) {
-    imp <- mutate(x, diff=(prev1-prev0)) %>%
+    imp <- mutate(x, diff=(log(prev1)-log(prev0))) %>%
+      filter(!is.infinite(diff)) %>%
+      filter(!is.infinite(prec.test)) %>%
+      filter(!is.infinite(prev.test)) %>%
       group_by(int) %>%
       summarize(prevalence=mean(prev1),
                 precision=mean(prec),
