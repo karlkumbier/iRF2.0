@@ -149,6 +149,9 @@ iRF <- function(x, y,
     # Update feature selection probabilities
     mtry.select.prob <- rf.list[[iter]][[imp.str]]
     mtry <- min(mtry, sum(mtry.select.prob != 0))
+
+    # Set minimum selection probability
+    mtry.select.prob[mtry.select.prob < 1e-5] <- 1e-5
   }
   
 
