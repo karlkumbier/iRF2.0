@@ -92,11 +92,11 @@ iRF <- function(x, y,
     warning('wt.pred.accuracy is depricated')
 
   # Check input attributes for correct format
-  if (length(intersect(class(x), c('data.frame', 'matrix'))) == 0) {
-    sp.mat <- attr(class(x), 'package') == 'Matrix'
-    if (is.null(sp.mat) || !sp.mat)
-      stop('x must be matrix or data frame')
+  x.class <- intersect(class(x), c('matrix', 'data.frame', 'Matrix', "dgCMatrix"))
+  if (length(x.class) == 0) {
+    stop('x must be of class "matrix", "data.frame", or "Matrix"')
   }
+ 
 
   if (nrow(x) != length(y))
     stop('x and y must contain the same number of observations')

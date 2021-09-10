@@ -77,9 +77,8 @@ predAccuracy <- function(y.hat, y) {
   # args:
   #   y.hat: predicted response
   #   y: true response
-  require(AUC)
   if (is.factor(y)) {
-    accuracy <- auc(roc(y.hat, y))
+    accuracy <- AUC::auc(AUC::roc(y.hat, y))
   } else {
     accuracy <- 1 - mean((y - y.hat) ^ 2) / var(y)
     if (accuracy < 0) accuracy <- 0

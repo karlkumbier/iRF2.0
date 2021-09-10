@@ -36,7 +36,7 @@ interactPredict <- function(x, int, read.forest, varnames=NULL, min.nd=1) {
   
   # Get indices for interaction features in <x> and <nf>
   int <- strsplit(int, '_')[[1]]
-  stopifnot(length(int) > 1)
+  #stopifnot(length(int) > 1)
   int.clean <- str_remove_all(int, '[-\\+]')
   int.nf <- int2Id(int, varnames, split=TRUE, signed=TRUE)
   int.x <- int.nf %% p + p * (int.nf %% p == 0)
@@ -44,8 +44,8 @@ interactPredict <- function(x, int, read.forest, varnames=NULL, min.nd=1) {
 
   # Subset node feature matrix and data matrix based on interacting features 
   tree.info <- read.forest$tree.info
-  nf <- read.forest$node.feature[,int.nf]
-  x <- x[,int.x]
+  nf <- read.forest$node.feature[,int.nf, drop=FALSE]
+  x <- x[,int.x, drop=FALSE]
 
   # Determine leaf nodes corresponding to the specified interaction 
   int.nds <- Matrix::rowMeans(nf != 0) == 1
