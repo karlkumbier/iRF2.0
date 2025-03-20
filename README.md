@@ -11,13 +11,13 @@ To download and install the package, use `devtools`
 
 ```r
 library(devtools)
-devtools::install_github("karlkumbier/iRF2.0")
+devtools::install_github("karlkumbier/iRF")
 ```
 Alternatively, the package can be installed by downloading this repository and
 using the command:
 
 ```r
-R CMD INSTALL iRF2.0
+R CMD INSTALL iRF
 ```
 
 You can subsequently load the package with the usual R commands:
