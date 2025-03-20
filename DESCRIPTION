@@ -19,8 +19,7 @@ Imports:
     ranger,
     fastmatch,
     memoise,
-    RColorBrewer,
-    rgl
+    RColorBrewer
 Suggests:
     MASS,
     testthat (>= 2.1.0),

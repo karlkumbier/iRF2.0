@@ -78,6 +78,8 @@ iRF <- function(x, y,
                 wt.pred.accuracy=NULL,
                 ...) {
  
+  require(doRNG, quiet=TRUE)
+  
   # Check for depricated arguments
   if (!is.null(interactions.return)) {
     warning('interactions.return is depricated, use iter.return instead')
@@ -95,6 +97,7 @@ iRF <- function(x, y,
   if (length(x.class) == 0) {
     stop('x must be of class "matrix", "data.frame", or "Matrix"')
   }
+ 
 
   if (nrow(x) != length(y))
     stop('x and y must contain the same number of observations')
