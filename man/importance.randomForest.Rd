@@ -4,8 +4,7 @@
 \alias{importance.randomForest}
 \title{Importance method for random forest}
 \usage{
-\method{importance}{randomForest}(x, type = NULL, class = NULL,
-  scale = TRUE, ...)
+\method{importance}{randomForest}(x, type = NULL, class = NULL, scale = TRUE, ...)
 }
 \description{
 Importance method for random forest

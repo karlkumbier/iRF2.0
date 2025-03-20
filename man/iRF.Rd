@@ -4,14 +4,33 @@
 \alias{iRF}
 \title{Iterative random forests (iRF)}
 \usage{
-iRF(x, y, xtest = NULL, ytest = NULL, n.iter = 5, ntree = 500,
-  mtry.select.prob = rep(1, ncol(x)), iter.return = n.iter,
-  int.return = NULL, select.iter = FALSE, rit.param = list(depth = 5,
-  ntree = 500, nchild = 2, class.id = 1, min.nd = 1, class.cut = NULL),
-  varnames.grp = colnames(x), n.bootstrap = 1, bs.sample = NULL,
-  weights = rep(1, nrow(x)), signed = TRUE, oob.importance = TRUE,
-  type = "randomForest", verbose = TRUE, n.core = 1,
-  interactions.return = NULL, wt.pred.accuracy = NULL, ...)
+iRF(
+  x,
+  y,
+  xtest = NULL,
+  ytest = NULL,
+  n.iter = 5,
+  ntree = 500,
+  mtry = floor(sqrt(ncol(x))),
+  mtry.select.prob = rep(1, ncol(x)),
+  iter.return = n.iter,
+  int.return = NULL,
+  select.iter = FALSE,
+  rit.param = list(depth = 5, ntree = 500, nchild = 2, class.id = 1, min.nd = 1,
+    class.cut = NULL),
+  varnames.grp = colnames(x),
+  n.bootstrap = 1,
+  bs.sample = NULL,
+  weights = rep(1, nrow(x)),
+  signed = TRUE,
+  oob.importance = TRUE,
+  type = "randomForest",
+  verbose = TRUE,
+  n.core = 1,
+  interactions.return = NULL,
+  wt.pred.accuracy = NULL,
+  ...
+)
 }
 \arguments{
 \item{x}{numeric feature matrix.}

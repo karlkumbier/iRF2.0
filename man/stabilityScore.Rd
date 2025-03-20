@@ -4,12 +4,26 @@
 \alias{stabilityScore}
 \title{Stability score}
 \usage{
-stabilityScore(x, y, ntree = 500, mtry.select.prob = rep(1, ncol(x)),
-  ints.idx.eval = NULL, ints.eval = NULL, rit.param = list(depth = 5,
-  ntree = 500, nchild = 2, class.id = 1, min.nd = 1, class.cut = NULL),
-  varnames.grp = NULL, n.bootstrap = 1, bs.sample = NULL,
-  weights = rep(1, nrow(x)), signed = TRUE, oob.importance = TRUE,
-  type = "randomForest", n.core = 1, ...)
+stabilityScore(
+  x,
+  y,
+  ntree = 500,
+  mtry = floor(sqrt(ncol(x))),
+  mtry.select.prob = rep(1, ncol(x)),
+  ints.idx.eval = NULL,
+  ints.eval = NULL,
+  rit.param = list(depth = 5, ntree = 500, nchild = 2, class.id = 1, min.nd = 1,
+    class.cut = NULL),
+  varnames.grp = NULL,
+  n.bootstrap = 1,
+  bs.sample = NULL,
+  weights = rep(1, nrow(x)),
+  signed = TRUE,
+  oob.importance = TRUE,
+  type = "randomForest",
+  n.core = 1,
+  ...
+)
 }
 \arguments{
 \item{x}{numeric feature matrix}

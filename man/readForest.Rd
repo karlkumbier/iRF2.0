@@ -4,9 +4,16 @@
 \alias{readForest}
 \title{Read forest}
 \usage{
-readForest(rand.forest, x, return.node.feature = TRUE,
-  return.node.obs = TRUE, varnames.grp = NULL, oob.importance = TRUE,
-  first.split = TRUE, n.core = 1)
+readForest(
+  rand.forest,
+  x,
+  return.node.feature = TRUE,
+  return.node.obs = TRUE,
+  varnames.grp = NULL,
+  oob.importance = TRUE,
+  first.split = TRUE,
+  n.core = 1
+)
 }
 \arguments{
 \item{rand.forest}{an object of class randomForest.}

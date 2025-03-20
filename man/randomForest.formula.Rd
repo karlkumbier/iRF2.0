@@ -4,8 +4,7 @@
 \alias{randomForest.formula}
 \title{Random forest formula}
 \usage{
-\method{randomForest}{formula}(formula, data = NULL, ..., subset,
-  na.action = na.fail)
+\method{randomForest}{formula}(formula, data = NULL, ..., subset, na.action = na.fail)
 }
 \description{
 Random forest formula

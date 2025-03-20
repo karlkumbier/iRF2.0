@@ -4,11 +4,21 @@
 \alias{gRIT}
 \title{Generalized random intersection trees}
 \usage{
-gRIT(x, y, rand.forest = NULL, read.forest = NULL,
-  rit.param = list(depth = 5, ntree = 500, nchild = 2, class.id = 1,
-  min.nd = 1, class.cut = NULL), varnames.grp = colnames(x),
-  weights = rep(1, nrow(x)), signed = TRUE, oob.importance = TRUE,
-  ints.idx.eval = NULL, ints.eval = NULL, n.core = 1)
+gRIT(
+  x,
+  y,
+  rand.forest = NULL,
+  read.forest = NULL,
+  rit.param = list(depth = 5, ntree = 500, nchild = 2, class.id = 1, min.nd = 1,
+    class.cut = NULL),
+  varnames.grp = colnames(x),
+  weights = rep(1, nrow(x)),
+  signed = TRUE,
+  oob.importance = TRUE,
+  ints.idx.eval = NULL,
+  ints.eval = NULL,
+  n.core = 1
+)
 }
 \arguments{
 \item{x}{numeric feature matrix}
